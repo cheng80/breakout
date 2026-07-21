@@ -86,7 +86,7 @@ describe("핵심 게임 규칙", () => {
     expect(brickPath[1].end.y).toBeCloseTo(FLOOR_Y);
   });
 
-  it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~20개로 제한한다", () => {
+  it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~30개로 제한한다", () => {
     const direction = aimFromDrag({ x: 100, y: 500 }, { x: 330, y: 495 });
     expect(direction).not.toBeNull();
     expect(direction!.y).toBeLessThanOrEqual(-0.28);
@@ -96,7 +96,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.bricks).toHaveLength(8);
     expect(state.bricks.every((brick) => brick.row <= 1 && brick.hp === 1)).toBe(true);
     state.ballCount = 99;
-    expect(MAX_BALLS).toBe(20);
+    expect(MAX_BALLS).toBe(30);
     expect(prepareVolley(state)).toBe(MAX_BALLS);
     expect(state.gameStatus).toBe("volley");
   });
