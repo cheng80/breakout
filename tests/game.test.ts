@@ -18,6 +18,7 @@ describe("핵심 게임 규칙", () => {
     expect(direction!.y).toBeLessThanOrEqual(-0.28);
 
     const state = createGame();
+    expect(state.ballCount).toBe(3);
     state.ballCount = 99;
     expect(prepareVolley(state)).toBe(MAX_BALLS);
     expect(state.gameStatus).toBe("volley");
@@ -33,14 +34,14 @@ describe("핵심 게임 규칙", () => {
     state.bricks = [];
     expect(advanceStageIfCleared(state)).toBe(true);
     expect(state.stage).toBe(2);
-    expect(state.ballCount).toBe(1);
+    expect(state.ballCount).toBe(4);
   });
 
   it("멀티볼, 쉴드, 폭탄 아이템을 규칙대로 적용한다", () => {
     const state = createGame();
     const multiball = state.items.find((item) => item.type === "multiball")!;
     collectItem(state, multiball.id);
-    expect(state.ballCount).toBe(2);
+    expect(state.ballCount).toBe(4);
 
     state.items.push({ id: "shield", row: 1, column: 1, type: "shield" });
     collectItem(state, "shield");

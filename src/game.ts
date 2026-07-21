@@ -52,6 +52,8 @@ const itemTypes: Record<string, ItemType> = {
   S: "shield",
 };
 
+const stageBallCount = (stage: number) => Math.min(MAX_BALLS, stage + 2);
+
 function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const bricks: Brick[] = [];
   const items: Item[] = [];
@@ -75,7 +77,7 @@ export function createGame(): GameState {
   return {
     stage: 1,
     score: 0,
-    ballCount: 1,
+    ballCount: stageBallCount(1),
     launchPosition: { x: BOARD_WIDTH / 2, y: 520 },
     ...stageBoard(1),
     gameStatus: "ready",
@@ -154,7 +156,7 @@ export function advanceStageIfCleared(state: GameState): boolean {
   }
 
   state.stage += 1;
-  state.ballCount = 1;
+  state.ballCount = stageBallCount(state.stage);
   state.shield = false;
   state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };
   Object.assign(state, stageBoard(state.stage));
