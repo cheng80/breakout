@@ -12,6 +12,7 @@ export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 export const SHIELD_REWIND_DURATION = 0.85;
+export const BRICK_HIT_EFFECT_DURATION = 0.18;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
 export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap";
@@ -55,6 +56,12 @@ export function laserEffectFrame(elapsed: number): { spread: number; alpha: numb
     spread: Math.min(1, progress * 3),
     alpha: 1 - progress,
   };
+}
+
+export function brickHitEffectFrame(elapsed: number): { scale: number; alpha: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / BRICK_HIT_EFFECT_DURATION));
+  const pulse = Math.sin(Math.PI * progress);
+  return { scale: 1 + pulse * 0.08, alpha: pulse };
 }
 
 export function shieldRewindFrame(elapsed: number): { offset: number; flash: number } {

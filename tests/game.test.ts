@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BOARD_HEIGHT,
+  BRICK_HIT_EFFECT_DURATION,
   DANGER_ROW,
   DANGER_Y,
   FLOOR_Y,
@@ -15,6 +16,7 @@ import {
   advanceStageIfCleared,
   aimFromDrag,
   bombEffectFrame,
+  brickHitEffectFrame,
   collectItem,
   consumeLaserTriggers,
   createGame,
@@ -32,6 +34,13 @@ describe("핵심 게임 규칙", () => {
     expect(bombEffectFrame(0)).toEqual({ radius: 24, alpha: 1 });
     expect(bombEffectFrame(BOMB_EFFECT_DURATION / 2).radius).toBeGreaterThan(24);
     expect(bombEffectFrame(BOMB_EFFECT_DURATION)).toEqual({ radius: 90, alpha: 0 });
+  });
+
+  it("벽돌 피격 테두리가 한 번 커졌다가 0.18초 안에 사라진다", () => {
+    expect(brickHitEffectFrame(0)).toEqual({ scale: 1, alpha: 0 });
+    expect(brickHitEffectFrame(BRICK_HIT_EFFECT_DURATION / 2)).toEqual({ scale: 1.08, alpha: 1 });
+    expect(brickHitEffectFrame(BRICK_HIT_EFFECT_DURATION).scale).toBeCloseTo(1);
+    expect(brickHitEffectFrame(BRICK_HIT_EFFECT_DURATION).alpha).toBeCloseTo(0);
   });
 
   it("보호막 발동 시 한 칸 내려왔다가 파란 점멸 후 원위치로 돌아간다", () => {
