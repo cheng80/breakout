@@ -7,6 +7,7 @@ export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 9;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const MAX_BALLS = 20;
+export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 
@@ -119,9 +120,9 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   candidates.sort(() => random() - 0.5);
 
   const bricks: Brick[] = [];
-  const baseHp = stage + 1;
+  const baseHp = Math.min(MAX_BRICK_HP, stage + 1);
   candidates.slice(0, targetPairs).forEach(({ row, column }, index) => {
-    const hp = Math.max(1, baseHp + Math.floor(random() * 3) - 1);
+    const hp = Math.min(MAX_BRICK_HP, Math.max(1, baseHp + Math.floor(random() * 3) - 1));
     for (const mirroredColumn of new Set([column, GRID_COLUMNS - 1 - column])) {
       bricks.push({
         id: `s${stage}-b${row}-${mirroredColumn}-${index}`,

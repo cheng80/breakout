@@ -7,6 +7,7 @@ import {
   CELL_HEIGHT,
   GRID_TOP,
   MAX_BALLS,
+  MAX_BRICK_HP,
   LASER_EFFECT_DURATION,
   advanceStageIfCleared,
   aimFromDrag,
@@ -203,8 +204,9 @@ describe("핵심 게임 규칙", () => {
     expect(far.stage).toBe(100);
     expect(far.bricks.length).toBeGreaterThan(0);
     const farHp = far.bricks.filter((brick) => brick.type !== "steel").map((brick) => brick.hp);
-    expect(Math.min(...farHp)).toBeGreaterThanOrEqual(100);
-    expect(Math.max(...farHp)).toBeLessThanOrEqual(102);
+    expect(MAX_BRICK_HP).toBe(50);
+    expect(Math.min(...farHp)).toBeGreaterThanOrEqual(49);
+    expect(Math.max(...farHp)).toBe(50);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {
