@@ -1,542 +1,97 @@
-goal: >-
-  TypeScript, PixiJS 8, CSS, Vite, Vitest와 브라우저 기본 입력·저장 API로
-  키보드·마우스·모바일 터치를 지원하고, 차별화된 5개 스테이지와 적 공격,
-  하트, 중첩·교체형 아이템, 시간·처치 점수, 로컬 최고 점수를 갖춘 싱글플레이
-  웹 벽돌깨기 게임을 구현하여 대표 3개 브라우저 환경의 자동·수동 검증과
-  증빙 체크리스트를 모두 통과한다.
+goal: "모바일 중심의 5스테이지 스와이프 벽돌깨기 웹게임을 완성한다."
 task_type: code
 brownfield_context:
   project_type: greenfield
-  context_references:
-    - path: /Users/cheng80/Desktop/breakout/.ouroboros/pm.md
-      role: reference
-      summary: 승인된 웹 벽돌깨기 제품 기획서
+  context_references: []
   existing_patterns: []
   existing_dependencies: []
-
 constraints:
-  - "[architecture] PixiJS 8의 WebGL 렌더러, TypeScript, CSS, Vite를 사용한다."
-  - "[architecture] 게임 규칙·충돌·상태 전이는 렌더링과 분리한 순수 TypeScript로 구현한다."
-  - "[architecture] 시뮬레이션은 렌더 루프와 분리된 60Hz 고정 timestep을 사용한다."
-  - "[architecture] 입력에는 PixiJS Pointer Events와 DOM Keyboard Events를 사용하고 영속 저장에는 localStorage만 사용한다. 렌더링·레이아웃에 필요한 표준 브라우저 API는 허용한다."
-  - "[architecture] React, Phaser, 백엔드, 데이터베이스, 서버 동기화는 사용하지 않는다."
-  - "[stage_differentiation] 스테이지 2~5는 직전 스테이지와 비교해 blockLayout, obstaclePattern, enemyType, enemyMovement 중 최소 2개가 달라야 하며 blockLayout 외 항목을 최소 1개 포함한다."
-  - "[stage_differentiation] blockLayout 변경은 동일 격자의 점유 셀이 직전 스테이지와 20% 이상 달라야 한다. obstaclePattern은 type enum이 다르고 동일 seed의 600 tick 위치·개폐 trace 중 20% 이상이 달라야 한다. enemyType은 공격 event kind 집합이 달라야 하며, enemyMovement는 동일 seed의 600 tick 위치 trace 평균 거리가 게임판 너비의 10% 이상이어야 한다. 색상·스프라이트 이름만 바꾼 변경은 인정하지 않는다."
-  - "[stage_differentiation] 스테이지 4와 5의 enemyMovement는 각각 직전 스테이지와 다른 enum 값이며 zigzag, delayedDive, feintDive, curveDive 중 하나 이상의 변칙 패턴을 쓴다."
-  - "[stage_differentiation] 장애물은 스테이지 1 고정 벽, 2 이동 벽, 3 개폐 게이트, 4 예고형 하강 위험 장애물, 5 이동·개폐·위험 패턴 조합으로 구성한다. 고정·이동·개폐 장애물은 공을 반사하고 레이저를 차단하며, 공과의 접촉은 피해를 주지 않는다. 위험 장애물은 최소 1초 전에 경고하고 패들과 접촉할 때만 하트 피해를 준다."
-  - "[stage_blueprints] {\"stage\":1,\"blockLayout\":\"basicRows\",\"obstaclePattern\":\"fixedWall\",\"enemyType\":\"basicShooter\",\"enemyMovement\":\"formationAndStraightDive\",\"attackEventKinds\":[\"straightBullet\",\"straightDive\"]}"
-  - "[stage_blueprints] {\"stage\":2,\"blockLayout\":\"splitLanes\",\"obstaclePattern\":\"horizontalWall\",\"enemyType\":\"crossShooter\",\"enemyMovement\":\"alternatingDive\",\"attackEventKinds\":[\"crossBullet\",\"alternatingDive\"]}"
-  - "[stage_blueprints] {\"stage\":3,\"blockLayout\":\"corridorGrid\",\"obstaclePattern\":\"timedGate\",\"enemyType\":\"interceptor\",\"enemyMovement\":\"zigzag\",\"attackEventKinds\":[\"aimedBullet\",\"zigzagDive\"]}"
-  - "[stage_blueprints] {\"stage\":4,\"blockLayout\":\"offsetFortress\",\"obstaclePattern\":\"warnedDropHazard\",\"enemyType\":\"feintAttacker\",\"enemyMovement\":\"delayedDive\",\"attackEventKinds\":[\"spreadBullet\",\"delayedDive\",\"feintDive\"]}"
-  - "[stage_blueprints] {\"stage\":5,\"blockLayout\":\"mixedCore\",\"obstaclePattern\":\"composite\",\"enemyType\":\"eliteMixed\",\"enemyMovement\":\"curveDive\",\"attackEventKinds\":[\"burstBullet\",\"curveDive\",\"feintDive\"]}"
-  - "[item_rules] 블록 파괴 시 seed 기반 RNG로 기본 12% 확률로 아이템 하나를 드롭하며 네 종류의 기본 가중치는 동일하다. 확률·가중치는 config에서 조정하고 테스트 seed를 고정한다."
-  - "[item_rules] item_drop_probability는 유한한 0 이상 1 이하, 각 item_drop_weights 값은 유한한 0 이상이며 네 가중치 합은 0보다 커야 한다. 선택 시 가중치 합으로 정규화한다. NaN·Infinity·음수·범위 초과·가중치 합 0은 fallback하지 않고 npm run validate:config와 build를 종료 코드 1 이상으로 실패시킨다."
-  - "[item_rules] 드롭은 게임판 아래로 벗어나거나 스테이지가 종료되면 소멸하고, 패들과 닿을 때 한 번만 획득된다. 적 처치는 아이템을 드롭하지 않는다."
-  - "[item_rules] 공 증가를 처음 획득하면 활성 공을 2개로 만들고, 동종 재획득 때 단계를 올린 뒤 3개·4개 상한까지 즉시 보충한다. 유실된 일부 공은 다음 획득 전까지 자동 보충하지 않는다. 지속시간 종료 시 가장 오래된 활성 공 하나만 남긴다."
-  - "[item_rules] 공 증가와 레이저가 서로 교체될 때 새 효과는 1단계·12초로 시작한다. 동종 재획득만 최대 3단계까지 증가하며 남은 시간을 12초로 되돌린다."
-  - "[item_rules] 마지막 공 유실로 하트가 차감되면 공 증가·레이저는 해제하지만 아이템 무적은 유지하고 남은 시간이 회복 2초 동안 계속 감소한다. 스테이지 전환은 모든 시간제 아이템을 즉시 해제한다."
-  - "[event_order] 각 tick에서 이동과 충돌을 수집한 뒤 블록·적 피해, 아이템 획득, 점수 반영 순으로 적용한다. 아이템 무적 획득과 피해가 같은 tick이면 무적을 먼저 적용한다."
-  - "[event_order] 마지막 블록 파괴를 판정한 뒤 클리어이면 해당 tick의 피해와 마지막 공 유실을 취소한다. 클리어가 아니면 같은 tick의 복수 피해와 마지막 공 유실을 합쳐 하트를 최대 1개만 차감한다. 그 뒤 recovery·gameOver·transition 상태로 전환한다."
-  - "[damage_rules.damage_sources] [\"enemyBullet\",\"enemyDive\",\"enemyBody\",\"hazardObstacle\"]"
-  - "[damage_rules.life_loss_event] lastBallLost"
-  - "[damage_rules.application] DamageSource 네 값은 아이템 무적과 recovery 면제가 모두 차단한다. lastBallLost는 둘 다 차단하지 않는다. 같은 tick의 DamageSource 0개 이상과 lastBallLost를 하나의 life-loss 후보로 병합해 하트를 최대 1개 차감하고, 남은 하트가 1 이상이면 recovery, 0이면 gameOver로 전환한다."
-  - "[runtime_pause] 튜토리얼·스테이지 전환·document hidden 상태에서는 시뮬레이션 tick, 스테이지 시간, 아이템 시간, 적 생성, 발사 cooldown을 모두 정지하고 입력을 해제한다. visible 복귀 시 hidden 이전 key·pointer 상태는 재사용하지 않는다. ready와 transition 상태는 새 Space keydown 또는 조작 영역에서 새 pointerdown으로 시작한 드래그의 pointerup만 시작 입력으로 인정하고 다른 입력은 무시한다. recovery 상태는 남은 면제 tick부터 재개하고 0이 된 tick에만 공을 자동 발사한다. playing의 레이저는 남은 cooldown부터 재개하며 복귀 즉시 추가 발사하지 않고 이후 cooldown이 0이 된 tick부터 자동 발사한다."
-  - "[runtime_pause] 게임 규칙 모듈은 Math.random을 직접 호출하지 않고 저장 가능한 seed RNG 상태만 사용해 동일 seed·입력·tick에서 같은 드롭과 적 행동을 만든다."
-  - "[balance_defaults.fixed_timestep_hz] 60"
-  - "[balance_defaults.starting_hearts] 3"
-  - "[balance_defaults.maximum_hearts] 5"
-  - "[balance_defaults.recovery_immunity_seconds] 2"
-  - "[balance_defaults.item_invincibility_seconds] 8"
-  - "[balance_defaults.offensive_item_seconds] 12"
-  - "[balance_defaults.offensive_item_max_level] 3"
-  - "[balance_defaults.multiball_active_ball_caps_by_level] [2,3,4]"
-  - "[balance_defaults.laser_interval_ms_by_level] [700,500,350]"
-  - "[balance_defaults.block_points] 100"
-  - "[balance_defaults.enemy_kill_points] 300"
-  - "[balance_defaults.stage_target_seconds] [90,110,130,150,180]"
-  - "[balance_defaults.stage_time_multipliers] [10,12,15,18,22]"
-  - "[balance_defaults.item_drop_probability] 0.12"
-  - "[balance_defaults.item_drop_weights] {\"heart\":1,\"invincibility\":1,\"multiball\":1,\"laser\":1}"
-  - "[balance_defaults.time_bonus_rounding] floor(max(0, targetSeconds * 60 - clearTicks) * stageMultiplier / 60)로 계산하며 모든 점수는 Number.MAX_SAFE_INTEGER 이하의 정수로 포화시킨다."
-  - "[balance_defaults.adjustment_rule] 위 값은 밸런스 조정 대상이다. 구현 중 변경할 때는 config 한 곳, PM의 변경 기록, 관련 자동 테스트 기대값을 같은 변경 단위로 갱신한다. 하트 3~5, 회복 면제 2초, 스테이지 5개, 60Hz는 제품 규칙이라 조정하지 않는다."
-  - "[balance_validation] config 루트와 item_drop_weights는 null이 아닌 plain object, 단계·스테이지 값은 JavaScript number, 단계별·스테이지별 목록은 실제 Array여야 한다. 필수 키 누락, 알 수 없는 키, null, undefined, 빈 문자열, 문자열 숫자, boolean, 잘못된 object·array 타입을 coercion하지 않고 거부한다."
-  - "[balance_validation] fixed_timestep_hz는 정수 60, starting_hearts는 정수 3, maximum_hearts는 정수 5, recovery_immunity_seconds는 유한수 2여야 한다."
-  - "[balance_validation] item_invincibility_seconds와 offensive_item_seconds는 유한수이며 0 초과 60 이하여야 한다. offensive_item_max_level은 1~10의 정수여야 한다."
-  - "[balance_validation] multiball_active_ball_caps_by_level은 offensive_item_max_level과 같은 길이의 배열이며 각 값은 2~10의 정수이고 앞 값보다 커야 한다."
-  - "[balance_validation] laser_interval_ms_by_level은 offensive_item_max_level과 같은 길이의 배열이며 각 값은 50~5000의 유한한 정수이고 앞 값보다 작아야 한다."
-  - "[balance_validation] block_points와 enemy_kill_points는 0 이상 Number.MAX_SAFE_INTEGER 이하 정수다. stage_target_seconds와 stage_time_multipliers는 각각 길이 5이며, 목표 시간은 1~3600의 유한수, 배율은 1~1000000의 정수여야 한다."
-  - "[balance_validation] item_drop_probability는 유한한 0~1이고 네 item_drop_weights는 유한한 0 이상이며 합이 0보다 커야 한다. 필드 누락·추가 배열 원소·길이 불일치· NaN·Infinity·범위·정수성·증감 순서 위반은 validate:config와 build를 실패시킨다."
-  - "[compatibility] 데스크톱 Chrome stable, iPhone Safari stable, Android Chrome stable의 검증일 설치 최신 버전을 사용하고 OS·브라우저의 정확한 버전을 체크리스트에 기록한다. 검증일은 2026-07-21 이후여야 한다."
-  - "[compatibility] 논리 게임판은 720×960(3:4)이며 CSS에서 늘이거나 찌그러뜨리지 않는다. `(orientation: portrait)`에서는 HUD·게임판·160px 논리 높이의 하단 조작 영역을 세로로 쌓고, `(orientation: landscape)`에서는 HUD를 옆 열로 옮기되 게임판과 조작 영역은 같은 열에서 위아래로 유지한다. 컨테이너는 미디어 쿼리와 min()/max()로 100vw·100dvh 안에 맞추고 전체를 중앙 정렬한다."
-  - "[compatibility] 렌더된 게임판 종횡비 오차는 0.5% 이하, 컨테이너 중심 오프셋은 가로·세로 각각 1 CSS px 이하, 잘림은 0건, 문서 스크롤은 0px여야 한다."
-  - "[persistence] 최고 점수 키는 brickBreaker.highScore.v1이며 0 이상 Number.MAX_SAFE_INTEGER 이하의 10진 정수 문자열만 유효하다."
-  - "[persistence] 키가 없거나 값이 빈 문자열·음수·소수·비숫자·안전 정수 초과이면 0으로 복구한다. 다른 버전 키는 읽지 않으며 v1 마이그레이션은 만들지 않는다."
-  - "[persistence] localStorage 읽기·쓰기가 예외를 내면 현재 탭의 메모리 최고 점수를 사용해 게임을 계속하고 새로고침 후 보존은 보장하지 않는다."
-  - "[persistence] 튜토리얼 완료 키는 brickBreaker.tutorialSeen.v1이며 값 1만 유효하다. 키가 없거나 값이 다르면 브라우저 프로필의 첫 게임 시작 전에 자동 표시하고 완료 후 1을 저장한다. 저장 실패 시 현재 탭 메모리에서만 완료 상태를 유지한다."
-  - "[workspace_safety] 구현 시작 전에 git status로 변경 파일을 기록하고 사용자 변경을 수정·삭제· 되돌리지 않는다. 대상 파일에 기존 변경이 겹치면 구현을 중단하고 사용자에게 충돌 파일과 필요한 선택을 보고한다."
-  - "[workspace_safety] 구현 중 검증은 관련 없는 사용자 변경이 있는 작업 공간에서도 수행할 수 있지만, 최종 승인용 npm run verify는 승인 대상 commitSha에서 만든 깨끗한 detached 전용 Worktree에서만 실행한다. 전용 Worktree 생성·삭제는 사용자 작업 공간과 파일을 변경하지 않는다."
-  - "[scope_exclusions] 현재 스테이지 이어하기, 광고형 이어하기, 스테이지 선택, 뉴 게임 플러스"
-  - "[scope_exclusions] 계정, 랭킹, 클라우드 저장, 기기 간 동기화"
+  - "기존 하트·적 공격형 벽돌깨기 명세와 구현은 폐기한다."
+  - "Swipe-JS(https://github.com/paulkim3151/Swipe-JS)의 최소 구현선을 참고한다: 하단 스와이프 조준, pointerup 발사, 벽돌 내구도와 하강."
+  - "SyphonArch/brick_breaker의 volley·멀티볼·첫 공 착지 위치 계승 규칙을 참고한다."
+  - "Google Play Swipe Brick Breaker의 벽돌 하강과 바닥 도달 게임오버 흐름을 참고한다."
+  - "현재 프로젝트의 TypeScript·Vite·PixiJS 의존성만 재사용하고 참고 코드·라이선스는 복제하지 않는다."
+  - "작은 화면에서도 게임판·패들·공·아이템·발사 영역이 잘리지 않는 반응형 UI를 구현한다."
 acceptance_criteria:
-  - description: >-
-      브라우저 프로필의 첫 게임 시작 전에 이미지와 설명문으로 구성된 튜토리얼을
-      자동 표시하고, HUD의 `?` 버튼으로 언제든 다시 열 수 있다. 튜토리얼은
-      키보드 이동·발사, 하단 드래그·pointerup 발사, 하트·무적·공 증가·레이저를
-      이미지 3장 이상과 한국어 본문으로 설명하며 docs/tutorial.md에도 같은 내용을
-      제공한다. 열려 있는 동안 시뮬레이션·게임 타이머를 정지하고 입력을 해제하며,
-      닫은 뒤 새 입력만 받는다. `?` 버튼은 키보드로 활성화되고 접근 가능한 이름
-      `튜토리얼`을 가지며 모든 설명 이미지에 대체 텍스트가 있다. 튜토리얼 저장
-      키가 없거나 값이 1이 아니거나 읽기 예외가 발생하면 안내를 표시하고, 쓰기
-      예외가 발생하면 현재 탭 메모리에서만 완료 상태를 유지한다. 좌우 화살표 또는
-      A/D로 이동하고 Space의 새 keydown으로 발사한다. 포인터는 하단 조작 영역에서
-      시작한 첫 pointer만 캡처해 좌표를 clamp하고 pointerup으로 발사하며, 추가
-      pointer는 무시하고 pointercancel·lostpointercapture는 발사 없이 초기화한다.
-    semantic_ac_key: ac_8cc3d7963e151c17
-    verify_command: npm run verify:ac -- ac_8cc3d7963e151c17
+  - description: "하단 포인터 드래그로 조준선을 표시하고 pointerup 또는 touchend에서 1~8개 공 volley를 발사한다."
+    semantic_ac_key: ac_5087c2052b58c48f
+    verify_command: "npm test -- --run"
+  - description: "공이 벽과 벽돌에 충돌하고 벽돌 내구도가 감소하며 volley 종료 후 벽돌이 한 줄 하강한다. 벽돌이 바닥에 닿으면 게임오버다."
+    semantic_ac_key: ac_023c1d7216b2f94d
+    verify_command: "npm test -- --run"
+  - description: "모든 벽돌 제거 시 다음 스테이지로 이동하고 5번째 스테이지 완료 시 승리·결과 화면을 표시한다."
+    semantic_ac_key: ac_5d4b36a4e4e9d06b
+    verify_command: "npm test -- --run"
+  - description: "폭탄은 주변 3x3 벽돌에 1회 피해, 멀티볼은 다음 volley 공 수를 최대 8개까지 증가, 쉴드는 바닥 손실 1회를 막고 소모된다."
+    semantic_ac_key: ac_f56457967b328aa1
+    verify_command: "npm test -- --run"
+  - description: "데스크톱·모바일 브라우저에서 조작·게임오버·승리 흐름을 확인하고 작은 viewport에서 잘림과 문서 스크롤이 없다."
+    semantic_ac_key: ac_f09bec7285021f1b
+  - description: "프로덕션 빌드와 핵심 게임 규칙 자동 테스트가 정상 완료된다."
+    semantic_ac_key: ac_f9274bd0d2c5649e
+    verify_command: "npm test -- --run && npm run build"
     expected_artifacts:
-      - tests/tutorial.test.ts
-      - tests/input.test.ts
-      - docs/tutorial.md
-      - public/tutorial/keyboard-controls.webp
-      - public/tutorial/pointer-controls.webp
-      - public/tutorial/items-and-hearts.webp
-      - .verification-output/evidence/tutorial
-      - .verification-output/evidence/input
-    output_assertion: 튜토리얼·접근성·저장 오류 복구와 키보드·포인터 경계 입력 검증의 종료 코드 0
-
-  - description: >-
-      대표 3개 환경 모두에서 portrait·landscape 미디어 쿼리가 적용되고 조작 영역은
-      항상 패들 아래에 있다. 720×960 게임판의 렌더 비율 오차는 0.5% 이하,
-      컨테이너 중심 오차는 가로·세로 각각 1 CSS px 이하이며 100vw·100dvh 초과
-      0px, 잘림 0건, 문서 스크롤 0px를 만족한다.
-    semantic_ac_key: ac_e273d7cf364c8f3a
-    verify_command: npm run verify:ac -- ac_e273d7cf364c8f3a
-    expected_artifacts:
-      - tests/layout.test.ts
-      - .verification-output/evidence/layout
-    output_assertion: portrait·landscape 크기·비율·중앙 정렬·무스크롤 테스트와 연결 증빙 검증의 종료 코드 0
-
-  - description: >-
-      blockLayout·obstaclePattern·enemyType·enemyMovement와 attackEventKinds가
-      stage_blueprints와 일치하는 5개 스테이지를 순서대로 플레이한다. 인접 스테이지는
-      블록 점유 셀 대칭차 20%, type이 다른 장애물과 type을 제외한 trace 20%, 적
-      이동 trace 10%, 서로 다른 공격 event 집합의 정량 기준을 만족한다. 4·5
-      스테이지는 각각 delayedDive와 curveDive를 포함해 후반 변칙 행동을 제공한다.
-    semantic_ac_key: ac_c59bf9cfe54effaf
-    verify_command: npm run verify:ac -- ac_c59bf9cfe54effaf
-    expected_artifacts:
-      - tests/stages-combat.test.ts
-      - .verification-output/evidence/stages
-    output_assertion: 자동 테스트와 연결된 5개 스테이지 완주·차별화 체크리스트·증빙 검증의 종료 코드 0
-
-  - description: >-
-      공은 블록·적에게 피해 후 반사되고 장애물에는 무해하게 반사되며, 레이저는
-      블록·적의 첫 충돌 또는 장애물 차단 시 관통 없이 소멸한다. 모든 블록 파괴 시
-      적이 남아 있어도 클리어하고 같은 tick의 치명적 피해·마지막 공 유실보다
-      클리어를 우선한다. 하트 3개로 시작하며 마지막 공 유실 또는 네 피해원이 같은
-      tick에 여러 번 발생해도 하트를 최대 1개 차감한다. 하트가 남으면 적·블록을
-      유지하고 중앙 패들·공 1개로 2초 면제 후 자동 발사하며, 하트 0이면 즉시
-      gameOver가 된다.
-    semantic_ac_key: ac_0d3a0de75da951ec
-    verify_command: npm run verify:ac -- ac_0d3a0de75da951ec
-    expected_artifacts:
-      - tests/damage-life-cycle.test.ts
-      - tests/collision-clear-priority.test.ts
-      - .verification-output/evidence/combat
-      - .verification-output/evidence/damage
-    output_assertion: 충돌·클리어 우선순위·하트 차감·회복·gameOver 검증의 종료 코드 0
-
-  - description: >-
-      블록은 seed RNG 기본 12% 확률과 동일 가중치로 하트·무적·공 증가·레이저를
-      드롭하고 패들 접촉에서 한 번만 획득한다. 하트는 다른 효과를 바꾸지 않고 최대
-      5개, 무적은 8초 동안 네 피해원만 막고 다른 효과와 독립이다. 공 증가와
-      레이저는 서로 교체되며 새 종류는 1단계·12초, 동종 재획득은 최대 3단계와
-      12초 리셋을 적용한다. 공 증가 만료 시 공 하나만 남기고 레이저 만료 시 자동
-      발사를 중단한다. 생명 손실 시 공격 아이템은 해제하되 남은 무적 시간은 회복
-      중에도 감소하고, 스테이지 전환 시 모든 시간제 효과를 해제한다.
-    semantic_ac_key: ac_12160888720808e2
-    verify_command: npm run verify:ac -- ac_12160888720808e2
-    expected_artifacts:
-      - tests/items.test.ts
-      - .verification-output/evidence/items
-    output_assertion: 드롭·획득·최대 하트·무적·공 증가·레이저의 교체·중첩·만료 검증의 종료 코드 0
-
-  - description: >-
-      스테이지 시간은 첫 공 발사부터 마지막 블록 파괴까지 측정하고 2초 회복
-      대기는 포함하되 튜토리얼·전환 시간은 제외한다. 총점은 블록 점수, 적 처치
-      점수, 각 스테이지의 floor(max(0, 목표 초×60-클리어 tick)×배율/60)을
-      합산하고 안전 정수 상한에서 포화시킨다.
-      최고 점수는 유효한 localStorage 값에서 복원하고 현재 점수가 초과할 때
-      갱신한다. 키 없음·빈 값·음수·소수·비숫자·안전 정수 초과는 0으로 복구하며,
-      읽기·쓰기 예외에서는 현재 탭 메모리 최고 점수로 계속한다. 게임 오버 화면에는 현재·최고 점수와 재시작을, 5스테이지 완료
-      화면에는 최종·최고 점수, 총 플레이 시간, 스테이지별 시간, 적 처치 보너스
-      합계, 시간 보너스 합계, 재시작을 표시한다.
-    semantic_ac_key: ac_a55f3dd6516724cc
-    verify_command: npm run verify:ac -- ac_a55f3dd6516724cc
-    expected_artifacts:
-      - tests/scoring-time-storage.test.ts
-      - .verification-output/evidence/scoring
-      - .verification-output/evidence/results
-    output_assertion: 결과 화면·점수 정수성·모든 잘못된 저장값·읽기·쓰기 예외와 메모리 fallback 검증의 종료 코드 0
-
-  - description: >-
-      스테이지 전환 시 누적 점수와 현재 하트만 유지하고 아이템·잔여 적·탄환·드롭·
-      공·레이저·입력을 초기화한다. 전환 중 시뮬레이션, 점수, 스테이지 시간,
-      생성·쿨다운을 정지하고 이전 입력을 해제한 뒤 새 Space 또는 새 드래그 후
-      pointerup에서 다음 스테이지와 공을 동시에 시작한다. 하트가 0이면 게임
-      오버가 되며 게임 오버 또는 5스테이지 완료 후 재시작은 스테이지 1, 점수 0,
-      하트 3, 아이템 없음으로 시작하고 유효한 최고 점수만 유지한다.
-    semantic_ac_key: ac_7fd6b13d07d999f4
-    verify_command: npm run verify:ac -- ac_7fd6b13d07d999f4
-    expected_artifacts:
-      - tests/transitions-endings.test.ts
-      - .verification-output/evidence/transitions
-      - .verification-output/evidence/final
-    output_assertion: 전환·게임 오버·완료 재시작 테스트와 연결 체크리스트·증빙 검증의 종료 코드 0
-
+      - dist
 ontology_schema:
-  name: BrickBreakerGameRun
-  description: 5스테이지 게임 런의 사용자 가시 상태와 검증 계약
+  name: SwipeBrickBreakerGame
+  description: "스와이프 발사, volley, 벽돌 내구도·하강, 아이템, 스테이지와 승패를 표현하는 게임 모델"
   fields:
-    - {name: gameStatus, type: string, required: true, description: tutorial|ready|playing|recovery|transition|gameOver|complete}
-    - {name: tutorialState, type: object, required: true, description: localStorage 완료 상태·자동 표시·도움말 버튼·열림·이미지·문서·접근성·일시정지 상태}
-    - {name: layoutState, type: object, required: true, description: orientation·720×960 gameBoard·160px controlArea·viewport·rendered 크기·aspectRatioError·centerOffset·clippingCount·documentScrollPx}
-    - {name: simulationClock, type: object, required: true, description: 60Hz tick·정지 여부·stage elapsed time}
-    - {name: stageNumber, type: number, required: true, description: 1~5}
-    - {name: stageConfiguration, type: object, required: true, description: blockLayout·obstaclePattern·enemyType·enemyMovement·attackEventKinds·balance 값}
-    - {name: score, type: number, required: true, description: 현재 런의 0 이상 안전 정수 누적 점수}
-    - {name: highScoreRecord, type: object, required: true, description: v1 저장 키·값·memoryFallback 상태}
-    - {name: hearts, type: number, required: true, description: 0~5}
-    - {name: paddle, type: object, required: true, description: 위치·이동·부착 공 상태}
-    - {name: balls, type: array, required: true, description: 활성 공의 위치·속도·상태}
-    - {name: blocks, type: array, required: true, description: 블록의 위치·체력·파괴 상태}
-    - {name: obstacles, type: array, required: true, description: 파괴 불가 장애물의 위치·접촉 상태}
-    - {name: enemies, type: array, required: true, description: 적의 체력·movement·attack 상태}
-    - {name: projectiles, type: array, required: true, description: 적 총알과 패들 레이저 상태}
-    - {name: itemDrops, type: array, required: true, description: invincibility|heart|multiball|laser 드롭 위치·획득 상태}
-    - {name: itemEffects, type: object, required: true, description: 무적·공 증가·레이저의 단계·종료 tick}
-    - {name: rngState, type: object, required: true, description: 아이템 드롭·적 행동에 쓰는 직렬화 가능한 seed RNG 상태}
-    - {name: eventQueue, type: array, required: true, description: 한 tick의 충돌·획득·점수·생명 손실·전환 이벤트와 적용 순서}
-    - {name: damageState, type: object, required: true, description: DamageSource enemyBullet|enemyDive|enemyBody|hazardObstacle·lastBallLost·병합 tick·면제 종료 tick}
-    - {name: inputState, type: object, required: true, description: 키보드·activePointerId·pointer capture·clamped drag·cancel·fresh launch 상태}
-    - {name: stageClearTicks, type: array, required: true, description: 완료한 스테이지별 60Hz 기준 0 이상 정수 tick}
-    - {name: stageTimes, type: array, required: true, description: stageClearTicks를 60으로 나눈 표시용 초}
-    - {name: scoreBreakdown, type: object, required: true, description: 블록·적 처치·시간 보너스 합계}
-    - {name: finalStatistics, type: object, required: false, nullableUntil: gameStatus=complete, finalRequiredWhen: gameStatus=complete, description: 최종·최고 점수·총 시간·스테이지별 시간·보너스 합계}
-    - {name: transitionState, type: object, required: true, description: 정지·정리·새 입력 대기 상태}
-    - {name: evidenceChecklist, type: "array<EvidenceChecklistRow>", required: true, description: 필수 수동 검증 행}
-    - {name: approvalRecord, type: ApprovalRecord, required: false, nullableUntil: finalApproval, finalRequiredWhen: exitCondition=finalApproval, description: 기획 책임자 최종 승인}
-    - {name: targetManifest, type: TargetManifest, required: false, nullableUntil: buildManifestComplete, finalRequiredWhen: verificationStarted, description: 검증 대상 식별자}
-  definitions:
-    EvidenceChecklistRow:
+    - name: stage
+      type: number
+      description: 현재 스테이지
+      required: true
+    - name: score
+      type: number
+      description: 누적 점수
+      required: true
+    - name: ballCount
+      type: number
+      description: 현재 volley 공 수
+      required: true
+    - name: launchPosition
       type: object
-      fields:
-        testId: {type: string, required: true, format: "^[A-Z]+(?:-[A-Z]+)*-[0-9]{2}$"}
-        environmentAndExactVersion: {type: EnvironmentDescriptor, required: true}
-        orientation: {type: string, required: true, enum: [portrait, landscape]}
-        precondition: {type: string, required: true, minLength: 1}
-        steps: {type: "array<string>", required: true, minItems: 1}
-        expected: {type: string, required: true, minLength: 1}
-        actual: {type: string, required: true, nullableUntilExecution: true}
-        verdict: {type: string, required: true, enum: [pass, fail], nullableUntilExecution: true}
-        evidencePath: {type: string, required: true, prefix: .verification-output/evidence/, nullableUntilExecution: true}
-        verifier: {type: string, required: true, minLength: 1, nullableUntilExecution: true}
-        verifiedAt: {type: string, required: true, format: RFC3339, minimum: "2026-07-21T00:00:00+09:00", mustBeOnOrAfter: targetManifest.generatedAt, nullableUntilExecution: true}
-        seedVersion: {type: string, required: true, format: semver}
-        buildId: {type: string, required: true, format: "^[0-9a-f]{64}$"}
-        commitSha: {type: string, required: true, format: "^[0-9a-f]{40}$"}
-        approvalRecordPath: {type: string, required: true, const: .verification-output/approval.json, nullableUntilExecution: true}
-      final_validation: actual·verdict·evidencePath·verifier·verifiedAt·approvalRecordPath는 null일 수 없다.
-    EnvironmentDescriptor:
-      type: object
-      fields:
-        osName: {type: string, required: true, enum: [macOS, iOS, Android]}
-        osVersion: {type: string, required: true, format: "^[0-9]+(?:\\.[0-9]+){1,2}$"}
-        browserName: {type: string, required: true, enum: [Chrome, Safari]}
-        browserVersion: {type: string, required: true, format: "^[0-9]+(?:\\.[0-9]+){1,3}$"}
-        deviceModel: {type: string, required: true, minLength: 1}
-      allowed_pairs: [macOS+Chrome, iOS+Safari, Android+Chrome]
-    ApprovalRecord:
-      type: object
-      fields:
-        approverId: {type: string, required: true, minLength: 1}
-        approverRole: {type: string, required: true, const: productOwner}
-        approvedAt: {type: string, required: true, format: RFC3339}
-        seedVersion: {type: string, required: true, format: semver}
-        buildId: {type: string, required: true, format: "^[0-9a-f]{64}$"}
-        commitSha: {type: string, required: true, format: "^[0-9a-f]{40}$"}
-        verdict: {type: string, required: true, const: pass}
-        evidenceRoot: {type: string, required: true, const: .verification-output/evidence/}
-    TargetManifest:
-      type: object
-      fields:
-        seedId: {type: string, required: true, minLength: 1}
-        seedVersion: {type: string, required: true, format: semver}
-        commitSha: {type: string, required: true, format: "^[0-9a-f]{40}$"}
-        buildId: {type: string, required: true, format: "^[0-9a-f]{64}$"}
-        generatedAt: {type: string, required: true, format: RFC3339}
-
-verification_contract:
-  common_expected_artifacts:
-    - docs/acceptance-checklist.md
-    - .verification-output/target-manifest.json
-    - .verification-output/acceptance-results.json
-    - .verification-output/approval.json
-    - tests/runtime-pause.test.ts
-    - tests/verification-idempotency.test.ts
-    - verification/approvers.json
-  execution_safety:
-    verification_worktree: >-
-      repoKey는 원본 repo realpath UTF-8 바이트 SHA-256의 앞 16자리다. 승인 대상
-      commitSha를 ${TMPDIR}/breakout-verify-<repoKey>-<commitSha>의 detached Git
-      Worktree로 checkout하고 그 경로에서만 최종 검증을 실행한다. 소유 marker는
-      Worktree 밖 ${HOME}/.ouroboros/verification-worktrees/<repoKey>/<commitSha>.json에
-      repo realpath·worktree realpath·commitSha·seedVersion을 기록한다. 경로가 이미
-      있으면 marker 네 값, git rev-parse HEAD, clean tracked 상태가 모두 일치할 때만
-      재사용하고 .verification-output/.tmp/<runId>만 제거한다.
-      하나라도 다르면 기존 경로를 삭제·변경하지 않고 실패해 새 경로 선택을 요구한다.
-      marker는 Worktree 밖이므로 상태 검사 대상이 아니다. 시작 직후 ignored
-      .verification-output을 제외한 git status --porcelain --untracked-files=all이
-      비어 있어야 하며 사용자 구현 Worktree는 변경하지 않는다.
-      중단 시 Worktree와 marker를 남겨 같은 runId로 재개한다.
-    atomic_outputs: >-
-      runId는 <commitSha>-<seedVersion>이다. dist는 같은 파일시스템의
-      dist.tmp-<runId>에 완전히 빌드한 뒤 기존 ignored dist를 제거하고 rename한다.
-      manifest와 acceptance-results JSON은 .verification-output/.tmp/<runId>/에
-      완전히 쓰고 close한 뒤 최종 경로로 rename한다. 시작 시 해당 runId의 임시
-      경로만 제거한다. 중단 시 최종 경로에는 이전 완성본 또는 파일 없음만 남고
-      부분 파일은 노출하지 않는다. 같은 commitSha·seedVersion 재실행은 같은
-      buildId와 필수 행 집합을 만들며 안전하게 덮어쓴다. 승인자가 작성한
-      approval.json과 evidence 파일은 자동 삭제·덮어쓰지 않는다.
-    durable_archive: >-
-      ${HOME}/.ouroboros/verification-archive/<repoKey>/<commitSha>/<buildId>/를
-      원본 repo 밖 영구 보존 경로로 사용한다. 검증 시작 시 같은 archive가 있으면 evidence와
-      approval.json만 검증 Worktree로 반입한다. 성공 시 .verification-output 전체를
-      ${HOME}/.ouroboros/verification-archive/<repoKey>/.tmp/<runId>/에 복사·검증한 뒤 최종 archive 경로로
-      rename하고, archive 완성을 확인한 뒤에만 임시 Worktree를 제거한다. 중단 시
-      Worktree를 유지하며 archive의 기존 완성본과 원본 repo는 변경하지 않는다.
-  automated:
-    phases:
-      prepare:
-        command: npm run verify:prepare
-        steps:
-          - npm run validate:config
-          - npm run test -- --run
-          - npm run verify:determinism
-          - npm run typecheck
-          - npm run build
-          - npm run build:manifest
-        success: 종료 코드 0과 target manifest 생성
-      manual_gate:
-        input: prepare가 만든 commitSha·seedVersion·buildId
-        action: 필수 test matrix를 실행하고 evidence·acceptance-results·approval을 작성한다.
-        completion: 모든 필수 행 pass와 유효한 productOwner 승인
-      finalize:
-        command: npm run verify:finalize
-        steps:
-          - 현재 HEAD·Seed metadata·dist buildId를 target manifest와 재대조
-          - npm run verify:evidence
-        success: 종료 코드 0과 durable archive 완료
-      command_alias: npm run verify는 manifest가 없으면 prepare만 실행해 manual_gate 필요 상태를 출력하고 종료 코드 2를 반환하며, manifest와 수동 산출물이 모두 있으면 finalize를 실행한다.
-    per_acceptance_command: >-
-      npm run verify:ac -- <semantic_ac_key>는 해당 자동 테스트와 그 기준에 연결된
-      전용 expected_artifacts 및 공통 expected_artifacts의 존재·식별자·pass 상태를
-      함께 검사한다.
-    timeout_seconds_per_step: 300
-    deterministic_check: >-
-      네트워크를 사용하지 않고 동일 random seed, 초기 상태, 입력 이벤트와 1000개
-      고정 tick을 두 번 실행해 직렬화한 최종 상태가 같아야 한다. 테스트 전체는
-      선언 순서와 역순 두 번 실행해 결과가 같아야 한다.
-    stage_difference_check: >-
-      verify:ac은 인접 스테이지를 동일 seed로 첫 적 생성부터 600 tick 실행한다.
-      매 tick 장애물과 적을 stable spawnOrder 오름차순으로 정렬하고 같은 index끼리
-      대응시킨다. 한쪽에만 있는 index의 차이는 1이다. 분모 D는 600 tick 각각의
-      max(양쪽 개체 수, 1)을 모두 더한 값이다. blockLayout 차이율은 두 스테이지의
-      점유 셀 대칭차 크기/max(점유 셀 합집합 크기, 1)이며 0.20 이상이어야 한다.
-      obstaclePattern type enum은 인접 스테이지끼리 다른지 별도 boolean으로 검사한다.
-      장애물 trace는 type을 제외하고 open·active 중 하나가 다르거나
-      sqrt(((xA-xB)/720)^2+((yA-yB)/960)^2)가 0.05 이상이면 차이 1, 아니면
-      0이며 전체 차이 합/D가 0.20 이상이어야 한다. 적 쌍은 누락 시
-      거리 1, 존재 시 min(1, sqrt((xA-xB)^2+(yA-yB)^2)/720)로 계산하고 전체
-      거리 합/D가 0.10 이상이어야 한다. attackEventKinds는 stage_blueprints의
-      집합과 실제 600 tick event kind 집합이 정확히 같고 인접 스테이지끼리 달라야 한다.
-    target_manifest:
-      path: .verification-output/target-manifest.json
-      generation: >-
-        npm run build 뒤 npm run build:manifest가 Node.js 표준 crypto만 사용해 만든다.
-        seedId와 seedVersion은 현재 Seed metadata에서, commitSha는 git rev-parse HEAD의
-        40자리 lowercase hex에서 읽는다. LP(x)는 uint64 big-endian 바이트 길이와
-        x 바이트의 결합이다. dist 파일은 상대 경로 UTF-8 바이트의 사전순으로 정렬한다.
-        buildId 입력은 LP(seedVersion UTF-8) || LP(commitSha UTF-8) ||
-        uint64be(fileCount) || 각 파일의 LP(relativePath UTF-8) || LP(fileBytes)를
-        순서대로 결합한 값이며, 그 SHA-256 lowercase 64자리를 buildId로 사용한다.
-        manifest는 seedId, seedVersion, commitSha, buildId, generatedAt을 가진다.
-        .verification-output/ 전체는 .gitignore에 포함한 비추적 생성 경로이며
-        checklist의 실제 결과와 승인 기록도 각각 acceptance-results.json과
-        approval.json에 저장한다. docs/acceptance-checklist.md는 추적되는 절차
-        템플릿만 포함하고 실행 결과·SHA를 기록하지 않는다.
-      validation: >-
-        verify:evidence는 .verification-output/이 .gitignore에 없거나
-        git status --porcelain --untracked-files=all이 비어 있지 않으면 fail이다. 현재
-        .ouroboros/seed.yaml의 metadata.seed_id·version과 실제 git rev-parse HEAD를
-        직접 읽어 manifest의 seedId·seedVersion·commitSha와 각각 비교하고 dist에서
-        buildId를 다시 계산한다. manifest가 없거나 필드 형식·현재 값·재계산 값이
-        다르거나 증빙 행의 seedVersion·commitSha·buildId가 manifest와 하나라도
-        다르면 fail이다.
-  manual:
-    environments:
-      - desktop Chrome stable keyboard and mouse
-      - real iPhone Safari stable touch
-      - real Android Chrome stable touch
-    groups:
-      - 튜토리얼과 접근성
-      - 키보드·마우스·터치 입력
-      - 반응형 레이아웃
-      - 5스테이지 완주와 차별화
-      - 네 피해원·마지막 공 유실·아이템 무적·2초 회복 면제
-      - 아이템 중첩·교체·피격 해제
-      - 점수·시간·최고 점수
-      - 전환·게임 오버·완료·재시작
-    environment_aliases:
-      desktop: desktop Chrome stable
-      iphone: real iPhone Safari stable
-      android: real Android Chrome stable
-    environment_validation: >-
-      alias를 실제 EvidenceChecklistRow로 확장할 때 EnvironmentDescriptor를 사용한다.
-      desktop은 macOS+Chrome, iphone은 iOS+Safari, android는 Android+Chrome 조합만
-      허용한다. OS·브라우저 버전은 숫자 점 표기와 실제 기기 모델을 필수로 하며
-      verifiedAt은 2026-07-21T00:00:00+09:00 이상이고 targetManifest.generatedAt과
-      같거나 이후여야 한다. 시간 비교는 RFC3339를 UTC instant로 변환해 수행한다.
-    primary_orientations:
-      desktop: landscape
-      iphone: portrait
-      android: portrait
-    required_test_matrix:
-      - {group: 튜토리얼과 접근성, testIds: [TUT-01, TUT-02], environments: [desktop, iphone, android], orientations: [portrait, landscape]}
-      - {group: 키보드·마우스·터치 입력, testIds: [CTL-KB-01, CTL-MOUSE-01], environments: [desktop], orientations: [landscape]}
-      - {group: 키보드·마우스·터치 입력, testIds: [CTL-TOUCH-01], environments: [iphone, android], orientations: [portrait, landscape]}
-      - {group: 반응형 레이아웃, testIds: [LAY-01], environments: [desktop, iphone, android], orientations: [portrait, landscape]}
-      - {group: 5스테이지 완주와 차별화, testIds: [STG-01], environments: [desktop, iphone, android], orientations: [primary]}
-      - {group: 네 피해원·마지막 공 유실·아이템 무적·2초 회복 면제, testIds: [DMG-01, DMG-INV-01], environments: [desktop, iphone, android], orientations: [primary]}
-      - {group: 아이템 중첩·교체·피격 해제, testIds: [ITM-01], environments: [desktop, iphone, android], orientations: [primary]}
-      - {group: 점수·시간·최고 점수, testIds: [SCR-01], environments: [desktop, iphone, android], orientations: [primary]}
-      - {group: 전환·게임 오버·완료·재시작, testIds: [END-01], environments: [desktop, iphone, android], orientations: [primary]}
-    test_definitions:
-      TUT-01:
-        precondition: brickBreaker.tutorialSeen.v1 키가 없고 게임이 시작 전 상태다.
-        steps: ["게임을 로드한다.", "자동 튜토리얼의 이미지·본문·대체 텍스트를 확인한다.", "튜토리얼을 닫는다."]
-        expected: 최초 튜토리얼이 자동 표시되고 진행 시간이 정지하며 닫은 뒤 완료값 1이 저장된다.
-      TUT-02:
-        precondition: brickBreaker.tutorialSeen.v1 값이 1이고 HUD가 표시된 상태다.
-        steps: ["게임을 로드해 자동 표시가 없음을 확인한다.", "키보드 또는 탭으로 튜토리얼 ? 버튼을 활성화한다.", "튜토리얼을 닫는다."]
-        expected: 자동 표시는 없고 ? 버튼으로 안내가 열리며 닫은 뒤 새 입력만 처리한다.
-      CTL-KB-01:
-        precondition: 데스크톱 환경의 ready 상태에서 공이 패들에 붙어 있다.
-        steps: ["좌우 화살표와 A/D로 각각 이동한다.", "Space keydown으로 발사한다.", "키를 누른 채 visibility를 전환한 뒤 복귀한다."]
-        expected: 두 키 조합이 패들을 이동하고 새 Space만 발사하며 복귀 전 held 입력은 재사용하지 않는다.
-      CTL-MOUSE-01:
-        precondition: 데스크톱 환경의 ready 상태이며 조작 영역이 표시돼 있다.
-        steps: ["조작 영역에서 마우스 드래그한다.", "영역 밖까지 이동해 pointerup한다.", "pointercancel을 별도로 발생시킨다."]
-        expected: 좌표가 경계로 clamp되고 캡처된 pointerup은 발사하며 pointercancel은 발사 없이 초기화한다.
-      CTL-TOUCH-01:
-        precondition: 터치 환경의 ready 상태이며 조작 영역이 표시돼 있다.
-        steps: ["첫 손가락으로 드래그한다.", "두 번째 손가락을 추가한다.", "첫 손가락을 뗀 뒤 pointercancel도 별도로 시험한다."]
-        expected: 첫 pointer만 패들을 움직이고 추가 터치는 무시되며 첫 pointerup만 발사하고 cancel은 발사하지 않는다.
-      LAY-01:
-        precondition: 지정 환경에서 게임이 로드되고 해당 orientation으로 회전 또는 크기 조정됐다.
-        steps: ["viewport와 컨테이너·게임판 rect를 측정한다.", "조작 영역이 패들 아래인지 확인한다.", "clipping과 document scroll을 측정한다."]
-        expected: 게임판 비율 오차 0.5% 이하, 중심 오차 1 CSS px 이하이며 viewport 초과·잘림·문서 스크롤이 0이다.
-      STG-01:
-        precondition: 새 게임의 스테이지 1에서 seed를 고정한 상태다.
-        steps: ["스테이지 1부터 5까지 모든 블록을 파괴한다.", "각 인접 스테이지의 블록·장애물·적 trace를 기록한다.", "마지막 완료 화면까지 진행한다."]
-        expected: 5개 스테이지가 순서대로 완료되고 stage_blueprints와 모든 정량 차별화 임계값을 만족한다.
-      DMG-01:
-        precondition: 하트 3, 무적 없음, 공 1개인 playing 상태다.
-        steps: ["네 DamageSource와 lastBallLost를 각각 발생시킨다.", "같은 tick 복수 사건도 발생시킨다.", "하트 1 이상과 0인 경우를 확인한다."]
-        expected: tick당 하트 최대 1개가 감소하고 하트가 남으면 2초 recovery 후 자동 발사하며 0이면 즉시 gameOver다.
-      DMG-INV-01:
-        precondition: 아이템 무적이 활성화되고 하트가 3인 playing 상태다.
-        steps: ["무적 중 네 DamageSource에 각각 접촉한다.", "무적 종료 후 한 DamageSource에 접촉한다.", "2초 recovery 중 다시 접촉한다."]
-        expected: 무적 중 손실이 없고 종료 후 하트 1개만 감소하며 recovery 중 추가 손실이 없다.
-      ITM-01:
-        precondition: 하트 3, 아이템 효과 없음, 고정 RNG seed의 playing 상태다.
-        steps: ["네 아이템을 각각 획득한다.", "공 증가와 레이저를 교차·동종 재획득한다.", "만료·생명 손실·스테이지 전환을 발생시킨다."]
-        expected: 드롭·최대 하트·무적 독립·공/레이저 교체·단계·시간 리셋·만료·해제가 규칙과 일치한다.
-      SCR-01:
-        precondition: 최고 점수 키를 정상·잘못된 값·예외 저장소로 교체 가능한 상태다.
-        steps: ["tick 기반 시간 보너스를 계산한다.", "모든 잘못된 저장값과 읽기·쓰기 예외를 주입한다.", "게임 오버와 완료 화면을 연다."]
-        expected: 점수는 안전 정수이고 잘못된 값은 0, 예외는 메모리 fallback이며 결과 화면의 모든 통계가 일치한다.
-      END-01:
-        precondition: 점수·하트·아이템·잔여 객체가 존재하는 스테이지 종료 직전 상태다.
-        steps: ["블록을 모두 파괴해 전환한다.", "새 Space와 새 drag+pointerup을 각각 시험한다.", "게임 오버·5스테이지 완료 뒤 재시작한다."]
-        expected: 전환은 점수·하트만 유지하고 지정 입력만 시작하며 재시작은 스테이지 1·점수 0·하트 3·아이템 없음이다.
-    matrix_rule: >-
-      environments와 orientations 배열의 데카르트 곱이 필수 행이다. primary는
-      primary_orientations의 환경별 값으로 치환한다. verify:evidence는 생성된 모든
-      testId·환경·orientation 조합이 정확히 한 개의 pass 행으로 존재하는지 검사하고
-      각 행의 precondition·steps·expected가 test_definitions와 정확히 일치하는지도
-      검사하며 누락·중복·불일치·fail을 거부한다.
-    required_row_fields:
-      - testId
-      - environmentAndExactVersion
-      - precondition
-      - steps
-      - expected
-      - actual
-      - verdict
-      - evidencePath
-      - verifier
-      - verifiedAt
-      - seedVersion
-      - buildId
-      - commitSha
-      - approvalRecordPath
-      - orientation
-    evidence_rule: >-
-      입력·피해·아이템·스테이지 흐름은 영상, 점수·초기화·결과 화면은 스크린샷,
-      시간·저장·동시 프레임 우선순위는 자동 테스트 결과를 연결한다. 파일이 없거나
-      열리지 않거나 testId·환경·실행 시점을 식별할 수 없으면 fail이다. seedVersion,
-      buildId, commitSha 중 현재 검증 대상과 하나라도 다르면 이전 증빙은 fail이다.
-      모든 행의 actual이 expected와 일치하고 verdict가 pass여야 한다.
-    approval_rule: >-
-      .verification-output/approval.json에 승인자, 승인 시각, seedVersion, buildId,
-      commitSha, pass 판정, 확인 가능한 증빙 경로, approverId, approverRole을 기록한다.
-      추적 파일 verification/approvers.json은 {"productOwner":["cheng80"]}을
-      포함한다. verify:evidence는 approverRole이 productOwner이고 approverId가 해당
-      배열에 있으며 현재 manifest와 나머지 필드가 일치할 때만 승인 기록을 유효하게 본다.
-    invincibility_regression: >-
-      무적 중 네 피해원에 각각 접촉해도 하트·공·패들이 초기화되지 않고, 무적 종료
-      후 한 피해원에서 하트가 1 감소해 중앙 패들·공 1개·2초 면제가 시작되며 면제
-      중 추가 접촉에서 하트가 감소하지 않는 절차를 세 환경 모두 수행한다.
-
+      description: 다음 volley 시작 위치
+      required: true
+    - name: bricks
+      type: array
+      description: 내구도를 가진 벽돌
+      required: true
+    - name: items
+      type: array
+      description: 폭탄·멀티볼·쉴드
+      required: true
+    - name: gameStatus
+      type: string
+      description: ready·aiming·volley·gameOver·victory
+      required: true
 evaluation_principles:
-  - {name: 규칙 정확성, weight: 0.35, description: 충돌·생명·아이템·클리어·점수·초기화 규칙 일치}
-  - {name: 조작성과 레이아웃, weight: 0.20, description: 세 입력 방식과 모바일 화면의 가림·잘림·스크롤 없음}
-  - {name: 스테이지 차별성, weight: 0.15, description: 5개 스테이지의 정량 차별화와 후반 변칙 행동}
-  - {name: 결정론과 검증성, weight: 0.15, description: 고정 tick의 반복 재현과 자동 검증}
-  - {name: 호환성과 증빙, weight: 0.15, description: 대표 세 환경의 필수 시나리오와 유효 증빙}
-
+  - name: 플레이완성도
+    description: "조준부터 승패까지 실제 플레이 가능"
+    weight: 0.4
+  - name: 규칙정확성
+    description: "volley·하강·아이템·스테이지 규칙 일치"
+    weight: 0.3
+  - name: 반응형가시성
+    description: "모바일·데스크톱에서 핵심 요소가 보임"
+    weight: 0.15
+  - name: 검증신뢰성
+    description: "자동 테스트와 브라우저 실행 증거"
+    weight: 0.15
 exit_conditions:
-  - name: 최종 승인
-    description: 모든 자동·수동 검증과 사용자 승인이 완료된다.
-    criteria: >-
-      npm run verify:prepare와 수동 gate 완료 후 npm run verify:finalize가 각각
-      제한 시간 안에 종료 코드 0이고, 대표 3개 환경의
-      8개 기능군 모든 필수 행에서 expected와 actual이 일치하며 유효한 증빙과
-      사용자(기획 책임자)의 승인 기록이 있다.
-  - name: 승인 실패
-    description: 필수 검증이나 승인 조건 중 하나라도 충족되지 않는다.
-    criteria: >-
-      자동 검증 실패·시간 초과, 필수 행 미실행·불일치, 증빙 누락·손상·식별 불가,
-      사용자 승인 누락 중 하나 이상이 있다.
-
+  - name: 완료
+    description: "5스테이지와 핵심 플레이·아이템·승패 흐름 구현"
+    criteria: "모든 acceptance criteria 충족"
+  - name: 검증완료
+    description: "테스트·빌드·브라우저 검증 통과"
+    criteria: "실패한 필수 검증 없음"
 metadata:
-  seed_id: seed_9aceaf881e5b
-  version: 1.14.0
-  created_at: '2026-07-20T19:27:08.649587Z'
-  revised_at: '2026-07-21T06:07:45+09:00'
-  ambiguity_score: 0.013
-  interview_id: interview_20260720_175050
+  seed_id: seed_swipe_minimum_20260721
+  version: 1.0.0
+  created_at: "2026-07-21T00:10:00Z"
+  ambiguity_score: 0.1
+  interview_id: interview_20260720_230439
+  parent_seed_id: null
   generation_mode: normal
   degraded: false
   unresolved_slots: []
+  recovery_reason: null
