@@ -1,5 +1,6 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
+import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -46,15 +47,11 @@ interface ActiveBall extends Vec2 {
   bounceCount: number;
 }
 
-interface BombEffect extends Vec2 {
+interface PositionedEffect extends Vec2 {
   elapsed: number;
 }
 
-interface LaserEffect extends Vec2 {
-  elapsed: number;
-}
-
-interface ShieldRewindEffect {
+interface TimedEffect {
   elapsed: number;
 }
 
@@ -64,20 +61,32 @@ void startGame().catch((error: unknown) => {
 
 async function startGame(): Promise<void> {
 const state = createGame();
+const ballPool = new ObjectPool<ActiveBall>(
+  () => ({ x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
+  (ball) => Object.assign(ball, { x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
+);
+const positionedEffectPool = new ObjectPool<PositionedEffect>(
+  () => ({ x: 0, y: 0, elapsed: 0 }),
+  (effect) => Object.assign(effect, { x: 0, y: 0, elapsed: 0 }),
+);
+const timedEffectPool = new ObjectPool<TimedEffect>(
+  () => ({ elapsed: 0 }),
+  (effect) => { effect.elapsed = 0; },
+);
 let bestScore = loadBestScore();
 let hasNewBestScore = false;
-let activeBalls: ActiveBall[] = [];
+const activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
 let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let resetConfirmOpen = false;
-let bombEffect: BombEffect | null = null;
-let trapEffect: BombEffect | null = null;
-let laserEffects: LaserEffect[] = [];
-let shieldRewindEffect: ShieldRewindEffect | null = null;
-const brickHitEffects = new Map<string, number>();
+let bombEffect: PositionedEffect | null = null;
+let trapEffect: PositionedEffect | null = null;
+const laserEffects: PositionedEffect[] = [];
+let shieldRewindEffect: TimedEffect | null = null;
+const brickHitEffects = new Map<string, TimedEffect>();
 
 const app = new Application();
 await app.init({
@@ -102,6 +111,21 @@ effectGlow.filters = [new BlurFilter({ strength: 10, quality: 3 })];
 const brickHitGlow = new Graphics();
 brickHitGlow.filters = [new BlurFilter({ strength: 7, quality: 3 })];
 const labels = new Container();
+const labelPool = new ObjectPool<Text>(
+  () => {
+    const label = new Text({
+      text: "",
+      style: { fill: 0xffffff, fontFamily: "system-ui", fontSize: 12, fontWeight: "800" },
+    });
+    label.anchor.set(0.5);
+    return label;
+  },
+  (label) => {
+    label.text = "";
+    label.position.set(0, 0);
+  },
+);
+const activeLabels: Text[] = [];
 const ballCounter = new Text({
   text: "×1",
   style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
@@ -152,7 +176,7 @@ const itemCenter = (item: Pick<Item, "row" | "column">) => ({
 
 function pullLaserEffects(): void {
   consumeLaserTriggers(state).forEach((trigger) => {
-    laserEffects.push({ ...itemCenter(trigger), elapsed: 0 });
+    laserEffects.push(Object.assign(positionedEffectPool.acquire(), itemCenter(trigger), { elapsed: 0 }));
   });
 }
 
@@ -160,28 +184,33 @@ function launch(direction: Vec2): void {
   if (state.gameStatus !== "ready") return;
   const count = prepareVolley(state);
   firstLandingX = null;
-  activeBalls = Array.from({ length: count }, (_, index) => ({
-    ...state.launchPosition,
-    vx: direction.x * BALL_SPEED,
-    vy: direction.y * BALL_SPEED,
-    delay: index * 0.075,
-    bounceCount: 0,
-  }));
+  for (let index = 0; index < count; index += 1) {
+    activeBalls.push(Object.assign(ballPool.acquire(), state.launchPosition, {
+      vx: direction.x * BALL_SPEED,
+      vy: direction.y * BALL_SPEED,
+      delay: index * 0.075,
+      bounceCount: 0,
+    }));
+  }
   syncUi();
 }
 
 function reset(): void {
   setResetConfirmOpen(false);
+  ballPool.releaseAll(activeBalls);
+  if (bombEffect) positionedEffectPool.release(bombEffect);
+  if (trapEffect) positionedEffectPool.release(trapEffect);
+  positionedEffectPool.releaseAll(laserEffects);
+  if (shieldRewindEffect) timedEffectPool.release(shieldRewindEffect);
+  brickHitEffects.forEach((effect) => timedEffectPool.release(effect));
   resetGame(state);
   hasNewBestScore = false;
-  activeBalls = [];
   aimStart = null;
   aimCurrent = null;
   firstLandingX = null;
   boardSignature = "";
   bombEffect = null;
   trapEffect = null;
-  laserEffects = [];
   shieldRewindEffect = null;
   brickHitEffects.clear();
   setHelpOpen(false);
@@ -321,30 +350,29 @@ function rebuildLabels(): void {
   const signature = `${state.stage}|${state.bricks.map((brick) => `${brick.id}:${brick.hp}:${brick.row}`).join(",")}|${state.items.map((item) => `${item.id}:${item.row}`).join(",")}`;
   if (signature === boardSignature) return;
   boardSignature = signature;
-  labels.removeChildren().forEach((child) => child.destroy());
+  labels.removeChildren();
+  labelPool.releaseAll(activeLabels);
 
   state.bricks.forEach((brick) => {
     const rect = brickRect(brick);
     const text = brick.type === "laser" ? `↔${brick.hp}` : brick.type === "steel" ? "◆" : String(brick.hp);
-    const label = new Text({
-      text,
-      style: { fill: 0xffffff, fontFamily: "system-ui", fontSize: brick.type === "normal" ? 14 : 12, fontWeight: "800" },
-    });
-    label.anchor.set(0.5);
+    const label = labelPool.acquire();
+    label.text = text;
+    label.style.fontSize = brick.type === "normal" ? 14 : 12;
     label.position.set(rect.x + rect.width / 2, rect.y + rect.height / 2);
     labels.addChild(label);
+    activeLabels.push(label);
   });
 
   const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "×2", power3: "×3", power4: "×4", trap: "−1" } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
-    const label = new Text({
-      text: itemLabel[item.type],
-      style: { fill: 0xffffff, fontFamily: "system-ui", fontSize: item.type === "multiball" ? 10 : 12, fontWeight: "800" },
-    });
-    label.anchor.set(0.5);
+    const label = labelPool.acquire();
+    label.text = itemLabel[item.type];
+    label.style.fontSize = item.type === "multiball" ? 10 : 12;
     label.position.set(center.x, center.y);
     labels.addChild(label);
+    activeLabels.push(label);
   });
 }
 
@@ -423,10 +451,10 @@ function draw(): void {
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
 
-  brickHitEffects.forEach((elapsed, brickId) => {
+  brickHitEffects.forEach((effect, brickId) => {
     const brick = state.bricks.find((candidate) => candidate.id === brickId);
     if (!brick) return;
-    const frame = brickHitEffectFrame(elapsed);
+    const frame = brickHitEffectFrame(effect.elapsed);
     const logicalRect = brickRect(brick);
     const width = logicalRect.width * frame.scale;
     const height = logicalRect.height * frame.scale;
@@ -482,7 +510,10 @@ function draw(): void {
       .stroke({ width: 5, color: 0xbcecff, alpha: shieldFrame.flash });
   }
 
-  const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
+  let queuedBalls = 0;
+  activeBalls.forEach((ball) => {
+    if (ball.delay > 0) queuedBalls += 1;
+  });
   const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
   const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
   if (showLaunchBall) {
@@ -565,8 +596,14 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       ball.vx = velocity.x;
       ball.vy = velocity.y;
       const destroyed = hitBrickWithBall(state, hitBrick.id);
-      if (hitBrick.type !== "steel" && !destroyed) brickHitEffects.set(hitBrick.id, 0);
-      else brickHitEffects.delete(hitBrick.id);
+      const hitEffect = brickHitEffects.get(hitBrick.id);
+      if (hitBrick.type !== "steel" && !destroyed) {
+        if (hitEffect) hitEffect.elapsed = 0;
+        else brickHitEffects.set(hitBrick.id, timedEffectPool.acquire());
+      } else if (hitEffect) {
+        brickHitEffects.delete(hitBrick.id);
+        timedEffectPool.release(hitEffect);
+      }
       pullLaserEffects();
       boardSignature = "";
       syncUi();
@@ -580,8 +617,13 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
     if (hitItem) {
       const center = itemCenter(hitItem);
       const itemType = collectItem(state, hitItem.id);
-      if (itemType === "bomb") bombEffect = { ...center, elapsed: 0 };
-      else if (itemType === "trap") trapEffect = { ...center, elapsed: 0 };
+      if (itemType === "bomb") {
+        if (bombEffect) positionedEffectPool.release(bombEffect);
+        bombEffect = Object.assign(positionedEffectPool.acquire(), center, { elapsed: 0 });
+      } else if (itemType === "trap") {
+        if (trapEffect) positionedEffectPool.release(trapEffect);
+        trapEffect = Object.assign(positionedEffectPool.acquire(), center, { elapsed: 0 });
+      }
       pullLaserEffects();
       boardSignature = "";
       syncUi();
@@ -594,30 +636,45 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 function update(delta: number): void {
   const paused = helpOpen || resetConfirmOpen;
   if (!paused) {
-    brickHitEffects.forEach((elapsed, brickId) => {
-      const nextElapsed = elapsed + delta;
-      if (nextElapsed >= BRICK_HIT_EFFECT_DURATION) brickHitEffects.delete(brickId);
-      else brickHitEffects.set(brickId, nextElapsed);
+    brickHitEffects.forEach((effect, brickId) => {
+      effect.elapsed += delta;
+      if (effect.elapsed >= BRICK_HIT_EFFECT_DURATION) {
+        brickHitEffects.delete(brickId);
+        timedEffectPool.release(effect);
+      }
     });
   }
   if (!paused && shieldRewindEffect) {
     shieldRewindEffect.elapsed += delta;
     if (shieldRewindEffect.elapsed >= SHIELD_REWIND_DURATION) {
+      timedEffectPool.release(shieldRewindEffect);
       shieldRewindEffect = null;
       syncUi();
     }
   }
   if (!paused && bombEffect) {
     bombEffect.elapsed += delta;
-    if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
+    if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) {
+      positionedEffectPool.release(bombEffect);
+      bombEffect = null;
+    }
   }
   if (!paused && trapEffect) {
     trapEffect.elapsed += delta;
-    if (trapEffect.elapsed >= BOMB_EFFECT_DURATION) trapEffect = null;
+    if (trapEffect.elapsed >= BOMB_EFFECT_DURATION) {
+      positionedEffectPool.release(trapEffect);
+      trapEffect = null;
+    }
   }
   if (!paused) {
-    laserEffects.forEach((effect) => (effect.elapsed += delta));
-    laserEffects = laserEffects.filter((effect) => effect.elapsed < LASER_EFFECT_DURATION);
+    for (let index = laserEffects.length - 1; index >= 0; index -= 1) {
+      const effect = laserEffects[index];
+      effect.elapsed += delta;
+      if (effect.elapsed >= LASER_EFFECT_DURATION) {
+        laserEffects.splice(index, 1);
+        positionedEffectPool.release(effect);
+      }
+    }
   }
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
@@ -628,12 +685,13 @@ function update(delta: number): void {
       if (returned) {
         firstLandingX ??= ball.x;
         activeBalls.splice(index, 1);
+        ballPool.release(ball);
       }
     }
 
     if (state.gameStatus === "volley" && activeBalls.length === 0) {
       const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
-      if (shieldRewound) shieldRewindEffect = { elapsed: 0 };
+      if (shieldRewound) shieldRewindEffect = timedEffectPool.acquire();
       firstLandingX = null;
       boardSignature = "";
       syncUi();
