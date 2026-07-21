@@ -11,6 +11,7 @@ export const MAX_BALLS = 30;
 export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
+export const SHIELD_REWIND_DURATION = 0.85;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
 export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap";
@@ -53,6 +54,27 @@ export function laserEffectFrame(elapsed: number): { spread: number; alpha: numb
   return {
     spread: Math.min(1, progress * 3),
     alpha: 1 - progress,
+  };
+}
+
+export function shieldRewindFrame(elapsed: number): { offset: number; flash: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / SHIELD_REWIND_DURATION));
+  const downEnd = 0.34;
+  const rewindStart = 0.58;
+  let offset = CELL_HEIGHT;
+
+  if (progress <= downEnd) {
+    const phase = progress / downEnd;
+    offset *= 1 - (1 - phase) ** 3;
+  } else if (progress >= rewindStart) {
+    const phase = (progress - rewindStart) / (1 - rewindStart);
+    const eased = phase * phase * (3 - 2 * phase);
+    offset *= 1 - eased;
+  }
+
+  return {
+    offset,
+    flash: Math.max(0, 1 - Math.abs(progress - 0.48) / 0.18),
   };
 }
 
@@ -407,11 +429,20 @@ function addTurnMultiball(state: GameState): void {
   }
 }
 
-export function finishVolley(state: GameState, firstLandingX: number): void {
+export function finishVolley(state: GameState, firstLandingX: number): boolean {
   state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, firstLandingX));
-  if (advanceStageIfCleared(state)) return;
+  if (advanceStageIfCleared(state)) return false;
   state.powerTurns = Math.max(0, state.powerTurns - 1);
   if (state.powerTurns === 0) state.powerMultiplier = 1;
+
+  const shieldRewound = state.shield && state.bricks.some(
+    (brick) => brick.type !== "steel" && GRID_TOP + (brick.row + 1) * CELL_HEIGHT + BRICK_HEIGHT > DANGER_Y,
+  );
+  if (shieldRewound) {
+    state.shield = false;
+    state.gameStatus = "ready";
+    return true;
+  }
 
   state.bricks.forEach((brick) => (brick.row += 1));
   state.items.forEach((item) => (item.row += 1));
@@ -428,13 +459,11 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
     (brick) => brick.type !== "steel" && GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT > DANGER_Y,
   );
   if (reachedDanger) {
-    if (state.shield) state.shield = false;
-    else {
-      state.gameStatus = "gameOver";
-      return;
-    }
+    state.gameStatus = "gameOver";
+    return false;
   }
   state.turn += 1;
   addTurnMultiball(state);
   state.gameStatus = "ready";
+  return false;
 }
