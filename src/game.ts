@@ -7,6 +7,7 @@ export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 9;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const MAX_BALLS = 8;
+export const BOMB_EFFECT_DURATION = 0.5;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
 export type ItemType = "bomb" | "multiball" | "shield" | "power";
@@ -33,6 +34,14 @@ export interface AimObstacle {
 export interface AimSegment {
   start: Vec2;
   end: Vec2;
+}
+
+export function bombEffectFrame(elapsed: number): { radius: number; alpha: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / BOMB_EFFECT_DURATION));
+  return {
+    radius: 24 + 66 * (1 - (1 - progress) ** 2),
+    alpha: 1 - progress,
+  };
 }
 
 export interface Brick {

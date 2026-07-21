@@ -3,12 +3,14 @@ import "./style.css";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  BOMB_EFFECT_DURATION,
   BRICK_HEIGHT,
   CELL_HEIGHT,
   DANGER_Y,
   GRID_TOP,
   GRID_COLUMNS,
   aimFromDrag,
+  bombEffectFrame,
   collectItem,
   createGame,
   finishVolley,
@@ -34,6 +36,10 @@ interface ActiveBall extends Vec2 {
   delay: number;
 }
 
+interface BombEffect extends Vec2 {
+  elapsed: number;
+}
+
 const state = createGame();
 let activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
@@ -41,6 +47,7 @@ let aimCurrent: Vec2 | null = null;
 let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
+let bombEffect: BombEffect | null = null;
 
 const app = new Application();
 await app.init({
@@ -118,6 +125,7 @@ function reset(): void {
   aimCurrent = null;
   firstLandingX = null;
   boardSignature = "";
+  bombEffect = null;
   setHelpOpen(false);
   syncUi();
 }
@@ -290,6 +298,14 @@ function draw(): void {
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
 
+  if (bombEffect) {
+    const frame = bombEffectFrame(bombEffect.elapsed);
+    scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0xff8a32, alpha: frame.alpha * 0.055 });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius).fill({ color: 0xff8a32, alpha: frame.alpha * 0.24 });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius).stroke({ width: 6, color: 0xffc145, alpha: frame.alpha });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius * 0.58).stroke({ width: 3, color: 0xffffff, alpha: frame.alpha * 0.85 });
+  }
+
   const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
   const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
   const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
@@ -373,7 +389,8 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       return circleHitsRect(ball, center.x - 12, center.y - 12, 24, 24);
     });
     if (hitItem) {
-      collectItem(state, hitItem.id);
+      const center = itemCenter(hitItem);
+      if (collectItem(state, hitItem.id) === "bomb") bombEffect = { ...center, elapsed: 0 };
       boardSignature = "";
       syncUi();
     }
@@ -383,6 +400,10 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
+  if (!helpOpen && bombEffect) {
+    bombEffect.elapsed += delta;
+    if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
+  }
   if (!helpOpen && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {

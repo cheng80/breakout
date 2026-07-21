@@ -3,11 +3,13 @@ import {
   DANGER_ROW,
   DANGER_Y,
   BRICK_HEIGHT,
+  BOMB_EFFECT_DURATION,
   CELL_HEIGHT,
   GRID_TOP,
   MAX_BALLS,
   advanceStageIfCleared,
   aimFromDrag,
+  bombEffectFrame,
   collectItem,
   createGame,
   damageBrick,
@@ -18,6 +20,12 @@ import {
 } from "../src/game";
 
 describe("핵심 게임 규칙", () => {
+  it("폭탄 충격파가 0.5초 동안 확대되며 사라진다", () => {
+    expect(bombEffectFrame(0)).toEqual({ radius: 24, alpha: 1 });
+    expect(bombEffectFrame(BOMB_EFFECT_DURATION / 2).radius).toBeGreaterThan(24);
+    expect(bombEffectFrame(BOMB_EFFECT_DURATION)).toEqual({ radius: 90, alpha: 0 });
+  });
+
   it("벽과 벽돌 충돌을 따라 조준 경로를 2회 반사한다", () => {
     const bounds = { minX: 5, maxX: 355, minY: 5, maxY: 520 };
     const wallPath = traceAimPath({ x: 50, y: 100 }, { x: -1, y: -1 }, bounds, [], 2);
