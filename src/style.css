@@ -1,0 +1,280 @@
+:root {
+  color: #f5f8ff;
+  background: #07111f;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -15%, rgba(85, 103, 255, 0.28), transparent 42%),
+    #07111f;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+}
+
+.app {
+  width: min(100%, 430px);
+  height: 100dvh;
+  min-height: 520px;
+  margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: clamp(7px, 1.4dvh, 12px);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: #8795ff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(18px, 2.8dvh, 25px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-size: 21px;
+  transition-property: transform, background-color;
+  transition-duration: 140ms;
+}
+
+.icon-button:active,
+.result button:active {
+  transform: scale(0.96);
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.hud div {
+  min-width: 0;
+  padding: 8px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.hud span {
+  display: block;
+  margin-bottom: 2px;
+  color: #71809a;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.hud strong {
+  display: block;
+  overflow: hidden;
+  font-size: clamp(11px, 1.8dvh, 14px);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#shield.active {
+  color: #5db7ff;
+}
+
+.game-shell {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.game-canvas {
+  width: min(100%, calc((100dvh - 160px) * 360 / 560));
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 360 / 560;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #091524;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.36), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.game-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.result {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(82%, 290px);
+  padding: 22px;
+  transform: translate(-50%, -50%);
+  border-radius: 18px;
+  background: rgba(9, 21, 36, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.11);
+  text-align: center;
+  backdrop-filter: blur(16px);
+}
+
+.result[hidden] {
+  display: none;
+}
+
+.result > p:first-child {
+  margin: 0 0 5px;
+  color: #8795ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.17em;
+}
+
+.result h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.result p {
+  color: #a9b4c8;
+  font-variant-numeric: tabular-nums;
+}
+
+.result button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: #6c7cff;
+  box-shadow: 0 10px 28px rgba(108, 124, 255, 0.32);
+  cursor: pointer;
+  font-weight: 800;
+  transition-property: transform, filter;
+  transition-duration: 140ms;
+}
+
+.control-copy {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 4px;
+  color: #9ba8bc;
+}
+
+.control-copy p {
+  margin: 0;
+  font-size: 11px;
+  text-wrap: pretty;
+}
+
+#status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #45d5a1;
+  box-shadow: 0 0 12px rgba(69, 213, 161, 0.65);
+}
+
+#status-dot[data-state="volley"] {
+  background: #ffc145;
+  box-shadow: 0 0 12px rgba(255, 193, 69, 0.65);
+}
+
+#status-dot[data-state="gameOver"] {
+  background: #ff4d6d;
+  box-shadow: 0 0 12px rgba(255, 77, 109, 0.65);
+}
+
+kbd {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #708098;
+  font: 700 8px/1 system-ui;
+  letter-spacing: 0.06em;
+}
+
+@media (max-height: 650px) {
+  .app {
+    gap: 6px;
+    padding-top: 8px;
+  }
+
+  .topbar h1 {
+    font-size: 17px;
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .hud div {
+    padding-block: 5px;
+  }
+}
+
+@media (max-width: 350px) {
+  .app {
+    padding-inline: 8px;
+  }
+
+  .hud {
+    gap: 4px;
+  }
+
+  .hud div {
+    padding-inline: 5px;
+  }
+
+  kbd {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-button,
+  .result button {
+    transition-duration: 0ms;
+  }
+}
