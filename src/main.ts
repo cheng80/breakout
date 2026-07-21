@@ -35,7 +35,7 @@ const GRID_GAP = 4;
 const GRID_MARGIN = 12;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
-const BALL_SPEED = 440;
+const BALL_SPEED = 600;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
 interface ActiveBall extends Vec2 {
   vx: number;
