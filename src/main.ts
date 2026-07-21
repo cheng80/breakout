@@ -11,6 +11,7 @@ import {
   GRID_TOP,
   GRID_COLUMNS,
   LASER_EFFECT_DURATION,
+  SHIELD_REWIND_DURATION,
   aimFromDrag,
   bombEffectFrame,
   collectItem,
@@ -21,6 +22,7 @@ import {
   laserEffectFrame,
   prepareVolley,
   resetGame,
+  shieldRewindFrame,
   traceAimPath,
   type Brick,
   type Item,
@@ -47,6 +49,10 @@ interface LaserEffect extends Vec2 {
   elapsed: number;
 }
 
+interface ShieldRewindEffect {
+  elapsed: number;
+}
+
 const state = createGame();
 let bestScore = loadBestScore();
 let hasNewBestScore = false;
@@ -59,6 +65,7 @@ let helpOpen = false;
 let bombEffect: BombEffect | null = null;
 let trapEffect: BombEffect | null = null;
 let laserEffects: LaserEffect[] = [];
+let shieldRewindEffect: ShieldRewindEffect | null = null;
 
 const app = new Application();
 await app.init({
@@ -155,6 +162,7 @@ function reset(): void {
   bombEffect = null;
   trapEffect = null;
   laserEffects = [];
+  shieldRewindEffect = null;
   setHelpOpen(false);
   syncUi();
 }
@@ -168,7 +176,7 @@ function screenPoint(event: PointerEvent): Vec2 {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (helpOpen || state.gameStatus !== "ready") return;
+  if (helpOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
@@ -255,7 +263,7 @@ function syncUi(): void {
     volley: state.powerTurns > 0 ? `강화볼 발사 중 · 공격력 ×${state.powerMultiplier}` : "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
   } as const;
-  statusEl.textContent = messages[state.gameStatus];
+  statusEl.textContent = shieldRewindEffect ? "보호막 발동 · 한 칸 되돌리는 중" : messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
 
   result.hidden = state.gameStatus !== "gameOver";
@@ -329,6 +337,9 @@ function draw(): void {
   scene.clear();
   effectGlow.clear();
   scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
+  const shieldFrame = shieldRewindEffect ? shieldRewindFrame(shieldRewindEffect.elapsed) : null;
+  const boardOffset = shieldFrame?.offset ?? 0;
+  labels.y = boardOffset;
 
   scene
     .roundRect(8, FLOOR_Y + 7, BOARD_WIDTH - 16, BOARD_HEIGHT - FLOOR_Y - 10, 11)
@@ -347,7 +358,8 @@ function draw(): void {
   scene.stroke({ width: 1.5, color: 0xff4d6d, alpha: 0.7 });
 
   state.bricks.forEach((brick) => {
-    const rect = brickRect(brick);
+    const logicalRect = brickRect(brick);
+    const rect = { ...logicalRect, y: logicalRect.y + boardOffset };
     scene.roundRect(rect.x, rect.y, rect.width, rect.height, 8).fill(brickColor(brick));
     if (brick.type === "laser") {
       scene.moveTo(rect.x + 6, rect.y + rect.height / 2).lineTo(rect.x + rect.width - 6, rect.y + rect.height / 2)
@@ -360,7 +372,8 @@ function draw(): void {
 
   const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff, power3: 0xb06cff, power4: 0xb06cff, trap: 0xff405f } as const;
   state.items.forEach((item) => {
-    const center = itemCenter(item);
+    const logicalCenter = itemCenter(item);
+    const center = { ...logicalCenter, y: logicalCenter.y + boardOffset };
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
@@ -399,6 +412,15 @@ function draw(): void {
     scene.moveTo(effect.x - left, effect.y).lineTo(effect.x + right, effect.y)
       .stroke({ width: 4, color: 0xffffff, alpha: frame.alpha });
   });
+
+  if (shieldFrame && shieldFrame.flash > 0) {
+    effectGlow.roundRect(7, 7, BOARD_WIDTH - 14, BOARD_HEIGHT - 14, 18)
+      .stroke({ width: 20, color: 0x38bfff, alpha: shieldFrame.flash * 0.95 });
+    scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+      .fill({ color: 0x3fa9ff, alpha: shieldFrame.flash * 0.08 });
+    scene.roundRect(7, 7, BOARD_WIDTH - 14, BOARD_HEIGHT - 14, 18)
+      .stroke({ width: 5, color: 0xbcecff, alpha: shieldFrame.flash });
+  }
 
   const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
   const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
@@ -498,6 +520,13 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
+  if (!helpOpen && shieldRewindEffect) {
+    shieldRewindEffect.elapsed += delta;
+    if (shieldRewindEffect.elapsed >= SHIELD_REWIND_DURATION) {
+      shieldRewindEffect = null;
+      syncUi();
+    }
+  }
   if (!helpOpen && bombEffect) {
     bombEffect.elapsed += delta;
     if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
@@ -523,7 +552,8 @@ function update(delta: number): void {
     }
 
     if (state.gameStatus === "volley" && activeBalls.length === 0) {
-      finishVolley(state, firstLandingX ?? state.launchPosition.x);
+      const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
+      if (shieldRewound) shieldRewindEffect = { elapsed: 0 };
       firstLandingX = null;
       boardSignature = "";
       syncUi();

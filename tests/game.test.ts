@@ -11,6 +11,7 @@ import {
   MAX_BALLS,
   MAX_BRICK_HP,
   LASER_EFFECT_DURATION,
+  SHIELD_REWIND_DURATION,
   advanceStageIfCleared,
   aimFromDrag,
   bombEffectFrame,
@@ -22,6 +23,7 @@ import {
   hitBrickWithBall,
   laserEffectFrame,
   prepareVolley,
+  shieldRewindFrame,
   traceAimPath,
 } from "../src/game";
 
@@ -30,6 +32,13 @@ describe("핵심 게임 규칙", () => {
     expect(bombEffectFrame(0)).toEqual({ radius: 24, alpha: 1 });
     expect(bombEffectFrame(BOMB_EFFECT_DURATION / 2).radius).toBeGreaterThan(24);
     expect(bombEffectFrame(BOMB_EFFECT_DURATION)).toEqual({ radius: 90, alpha: 0 });
+  });
+
+  it("보호막 발동 시 한 칸 내려왔다가 파란 점멸 후 원위치로 돌아간다", () => {
+    expect(shieldRewindFrame(0)).toEqual({ offset: 0, flash: 0 });
+    expect(shieldRewindFrame(SHIELD_REWIND_DURATION * 0.34).offset).toBe(CELL_HEIGHT);
+    expect(shieldRewindFrame(SHIELD_REWIND_DURATION * 0.48).flash).toBe(1);
+    expect(shieldRewindFrame(SHIELD_REWIND_DURATION)).toEqual({ offset: 0, flash: 0 });
   });
 
   it("레이저가 가로줄을 제거하고 강철은 점수 없이 내려오며 위험선을 통과하면 사라진다", () => {
@@ -174,16 +183,18 @@ describe("핵심 게임 규칙", () => {
     state.items.push({ id: "barrier-multiball", row: DANGER_ROW, column: 7, type: "multiball" });
     const priorRows = state.bricks.map((brick) => brick.row);
 
-    finishVolley(state, 37);
+    expect(finishVolley(state, 37)).toBe(true);
     expect(state.launchPosition.x).toBe(37);
-    expect(state.bricks[0].row).toBe(priorRows[0] + 1);
+    expect(state.bricks.map((brick) => brick.row)).toEqual(priorRows);
     expect(state.shield).toBe(false);
     expect(state.gameStatus).toBe("ready");
-    expect(state.ballCount).toBe(2);
-    expect(state.items.some((item) => item.type === "multiball" && item.row === 0)).toBe(true);
+    expect(state.ballCount).toBe(1);
+    expect(state.items.find((item) => item.id === "barrier-multiball")?.row).toBe(DANGER_ROW);
+    expect(state.items.some((item) => item.type === "multiball" && item.row === 0)).toBe(false);
 
-    finishVolley(state, 51);
+    expect(finishVolley(state, 51)).toBe(false);
     expect(state.gameStatus).toBe("gameOver");
+    expect(state.ballCount).toBe(2);
   });
 
   it("벽돌 하단이 위험선에 닿는 것은 허용하고 아래로 내려오면 게임오버다", () => {
