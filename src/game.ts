@@ -6,7 +6,7 @@ export const CELL_HEIGHT = 42;
 export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 9;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
-export const MAX_BALLS = 8;
+export const MAX_BALLS = 20;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 

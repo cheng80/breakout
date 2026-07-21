@@ -87,8 +87,8 @@ const dangerLabel = new Text({
   text: "DANGER",
   style: { fill: 0xff718b, fontFamily: "system-ui", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
 });
-dangerLabel.anchor.set(1, 1);
-dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y - 4);
+dangerLabel.anchor.set(1, 0);
+dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
 app.stage.addChild(scene, effectGlow, labels, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
