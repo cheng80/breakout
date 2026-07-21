@@ -139,12 +139,23 @@ describe("핵심 게임 규칙", () => {
     state.items.push({ id: "power", row: 1, column: 2, type: "power" });
     collectItem(state, "power");
     expect(state.powerTurns).toBe(2);
+    expect(state.powerMultiplier).toBe(2);
     hitBrickWithBall(state, powerTarget.id);
     expect(powerTarget.hp).toBe(1);
     finishVolley(state, 180);
     expect(state.powerTurns).toBe(1);
     finishVolley(state, 180);
     expect(state.powerTurns).toBe(0);
+    expect(state.powerMultiplier).toBe(1);
+
+    state.items.push({ id: "power3", row: 1, column: 5, type: "power3" });
+    state.items.push({ id: "power4", row: 1, column: 6, type: "power4" });
+    collectItem(state, "power4");
+    collectItem(state, "power3");
+    expect(state.powerMultiplier).toBe(4);
+    state.bricks.push({ id: "power4-target", row: 5, column: 7, hp: 5, maxHp: 5, type: "normal" });
+    hitBrickWithBall(state, "power4-target");
+    expect(state.bricks.find((brick) => brick.id === "power4-target")?.hp).toBe(1);
 
     state.ballCount = 3;
     state.items.push({ id: "trap", row: 1, column: 3, type: "trap" });
@@ -248,6 +259,10 @@ describe("핵심 게임 규칙", () => {
     late.bricks = [];
     advanceStageIfCleared(late);
     expect(late.bricks.length).toBeGreaterThan(first.bricks.length);
+    expect(late.bricks.filter((brick) => brick.type === "laser")).toHaveLength(2);
+    expect(late.items.filter((item) => item.type === "power" || item.type === "power3")).toHaveLength(2);
+    expect(late.items.some((item) => item.type === "power3")).toBe(true);
+    expect(late.items.filter((item) => item.type === "bomb")).toHaveLength(1);
 
     const sevenRows = createGame();
     sevenRows.stage = 30;
@@ -255,6 +270,10 @@ describe("핵심 게임 규칙", () => {
     advanceStageIfCleared(sevenRows);
     expect(sevenRows.stage).toBe(31);
     expect(new Set(sevenRows.bricks.map((brick) => brick.row)).size).toBe(7);
+    expect(sevenRows.bricks.filter((brick) => brick.type === "laser")).toHaveLength(3);
+    expect(sevenRows.items.some((item) => item.type === "power3")).toBe(true);
+    expect(sevenRows.items.some((item) => item.type === "power4")).toBe(true);
+    expect(sevenRows.items.filter((item) => item.type === "bomb")).toHaveLength(2);
 
     const maxDensity = createGame();
     maxDensity.stage = 38;
@@ -262,6 +281,8 @@ describe("핵심 게임 규칙", () => {
     advanceStageIfCleared(maxDensity);
     expect(maxDensity.stage).toBe(39);
     expect(maxDensity.bricks).toHaveLength(52);
+    expect(maxDensity.items).toHaveLength(4);
+    expect(maxDensity.items.every((item) => Number.isInteger(item.row) && Number.isInteger(item.column))).toBe(true);
 
     const firstTrap = createGame();
     firstTrap.stage = 10;
