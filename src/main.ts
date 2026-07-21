@@ -214,7 +214,7 @@ function syncUi(): void {
   shieldEl.classList.toggle("active", state.shield);
 
   const messages = {
-    ready: state.powerTurns > 0 ? "강화볼 준비 · 공격력 ×2" : "아래에서 위로 드래그해 발사하세요",
+    ready: state.powerTurns > 0 ? "강화볼 준비 · 공격력 ×2" : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
     volley: state.powerTurns > 0 ? "강화볼 발사 중 · 공격력 ×2" : "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",

@@ -59,21 +59,14 @@ button {
   width: 100%;
 }
 
-.eyebrow {
-  margin: 0 0 2px;
-  color: #8795ff;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-h1 {
+.brand-title {
   margin: 0;
-  max-width: 290px;
-  font-size: clamp(18px, 2.6dvh, 24px);
-  line-height: 1.12;
-  letter-spacing: -0.04em;
-  text-wrap: balance;
+  color: #a5afff;
+  font-size: clamp(17px, 5.2vw, 22px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  white-space: nowrap;
 }
 
 .icon-button {
@@ -398,10 +391,6 @@ h1 {
   .app {
     gap: 6px;
     padding-top: 8px;
-  }
-
-  .topbar h1 {
-    font-size: 17px;
   }
 
   .icon-button {
