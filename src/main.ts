@@ -4,6 +4,7 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   BOMB_EFFECT_DURATION,
+  BRICK_HIT_EFFECT_DURATION,
   BRICK_HEIGHT,
   CELL_HEIGHT,
   DANGER_Y,
@@ -14,6 +15,7 @@ import {
   SHIELD_REWIND_DURATION,
   aimFromDrag,
   bombEffectFrame,
+  brickHitEffectFrame,
   collectItem,
   consumeLaserTriggers,
   createGame,
@@ -66,6 +68,7 @@ let bombEffect: BombEffect | null = null;
 let trapEffect: BombEffect | null = null;
 let laserEffects: LaserEffect[] = [];
 let shieldRewindEffect: ShieldRewindEffect | null = null;
+const brickHitEffects = new Map<string, number>();
 
 const app = new Application();
 await app.init({
@@ -163,6 +166,7 @@ function reset(): void {
   trapEffect = null;
   laserEffects = [];
   shieldRewindEffect = null;
+  brickHitEffects.clear();
   setHelpOpen(false);
   syncUi();
 }
@@ -378,6 +382,21 @@ function draw(): void {
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
 
+  brickHitEffects.forEach((elapsed, brickId) => {
+    const brick = state.bricks.find((candidate) => candidate.id === brickId);
+    if (!brick) return;
+    const frame = brickHitEffectFrame(elapsed);
+    const logicalRect = brickRect(brick);
+    const width = logicalRect.width * frame.scale;
+    const height = logicalRect.height * frame.scale;
+    const x = logicalRect.x - (width - logicalRect.width) / 2;
+    const y = logicalRect.y + boardOffset - (height - logicalRect.height) / 2;
+    effectGlow.roundRect(x, y, width, height, 9)
+      .stroke({ width: 14, color: 0xff8a32, alpha: frame.alpha * 0.85 });
+    scene.roundRect(x, y, width, height, 9)
+      .stroke({ width: 3, color: 0xffc15d, alpha: frame.alpha });
+  });
+
   if (bombEffect) {
     const frame = bombEffectFrame(bombEffect.elapsed);
     effectGlow.circle(bombEffect.x, bombEffect.y, frame.radius).stroke({ width: 20, color: 0xff8a32, alpha: frame.alpha * 0.72 });
@@ -494,7 +513,9 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       ball.y = previous.y;
       if (cameFromSide) ball.vx *= -1;
       else ball.vy *= -1;
-      hitBrickWithBall(state, hitBrick.id);
+      const destroyed = hitBrickWithBall(state, hitBrick.id);
+      if (hitBrick.type !== "steel" && !destroyed) brickHitEffects.set(hitBrick.id, 0);
+      else brickHitEffects.delete(hitBrick.id);
       pullLaserEffects();
       boardSignature = "";
       syncUi();
@@ -520,6 +541,13 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
+  if (!helpOpen) {
+    brickHitEffects.forEach((elapsed, brickId) => {
+      const nextElapsed = elapsed + delta;
+      if (nextElapsed >= BRICK_HIT_EFFECT_DURATION) brickHitEffects.delete(brickId);
+      else brickHitEffects.set(brickId, nextElapsed);
+    });
+  }
   if (!helpOpen && shieldRewindEffect) {
     shieldRewindEffect.elapsed += delta;
     if (shieldRewindEffect.elapsed >= SHIELD_REWIND_DURATION) {
