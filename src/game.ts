@@ -119,9 +119,9 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   candidates.sort(() => random() - 0.5);
 
   const bricks: Brick[] = [];
-  const baseHp = Math.min(12, stage + 1);
+  const baseHp = stage + 1;
   candidates.slice(0, targetPairs).forEach(({ row, column }, index) => {
-    const hp = Math.min(12, Math.max(1, baseHp + Math.floor(random() * 3) - 1));
+    const hp = Math.max(1, baseHp + Math.floor(random() * 3) - 1);
     for (const mirroredColumn of new Set([column, GRID_COLUMNS - 1 - column])) {
       bricks.push({
         id: `s${stage}-b${row}-${mirroredColumn}-${index}`,

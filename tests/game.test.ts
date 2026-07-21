@@ -202,7 +202,9 @@ describe("핵심 게임 규칙", () => {
     advanceStageIfCleared(far);
     expect(far.stage).toBe(100);
     expect(far.bricks.length).toBeGreaterThan(0);
-    expect(Math.max(...far.bricks.map((brick) => brick.hp))).toBeLessThanOrEqual(12);
+    const farHp = far.bricks.filter((brick) => brick.type !== "steel").map((brick) => brick.hp);
+    expect(Math.min(...farHp)).toBeGreaterThanOrEqual(100);
+    expect(Math.max(...farHp)).toBeLessThanOrEqual(102);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {
