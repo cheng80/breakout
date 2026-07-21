@@ -13,9 +13,12 @@ export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 export const SHIELD_REWIND_DURATION = 0.85;
 export const BRICK_HIT_EFFECT_DURATION = 0.18;
+export const BLACK_HOLE_INFLUENCE_RADIUS = 110;
+export const BLACK_HOLE_CAPTURE_RADIUS = 9;
+export const BLACK_HOLE_CYCLE_DURATION = 5;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
-export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap";
+export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
 export type BrickType = "normal" | "laser" | "steel";
 
 export interface Vec2 {
@@ -85,6 +88,19 @@ export function shieldRewindFrame(elapsed: number): { offset: number; flash: num
   };
 }
 
+export function blackHolePullStrength(distance: number): number {
+  const proximity = Math.min(1, Math.max(0, 1 - distance / BLACK_HOLE_INFLUENCE_RADIUS));
+  return proximity ** 2;
+}
+
+export function blackHolePresence(elapsed: number): number {
+  const phase = ((elapsed % BLACK_HOLE_CYCLE_DURATION) + BLACK_HOLE_CYCLE_DURATION) % BLACK_HOLE_CYCLE_DURATION;
+  if (phase < 0.3) return 1 - (1 - phase / 0.3) ** 3;
+  if (phase < 4.3) return 1;
+  if (phase < 4.65) return 1 - ((phase - 4.3) / 0.35) ** 3;
+  return 0;
+}
+
 export interface Brick {
   id: string;
   row: number;
@@ -104,6 +120,7 @@ export interface Item {
   row: number;
   column: number;
   type: ItemType;
+  charges?: number;
 }
 
 export interface GameState {
@@ -186,6 +203,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     column: index % GRID_COLUMNS,
   })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
   openCells.sort(() => random() - 0.5);
+  const hasBlackHole = stage >= 10 && (stage - 10) % 3 === 0;
   let itemOrder: ItemType[];
   if (stage >= 31) {
     itemOrder = ["multiball", "power3", "power4", "bomb", "bomb"];
@@ -201,12 +219,13 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     if (stage % 3 === 0) itemOrder.push("shield");
     if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
   }
-  const itemLimit = stage >= 31 ? 7 : stage >= 16 ? 5 : 4;
-  const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => ({
-    id: `s${stage}-i${index}`,
-    ...openCells[index],
-    type,
-  }));
+  if (hasBlackHole) itemOrder.splice(Math.min(4, itemOrder.length), 0, "blackhole");
+  const itemLimit = (stage >= 31 ? 7 : stage >= 16 ? 5 : 4) + Number(hasBlackHole);
+  const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => {
+    const item: Item = { id: `s${stage}-i${index}`, ...openCells[index], type };
+    if (type === "blackhole") item.charges = stage >= 31 ? 2 : 1;
+    return item;
+  });
 
   return { bricks, items };
 }
@@ -442,7 +461,7 @@ export function hitBrickWithBall(state: GameState, brickId: string): boolean {
 
 export function collectItem(state: GameState, itemId: string): ItemType | null {
   const item = state.items.find((candidate) => candidate.id === itemId);
-  if (!item) return null;
+  if (!item || item.type === "blackhole") return null;
   state.items = state.items.filter((candidate) => candidate.id !== itemId);
 
   if (item.type === "multiball") {
@@ -463,6 +482,53 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
   }
 
   return item.type;
+}
+
+export function captureBallByBlackHole(state: GameState, itemId: string): number | null {
+  const item = state.items.find((candidate) => candidate.id === itemId && candidate.type === "blackhole");
+  if (!item || state.ballCount <= 1) return null;
+
+  state.ballCount = Math.max(1, state.ballCount - 1);
+  const remainingCharges = Math.max(0, (item.charges ?? 1) - 1);
+  if (remainingCharges === 0) state.items = state.items.filter((candidate) => candidate !== item);
+  else item.charges = remainingCharges;
+  return remainingCharges;
+}
+
+export function relocateBlackHoles(state: GameState, cycle: number): boolean {
+  const blackHoles = state.items.filter((item) => item.type === "blackhole");
+  if (blackHoles.length === 0) return false;
+
+  const occupied = new Set([
+    ...state.bricks.map((brick) => `${brick.row}:${brick.column}`),
+    ...state.items.filter((item) => item.type !== "blackhole").map((item) => `${item.row}:${item.column}`),
+  ]);
+  let relocated = false;
+
+  blackHoles.forEach((item, itemIndex) => {
+    const currentCell = `${item.row}:${item.column}`;
+    const openCells = Array.from({ length: (DANGER_ROW - 1) * GRID_COLUMNS }, (_, index) => ({
+      row: Math.floor(index / GRID_COLUMNS),
+      column: index % GRID_COLUMNS,
+    })).filter((cell) => {
+      const key = `${cell.row}:${cell.column}`;
+      const centerY = GRID_TOP + cell.row * CELL_HEIGHT + BRICK_HEIGHT / 2;
+      return key !== currentCell && !occupied.has(key) && DANGER_Y - centerY > BLACK_HOLE_INFLUENCE_RADIUS;
+    });
+    if (openCells.length === 0) {
+      occupied.add(currentCell);
+      return;
+    }
+
+    const seed = Math.imul(state.stage + cycle * 17 + itemIndex * 31, 0x9e3779b1) >>> 0;
+    const destination = openCells[seed % openCells.length];
+    item.row = destination.row;
+    item.column = destination.column;
+    occupied.add(`${item.row}:${item.column}`);
+    relocated = true;
+  });
+
+  return relocated;
 }
 
 export function advanceStageIfCleared(state: GameState): boolean {

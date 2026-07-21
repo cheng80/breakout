@@ -434,6 +434,11 @@ button {
   background: #df3654;
 }
 
+.legend-blackhole {
+  background: radial-gradient(circle, #010101 42%, #9f2d0b 47%, #f05a16 66%, #391005 100%);
+  box-shadow: 0 0 12px rgb(229 82 22 / 65%);
+}
+
 .legend-laser {
   background: #10a9d4;
 }

@@ -4,6 +4,9 @@ import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  BLACK_HOLE_CAPTURE_RADIUS,
+  BLACK_HOLE_CYCLE_DURATION,
+  BLACK_HOLE_INFLUENCE_RADIUS,
   BOMB_EFFECT_DURATION,
   BRICK_HIT_EFFECT_DURATION,
   BRICK_HEIGHT,
@@ -15,8 +18,11 @@ import {
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   aimFromDrag,
+  blackHolePullStrength,
+  blackHolePresence,
   bombEffectFrame,
   brickHitEffectFrame,
+  captureBallByBlackHole,
   collectItem,
   consumeLaserTriggers,
   createGame,
@@ -24,6 +30,7 @@ import {
   hitBrickWithBall,
   laserEffectFrame,
   prepareVolley,
+  relocateBlackHoles,
   resetGame,
   resolveCircleRectCollision,
   shieldRewindFrame,
@@ -39,6 +46,8 @@ const GRID_MARGIN = 12;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
 const BALL_SPEED = 600;
+const BLACK_HOLE_PULL_ACCELERATION = 4000;
+const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
 interface ActiveBall extends Vec2 {
   vx: number;
@@ -54,6 +63,8 @@ interface PositionedEffect extends Vec2 {
 interface TimedEffect {
   elapsed: number;
 }
+
+type BallExit = "landed" | "captured" | null;
 
 void startGame().catch((error: unknown) => {
   console.error("게임 렌더러 초기화에 실패했습니다.", error);
@@ -82,6 +93,9 @@ let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let resetConfirmOpen = false;
+let blackHoleTime = 0;
+let blackHoleCycle = 0;
+let blackHoleStage = state.stage;
 let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
 const laserEffects: PositionedEffect[] = [];
@@ -126,6 +140,7 @@ const labelPool = new ObjectPool<Text>(
   },
 );
 const activeLabels: Text[] = [];
+const itemLabels = new Map<string, Text>();
 const ballCounter = new Text({
   text: "×1",
   style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
@@ -209,6 +224,9 @@ function reset(): void {
   aimCurrent = null;
   firstLandingX = null;
   boardSignature = "";
+  blackHoleTime = 0;
+  blackHoleCycle = 0;
+  blackHoleStage = state.stage;
   bombEffect = null;
   trapEffect = null;
   shieldRewindEffect = null;
@@ -347,11 +365,12 @@ function syncUi(): void {
 }
 
 function rebuildLabels(): void {
-  const signature = `${state.stage}|${state.bricks.map((brick) => `${brick.id}:${brick.hp}:${brick.row}`).join(",")}|${state.items.map((item) => `${item.id}:${item.row}`).join(",")}`;
+  const signature = `${state.stage}|${state.bricks.map((brick) => `${brick.id}:${brick.hp}:${brick.row}`).join(",")}|${state.items.map((item) => `${item.id}:${item.row}:${item.column}:${item.charges ?? ""}`).join(",")}`;
   if (signature === boardSignature) return;
   boardSignature = signature;
   labels.removeChildren();
   labelPool.releaseAll(activeLabels);
+  itemLabels.clear();
 
   state.bricks.forEach((brick) => {
     const rect = brickRect(brick);
@@ -368,11 +387,12 @@ function rebuildLabels(): void {
   state.items.forEach((item) => {
     const center = itemCenter(item);
     const label = labelPool.acquire();
-    label.text = itemLabel[item.type];
-    label.style.fontSize = item.type === "multiball" ? 10 : 12;
+    label.text = item.type === "blackhole" ? String(item.charges ?? 1) : itemLabel[item.type];
+    label.style.fontSize = item.type === "multiball" || item.type === "blackhole" ? 10 : 12;
     label.position.set(center.x, center.y);
     labels.addChild(label);
     activeLabels.push(label);
+    itemLabels.set(item.id, label);
   });
 }
 
@@ -447,6 +467,31 @@ function draw(): void {
   state.items.forEach((item) => {
     const logicalCenter = itemCenter(item);
     const center = { ...logicalCenter, y: logicalCenter.y + boardOffset };
+    if (item.type === "blackhole") {
+      const presence = blackHolePresence(blackHoleTime);
+      const pulse = (Math.sin(blackHoleTime * 5) + 1) / 2;
+      const label = itemLabels.get(item.id);
+      if (label) label.alpha = presence;
+      if (presence <= 0) return;
+
+      effectGlow.ellipse(center.x, center.y, 22 + pulse * 2, 7 + pulse * 0.7)
+        .stroke({ width: 12, color: 0xe55216, alpha: presence * 0.48 });
+      effectGlow.circle(center.x, center.y, BLACK_HOLE_INFLUENCE_RADIUS)
+        .stroke({ width: 8, color: 0xd9470e, alpha: presence * 0.08 });
+      scene.ellipse(center.x, center.y, 21 + pulse * 1.5, 6 + pulse * 0.6)
+        .stroke({ width: 2.5, color: 0xff6a19, alpha: presence * 0.92 });
+      scene.circle(center.x, center.y, 17).fill({ color: 0xa92d08, alpha: presence * 0.74 });
+      scene.circle(center.x, center.y, 13).fill({ color: 0x010101, alpha: presence });
+      scene.circle(center.x, center.y, 15 + pulse * 2)
+        .stroke({ width: 2, color: 0xf05a16, alpha: presence * 0.9 });
+      for (let orbit = 0; orbit < 2; orbit += 1) {
+        const angle = blackHoleTime * (2.3 + orbit * 0.45) + orbit * Math.PI;
+        const radius = 20 + orbit * 4;
+        scene.circle(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, 2.2 - orbit * 0.35)
+          .fill({ color: 0xff8a32, alpha: presence * (0.9 - orbit * 0.2) });
+      }
+      return;
+    }
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
@@ -553,14 +598,53 @@ function circleHitsRect(ball: ActiveBall, x: number, y: number, width: number, h
   return (ball.x - nearestX) ** 2 + (ball.y - nearestY) ** 2 <= radius ** 2;
 }
 
-function updateBall(ball: ActiveBall, delta: number): boolean {
+function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
+  const presence = blackHolePresence(blackHoleTime);
+  if (presence <= 0) return false;
+
+  let nearest: { item: Item; center: Vec2; distance: number } | null = null;
+  state.items.forEach((item) => {
+    if (item.type !== "blackhole") return;
+    const center = itemCenter(item);
+    const distance = Math.hypot(center.x - ball.x, center.y - ball.y);
+    if (distance <= BLACK_HOLE_INFLUENCE_RADIUS && (!nearest || distance < nearest.distance)) {
+      nearest = { item, center, distance };
+    }
+  });
+  if (!nearest) return false;
+
+  const target = nearest as { item: Item; center: Vec2; distance: number };
+  if (target.distance <= BLACK_HOLE_CAPTURE_RADIUS && presence >= 0.7) {
+    const remaining = captureBallByBlackHole(state, target.item.id);
+    if (remaining !== null) {
+      boardSignature = "";
+      syncUi();
+      return true;
+    }
+  }
+
+  const acceleration = BLACK_HOLE_PULL_ACCELERATION * blackHolePullStrength(target.distance) * presence;
+  if (target.distance > 0) {
+    ball.vx += ((target.center.x - ball.x) / target.distance) * acceleration * delta;
+    ball.vy += ((target.center.y - ball.y) / target.distance) * acceleration * delta;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    if (speed > BLACK_HOLE_MAX_SPEED) {
+      ball.vx = (ball.vx / speed) * BLACK_HOLE_MAX_SPEED;
+      ball.vy = (ball.vy / speed) * BLACK_HOLE_MAX_SPEED;
+    }
+  }
+  return false;
+}
+
+function updateBall(ball: ActiveBall, delta: number): BallExit {
   if (ball.delay > 0) {
     ball.delay -= delta;
-    return false;
+    return null;
   }
 
   const steps = 2;
   for (let step = 0; step < steps; step += 1) {
+    if (applyBlackHolePull(ball, delta / steps)) return "captured";
     ball.x += (ball.vx * delta) / steps;
     ball.y += (ball.vy * delta) / steps;
 
@@ -612,7 +696,7 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 
     const hitItem = state.items.find((item) => {
       const center = itemCenter(item);
-      return circleHitsRect(ball, center.x - 12, center.y - 12, 24, 24);
+      return item.type !== "blackhole" && circleHitsRect(ball, center.x - 12, center.y - 12, 24, 24);
     });
     if (hitItem) {
       const center = itemCenter(hitItem);
@@ -630,7 +714,7 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
     }
   }
 
-  return ball.y >= FLOOR_Y;
+  return ball.y >= FLOOR_Y ? "landed" : null;
 }
 
 function update(delta: number): void {
@@ -676,14 +760,28 @@ function update(delta: number): void {
       }
     }
   }
+  if (!paused && state.gameStatus !== "gameOver") {
+    if (blackHoleStage !== state.stage) {
+      blackHoleStage = state.stage;
+      blackHoleTime = 0;
+      blackHoleCycle = 0;
+    } else {
+      blackHoleTime += delta;
+      const nextCycle = Math.floor(blackHoleTime / BLACK_HOLE_CYCLE_DURATION);
+      if (nextCycle > blackHoleCycle) {
+        blackHoleCycle = nextCycle;
+        if (relocateBlackHoles(state, blackHoleCycle)) boardSignature = "";
+      }
+    }
+  }
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];
-      const returned = updateBall(ball, safeDelta);
+      const exit = updateBall(ball, safeDelta);
       if (state.gameStatus !== "volley") break;
-      if (returned) {
-        firstLandingX ??= ball.x;
+      if (exit) {
+        if (exit === "landed") firstLandingX ??= ball.x;
         activeBalls.splice(index, 1);
         ballPool.release(ball);
       }
