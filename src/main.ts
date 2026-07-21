@@ -26,6 +26,7 @@ import {
   resetGame,
   resolveCircleRectCollision,
   shieldRewindFrame,
+  stabilizeShallowBounce,
   traceAimPath,
   type Brick,
   type Item,
@@ -42,6 +43,7 @@ interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
   delay: number;
+  bounceCount: number;
 }
 
 interface BombEffect extends Vec2 {
@@ -163,6 +165,7 @@ function launch(direction: Vec2): void {
     vx: direction.x * BALL_SPEED,
     vy: direction.y * BALL_SPEED,
     delay: index * 0.075,
+    bounceCount: 0,
   }));
   syncUi();
 }
@@ -530,13 +533,22 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
     ball.x += (ball.vx * delta) / steps;
     ball.y += (ball.vy * delta) / steps;
 
+    let bounced = false;
     if (ball.x <= BALL_RADIUS || ball.x >= BOARD_WIDTH - BALL_RADIUS) {
       ball.x = Math.max(BALL_RADIUS, Math.min(BOARD_WIDTH - BALL_RADIUS, ball.x));
       ball.vx *= -1;
+      bounced = true;
     }
     if (ball.y <= BALL_RADIUS) {
       ball.y = BALL_RADIUS;
       ball.vy = Math.abs(ball.vy);
+      bounced = true;
+    }
+    if (bounced) {
+      ball.bounceCount += 1;
+      const velocity = stabilizeShallowBounce({ x: ball.vx, y: ball.vy }, ball.bounceCount);
+      ball.vx = velocity.x;
+      ball.vy = velocity.y;
     }
 
     const hitBrick = state.bricks.find((brick) => {
@@ -548,8 +560,10 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       const collision = resolveCircleRectCollision(ball, { x: ball.vx, y: ball.vy }, rect, BALL_RADIUS)!;
       ball.x = collision.position.x;
       ball.y = collision.position.y;
-      ball.vx = collision.velocity.x;
-      ball.vy = collision.velocity.y;
+      ball.bounceCount += 1;
+      const velocity = stabilizeShallowBounce(collision.velocity, ball.bounceCount);
+      ball.vx = velocity.x;
+      ball.vy = velocity.y;
       const destroyed = hitBrickWithBall(state, hitBrick.id);
       if (hitBrick.type !== "steel" && !destroyed) brickHitEffects.set(hitBrick.id, 0);
       else brickHitEffects.delete(hitBrick.id);

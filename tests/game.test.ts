@@ -27,6 +27,7 @@ import {
   prepareVolley,
   resolveCircleRectCollision,
   shieldRewindFrame,
+  stabilizeShallowBounce,
   traceAimPath,
 } from "../src/game";
 
@@ -122,6 +123,17 @@ describe("핵심 게임 규칙", () => {
     const embedded = resolveCircleRectCollision({ x: 42, y: 50 }, { x: 100, y: 0 }, rect, 5)!;
     expect(resolveCircleRectCollision(embedded.position, embedded.velocity, rect, 5)).toBeNull();
     expect(embedded.velocity.x).toBeLessThan(0);
+  });
+
+  it("거의 수평인 반사는 속도를 유지하면서 반복 횟수에 따라 다른 탈출 각도로 보정한다", () => {
+    const shallow = { x: 600, y: 10 };
+    const first = stabilizeShallowBounce(shallow, 0);
+    const second = stabilizeShallowBounce(shallow, 1);
+
+    expect(Math.hypot(first.x, first.y)).toBeCloseTo(Math.hypot(shallow.x, shallow.y));
+    expect(Math.abs(first.y)).toBeGreaterThan(100);
+    expect(Math.abs(second.y)).toBeGreaterThan(Math.abs(first.y));
+    expect(stabilizeShallowBounce({ x: 500, y: 300 }, 0)).toEqual({ x: 500, y: 300 });
   });
 
   it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~30개로 제한한다", () => {
