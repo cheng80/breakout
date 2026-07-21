@@ -1,15 +1,24 @@
-import { Application, Container, Graphics, Text } from "pixi.js";
+import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  DANGER_ROW,
+  BOMB_EFFECT_DURATION,
+  BRICK_HEIGHT,
+  CELL_HEIGHT,
+  DANGER_Y,
+  FLOOR_Y,
+  GRID_TOP,
   GRID_COLUMNS,
+  LASER_EFFECT_DURATION,
   aimFromDrag,
+  bombEffectFrame,
   collectItem,
+  consumeLaserTriggers,
   createGame,
-  damageBrick,
   finishVolley,
+  hitBrickWithBall,
+  laserEffectFrame,
   prepareVolley,
   resetGame,
   traceAimPath,
@@ -18,29 +27,35 @@ import {
   type Vec2,
 } from "./game";
 
-const GRID_TOP = 42;
 const GRID_GAP = 4;
 const GRID_MARGIN = 12;
-const CELL_HEIGHT = 42;
-const BRICK_HEIGHT = 34;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
 const BALL_SPEED = 360;
-const FLOOR_Y = 520;
-
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
   delay: number;
 }
 
+interface BombEffect extends Vec2 {
+  elapsed: number;
+}
+
+interface LaserEffect extends Vec2 {
+  elapsed: number;
+}
+
 const state = createGame();
 let activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
-let lastDirection: Vec2 = { x: 0, y: -1 };
 let firstLandingX: number | null = null;
 let boardSignature = "";
+let helpOpen = false;
+let bombEffect: BombEffect | null = null;
+let trapEffect: BombEffect | null = null;
+let laserEffects: LaserEffect[] = [];
 
 const app = new Application();
 await app.init({
@@ -54,17 +69,33 @@ await app.init({
 
 const host = document.querySelector<HTMLDivElement>("#game-canvas")!;
 host.appendChild(app.canvas);
+app.canvas.style.width = "100%";
+app.canvas.style.height = "100%";
 app.canvas.setAttribute("role", "application");
 app.canvas.setAttribute("aria-label", "아래에서 위로 드래그해 공을 발사하는 게임판");
 
 const scene = new Graphics();
+const effectGlow = new Graphics();
+effectGlow.filters = [new BlurFilter({ strength: 10, quality: 3 })];
 const labels = new Container();
 const ballCounter = new Text({
   text: "×1",
   style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
 });
 ballCounter.anchor.set(0, 0.5);
-app.stage.addChild(scene, labels, ballCounter);
+const trapNotice = new Text({
+  text: "−1",
+  style: { fill: 0xff6b7f, fontFamily: "system-ui", fontSize: 18, fontWeight: "900" },
+});
+trapNotice.anchor.set(0.5);
+trapNotice.visible = false;
+const dangerLabel = new Text({
+  text: "DANGER",
+  style: { fill: 0xff718b, fontFamily: "system-ui", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
+});
+dangerLabel.anchor.set(1, 0);
+dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
+app.stage.addChild(scene, effectGlow, labels, trapNotice, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -73,9 +104,10 @@ const shieldEl = document.querySelector<HTMLElement>("#shield")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
-const resultKicker = document.querySelector<HTMLElement>("#result-kicker")!;
-const resultTitle = document.querySelector<HTMLElement>("#result-title")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
+const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
+const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
+const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
 
 const brickRect = (brick: Brick) => ({
   x: GRID_MARGIN + brick.column * (CELL_WIDTH + GRID_GAP),
@@ -84,14 +116,19 @@ const brickRect = (brick: Brick) => ({
   height: BRICK_HEIGHT,
 });
 
-const itemCenter = (item: Item) => ({
+const itemCenter = (item: Pick<Item, "row" | "column">) => ({
   x: GRID_MARGIN + item.column * (CELL_WIDTH + GRID_GAP) + CELL_WIDTH / 2,
   y: GRID_TOP + item.row * CELL_HEIGHT + BRICK_HEIGHT / 2,
 });
 
-function launch(direction = lastDirection): void {
+function pullLaserEffects(): void {
+  consumeLaserTriggers(state).forEach((trigger) => {
+    laserEffects.push({ ...itemCenter(trigger), elapsed: 0 });
+  });
+}
+
+function launch(direction: Vec2): void {
   if (state.gameStatus !== "ready") return;
-  lastDirection = direction;
   const count = prepareVolley(state);
   firstLandingX = null;
   activeBalls = Array.from({ length: count }, (_, index) => ({
@@ -110,6 +147,10 @@ function reset(): void {
   aimCurrent = null;
   firstLandingX = null;
   boardSignature = "";
+  bombEffect = null;
+  trapEffect = null;
+  laserEffects = [];
+  setHelpOpen(false);
   syncUi();
 }
 
@@ -122,7 +163,7 @@ function screenPoint(event: PointerEvent): Vec2 {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (state.gameStatus !== "ready") return;
+  if (helpOpen || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
@@ -155,41 +196,41 @@ app.canvas.addEventListener("pointercancel", () => {
   syncUi();
 });
 
-window.addEventListener("keydown", (event) => {
-  if (event.code === "Space") {
-    event.preventDefault();
-    launch();
-  }
-});
-
 document.querySelector("#restart")!.addEventListener("click", reset);
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+helpButton.addEventListener("click", () => setHelpOpen(!helpOpen));
+helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+
+function setHelpOpen(open: boolean): void {
+  helpOpen = open;
+  helpDialog.hidden = !open;
+  helpButton.setAttribute("aria-expanded", String(open));
+  if (open && state.gameStatus === "aiming") {
+    aimStart = null;
+    aimCurrent = null;
+    state.gameStatus = "ready";
+    syncUi();
+  }
+}
 
 function syncUi(): void {
-  stageEl.textContent = `${state.stage} / 5`;
+  stageEl.textContent = String(state.stage).padStart(2, "0");
   scoreEl.textContent = state.score.toLocaleString("ko-KR");
   ballsEl.textContent = `× ${state.ballCount}`;
   shieldEl.textContent = state.shield ? "ON" : "OFF";
   shieldEl.classList.toggle("active", state.shield);
 
   const messages = {
-    ready: "아래에서 위로 드래그해 발사하세요",
+    ready: state.powerTurns > 0 ? "강화볼 준비 · 공격력 ×2" : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
-    volley: "공이 모두 돌아올 때까지 기다리세요",
+    volley: state.powerTurns > 0 ? "강화볼 발사 중 · 공격력 ×2" : "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
-    victory: "5개 스테이지를 모두 돌파했습니다",
   } as const;
   statusEl.textContent = messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
 
-  const terminal = state.gameStatus === "gameOver" || state.gameStatus === "victory";
-  result.hidden = !terminal;
-  if (terminal) {
-    const victory = state.gameStatus === "victory";
-    resultKicker.textContent = victory ? "ALL CLEAR" : "RUN OVER";
-    resultTitle.textContent = victory ? "완벽한 클리어!" : "한 번 더 도전할까요?";
-    resultScore.textContent = state.score.toLocaleString("ko-KR");
-  }
+  result.hidden = state.gameStatus !== "gameOver";
+  if (state.gameStatus === "gameOver") resultScore.textContent = state.score.toLocaleString("ko-KR");
 }
 
 function rebuildLabels(): void {
@@ -200,16 +241,17 @@ function rebuildLabels(): void {
 
   state.bricks.forEach((brick) => {
     const rect = brickRect(brick);
+    const text = brick.type === "laser" ? `↔${brick.hp}` : brick.type === "steel" ? "◆" : String(brick.hp);
     const label = new Text({
-      text: String(brick.hp),
-      style: { fill: 0xffffff, fontFamily: "system-ui", fontSize: 14, fontWeight: "700" },
+      text,
+      style: { fill: 0xffffff, fontFamily: "system-ui", fontSize: brick.type === "normal" ? 14 : 12, fontWeight: "800" },
     });
     label.anchor.set(0.5);
     label.position.set(rect.x + rect.width / 2, rect.y + rect.height / 2);
     labels.addChild(label);
   });
 
-  const itemLabel = { bomb: "B", multiball: "+1", shield: "S" } as const;
+  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "P", trap: "−1" } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     const label = new Text({
@@ -223,6 +265,8 @@ function rebuildLabels(): void {
 }
 
 function brickColor(brick: Brick): number {
+  if (brick.type === "laser") return 0x10a9d4;
+  if (brick.type === "steel") return 0x596579;
   const ratio = brick.hp / brick.maxHp;
   if (ratio > 0.7) return 0xff4d6d;
   if (ratio > 0.35) return 0xff8a4c;
@@ -243,7 +287,7 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
       .lineTo(start.x + unit.x * dashEnd, start.y + unit.y * dashEnd);
   }
   scene.stroke({
-    width: reflection === 0 ? 2.4 : 1.5,
+    width: reflection === 0 ? 3.4 : 2.2,
     color: 0xffffff,
     alpha: [0.92, 0.44, 0.28][reflection],
   });
@@ -251,30 +295,84 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
 
 function draw(): void {
   scene.clear();
+  effectGlow.clear();
   scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
 
-  const dangerY = GRID_TOP + DANGER_ROW * CELL_HEIGHT - 5;
+  scene
+    .roundRect(8, FLOOR_Y + 7, BOARD_WIDTH - 16, BOARD_HEIGHT - FLOOR_Y - 10, 11)
+    .fill(0x14263d);
+  scene
+    .moveTo(14, FLOOR_Y + 7)
+    .lineTo(BOARD_WIDTH - 14, FLOOR_Y + 7)
+    .stroke({ width: 3, color: 0x365274, alpha: 0.95 });
+  scene
+    .roundRect(state.launchPosition.x - 19, FLOOR_Y + 4, 38, 8, 4)
+    .fill({ color: 0x6c7cff, alpha: 0.75 });
+
   for (let x = 10; x < BOARD_WIDTH - 10; x += 16) {
-    scene.moveTo(x, dangerY).lineTo(Math.min(x + 8, BOARD_WIDTH - 10), dangerY);
+    scene.moveTo(x, DANGER_Y).lineTo(Math.min(x + 8, BOARD_WIDTH - 10), DANGER_Y);
   }
   scene.stroke({ width: 1.5, color: 0xff4d6d, alpha: 0.7 });
 
   state.bricks.forEach((brick) => {
     const rect = brickRect(brick);
     scene.roundRect(rect.x, rect.y, rect.width, rect.height, 8).fill(brickColor(brick));
+    if (brick.type === "laser") {
+      scene.moveTo(rect.x + 6, rect.y + rect.height / 2).lineTo(rect.x + rect.width - 6, rect.y + rect.height / 2)
+        .stroke({ width: 2, color: 0xffffff, alpha: 0.3 });
+    } else if (brick.type === "steel") {
+      scene.roundRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6, 6)
+        .stroke({ width: 2, color: 0xd7e0ec, alpha: 0.58 });
+    }
   });
 
-  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff } as const;
+  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff, trap: 0xff405f } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
 
+  if (bombEffect) {
+    const frame = bombEffectFrame(bombEffect.elapsed);
+    effectGlow.circle(bombEffect.x, bombEffect.y, frame.radius).stroke({ width: 20, color: 0xff8a32, alpha: frame.alpha * 0.72 });
+    scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0xff8a32, alpha: frame.alpha * 0.055 });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius).fill({ color: 0xff8a32, alpha: frame.alpha * 0.24 });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius).stroke({ width: 6, color: 0xffc145, alpha: frame.alpha });
+    scene.circle(bombEffect.x, bombEffect.y, frame.radius * 0.58).stroke({ width: 3, color: 0xffffff, alpha: frame.alpha * 0.85 });
+  }
+
+  if (trapEffect) {
+    const frame = bombEffectFrame(trapEffect.elapsed);
+    const radius = frame.radius * 0.55;
+    effectGlow.circle(trapEffect.x, trapEffect.y, radius).stroke({ width: 18, color: 0xff405f, alpha: frame.alpha * 0.8 });
+    scene.circle(trapEffect.x, trapEffect.y, radius).fill({ color: 0xff405f, alpha: frame.alpha * 0.12 });
+    scene.circle(trapEffect.x, trapEffect.y, radius).stroke({ width: 5, color: 0xff6b7f, alpha: frame.alpha });
+    trapNotice.visible = true;
+    trapNotice.alpha = frame.alpha;
+    trapNotice.position.set(trapEffect.x, trapEffect.y - 14 - (1 - frame.alpha) * 18);
+  } else {
+    trapNotice.visible = false;
+  }
+
+  laserEffects.forEach((effect) => {
+    const frame = laserEffectFrame(effect.elapsed);
+    const left = effect.x * frame.spread;
+    const right = (BOARD_WIDTH - effect.x) * frame.spread;
+    effectGlow.moveTo(effect.x - left, effect.y).lineTo(effect.x + right, effect.y)
+      .stroke({ width: 32, color: 0x16cfff, alpha: frame.alpha * 0.82 });
+    scene.rect(effect.x - left, effect.y - 10, left + right, 20).fill({ color: 0x11cfff, alpha: frame.alpha * 0.24 });
+    scene.moveTo(effect.x - left, effect.y).lineTo(effect.x + right, effect.y)
+      .stroke({ width: 16, color: 0x11bfe8, alpha: frame.alpha * 0.82 });
+    scene.moveTo(effect.x - left, effect.y).lineTo(effect.x + right, effect.y)
+      .stroke({ width: 4, color: 0xffffff, alpha: frame.alpha });
+  });
+
   const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
+  const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
   const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
   if (showLaunchBall) {
-    scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(0xf4f8ff);
+    scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(ballColor);
     scene.circle(state.launchPosition.x, state.launchPosition.y, 13).stroke({ width: 1, color: 0x6c7cff, alpha: 0.7 });
   }
 
@@ -299,7 +397,7 @@ function draw(): void {
   }
 
   activeBalls.forEach((ball) => {
-    if (ball.delay <= 0) scene.circle(ball.x, ball.y, BALL_RADIUS).fill(0xffffff);
+    if (ball.delay <= 0) scene.circle(ball.x, ball.y, BALL_RADIUS).fill(ballColor);
   });
   rebuildLabels();
 }
@@ -342,7 +440,8 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       ball.y = previous.y;
       if (cameFromSide) ball.vx *= -1;
       else ball.vy *= -1;
-      damageBrick(state, hitBrick.id);
+      hitBrickWithBall(state, hitBrick.id);
+      pullLaserEffects();
       boardSignature = "";
       syncUi();
       break;
@@ -353,7 +452,11 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       return circleHitsRect(ball, center.x - 12, center.y - 12, 24, 24);
     });
     if (hitItem) {
-      collectItem(state, hitItem.id);
+      const center = itemCenter(hitItem);
+      const itemType = collectItem(state, hitItem.id);
+      if (itemType === "bomb") bombEffect = { ...center, elapsed: 0 };
+      else if (itemType === "trap") trapEffect = { ...center, elapsed: 0 };
+      pullLaserEffects();
       boardSignature = "";
       syncUi();
     }
@@ -363,7 +466,19 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
-  if (state.gameStatus === "volley") {
+  if (!helpOpen && bombEffect) {
+    bombEffect.elapsed += delta;
+    if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
+  }
+  if (!helpOpen && trapEffect) {
+    trapEffect.elapsed += delta;
+    if (trapEffect.elapsed >= BOMB_EFFECT_DURATION) trapEffect = null;
+  }
+  if (!helpOpen) {
+    laserEffects.forEach((effect) => (effect.elapsed += delta));
+    laserEffects = laserEffects.filter((effect) => effect.elapsed < LASER_EFFECT_DURATION);
+  }
+  if (!helpOpen && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];

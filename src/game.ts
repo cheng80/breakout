@@ -1,11 +1,20 @@
 export const BOARD_WIDTH = 360;
-export const BOARD_HEIGHT = 560;
+export const BOARD_HEIGHT = 602;
 export const GRID_COLUMNS = 8;
+export const GRID_TOP = 42;
+export const CELL_HEIGHT = 42;
+export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 10;
-export const MAX_BALLS = 8;
+export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
+export const FLOOR_Y = BOARD_HEIGHT - 40;
+export const MAX_BALLS = 20;
+export const MAX_BRICK_HP = 50;
+export const BOMB_EFFECT_DURATION = 0.5;
+export const LASER_EFFECT_DURATION = 0.45;
 
-export type GameStatus = "ready" | "aiming" | "volley" | "gameOver" | "victory";
-export type ItemType = "bomb" | "multiball" | "shield";
+export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
+export type ItemType = "bomb" | "multiball" | "shield" | "power" | "trap";
+export type BrickType = "normal" | "laser" | "steel";
 
 export interface Vec2 {
   x: number;
@@ -31,12 +40,34 @@ export interface AimSegment {
   end: Vec2;
 }
 
+export function bombEffectFrame(elapsed: number): { radius: number; alpha: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / BOMB_EFFECT_DURATION));
+  return {
+    radius: 24 + 66 * (1 - (1 - progress) ** 2),
+    alpha: 1 - progress,
+  };
+}
+
+export function laserEffectFrame(elapsed: number): { spread: number; alpha: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / LASER_EFFECT_DURATION));
+  return {
+    spread: Math.min(1, progress * 3),
+    alpha: 1 - progress,
+  };
+}
+
 export interface Brick {
   id: string;
   row: number;
   column: number;
   hp: number;
   maxHp: number;
+  type: BrickType;
+}
+
+export interface LaserTrigger {
+  row: number;
+  column: number;
 }
 
 export interface Item {
@@ -55,13 +86,15 @@ export interface GameState {
   items: Item[];
   gameStatus: GameStatus;
   shield: boolean;
+  powerTurns: number;
+  pendingLaserTriggers: LaserTrigger[];
   turn: number;
 }
 
 const layouts = [
-  ["..1111..", ".1....1.", "1..M...1", ".1....1.", "..1111.."],
-  ["2.2..2.2", ".222222.", "..B..M..", ".2.22.2.", "2..22..2"],
-  ["333..333", "3..33..3", ".3.S..3.", "..3333..", "3.M..B.3"],
+  [".1.11.1.", "..1111..", "...M...."],
+  ["2.2..2.2", ".22L222.", ".PB..M..", ".2.22.2.", "2..22..2"],
+  ["333..333", "3..3X..3", ".3.S..3.", "..3333..", "3.M..B.3"],
   ["44.44.44", ".444444.", "4.B..M.4", ".44..44.", "44.SS.44"],
   ["55555555", "5.5..5.5", ".555555.", "5.BMS..5", ".55..55.", "555..555"],
 ] as const;
@@ -70,18 +103,84 @@ const itemTypes: Record<string, ItemType> = {
   B: "bomb",
   M: "multiball",
   S: "shield",
+  P: "power",
 };
 
+function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
+  let seed = Math.imul(stage, 0x9e3779b1) >>> 0;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const rows = stage >= 31 ? 7 : Math.min(6, 4 + Math.floor((stage - 6) / 5));
+  const targetPairs = Math.min(rows * 4 - 2, Math.ceil((12 + stage) / 2));
+  const candidates = Array.from({ length: rows * 4 }, (_, index) => ({
+    row: Math.floor(index / 4),
+    column: index % 4,
+    noise: random(),
+  }));
+  const pattern = stage % 5;
+  const priority = ({ row, column, noise }: (typeof candidates)[number]) => {
+    if (pattern === 1) return ((row + column + stage) % 2 === 0 ? 0 : 2) + noise;
+    if (pattern === 2) return Math.abs(column - ((row + Math.floor(stage / 5)) % 4)) + noise * 0.35;
+    if (pattern === 3) return column + noise * 0.35;
+    if (pattern === 4) return Math.min(row, rows - 1 - row, column, 3 - column) + noise * 0.35;
+    return noise;
+  };
+  candidates.sort((a, b) => priority(a) - priority(b));
+
+  const bricks: Brick[] = [];
+  const baseHp = Math.min(MAX_BRICK_HP, stage + 1);
+  candidates.slice(0, targetPairs).forEach(({ row, column }, index) => {
+    const hp = Math.min(MAX_BRICK_HP, Math.max(1, baseHp + Math.floor(random() * 3) - 1));
+    for (const mirroredColumn of new Set([column, GRID_COLUMNS - 1 - column])) {
+      bricks.push({
+        id: `s${stage}-b${row}-${mirroredColumn}-${index}`,
+        row,
+        column: mirroredColumn,
+        hp,
+        maxHp: hp,
+        type: "normal",
+      });
+    }
+  });
+
+  const specialBricks = [...bricks].sort(() => random() - 0.5);
+  if (specialBricks[0]) specialBricks[0].type = "laser";
+  if (specialBricks[1]) Object.assign(specialBricks[1], { type: "steel", hp: 0, maxHp: 0 });
+
+  const occupied = new Set(bricks.map((brick) => `${brick.row}:${brick.column}`));
+  const openCells = Array.from({ length: rows * GRID_COLUMNS }, (_, index) => ({
+    row: Math.floor(index / GRID_COLUMNS),
+    column: index % GRID_COLUMNS,
+  })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
+  openCells.sort(() => random() - 0.5);
+  const itemOrder: ItemType[] = ["multiball", "power"];
+  if (stage % 2 === 0) itemOrder.push("bomb");
+  if (stage % 3 === 0) itemOrder.push("shield");
+  if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
+  if (stage >= 31 && itemOrder.length < 4) itemOrder.push("trap");
+  const items = itemOrder.map((type, index) => ({
+    id: `s${stage}-i${index}`,
+    ...openCells[index],
+    type,
+  }));
+
+  return { bricks, items };
+}
+
 function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
+  if (stage > layouts.length) return proceduralBoard(stage);
   const bricks: Brick[] = [];
   const items: Item[] = [];
   const layout = layouts[stage - 1];
 
   layout.forEach((line, row) => {
     [...line].forEach((cell, column) => {
-      if (/\d/.test(cell)) {
-        const hp = Number(cell) + Math.floor((stage - 1) / 2);
-        bricks.push({ id: `s${stage}-b${row}-${column}`, row, column, hp, maxHp: hp });
+      if (/\d|L|X/.test(cell)) {
+        const type: BrickType = cell === "L" ? "laser" : cell === "X" ? "steel" : "normal";
+        const hp = type === "steel" ? 0 : cell === "L" ? stage : Number(cell) + Math.floor((stage - 1) / 2);
+        bricks.push({ id: `s${stage}-b${row}-${column}`, row, column, hp, maxHp: hp, type });
       } else if (itemTypes[cell]) {
         items.push({ id: `s${stage}-i${row}-${column}`, row, column, type: itemTypes[cell] });
       }
@@ -96,10 +195,12 @@ export function createGame(): GameState {
     stage: 1,
     score: 0,
     ballCount: 1,
-    launchPosition: { x: BOARD_WIDTH / 2, y: 520 },
+    launchPosition: { x: BOARD_WIDTH / 2, y: FLOOR_Y },
     ...stageBoard(1),
     gameStatus: "ready",
     shield: false,
+    powerTurns: 0,
+    pendingLaserTriggers: [],
     turn: 0,
   };
 }
@@ -211,18 +312,33 @@ export function prepareVolley(state: GameState): number {
 
 export function damageBrick(state: GameState, brickId: string, damage = 1): boolean {
   const brick = state.bricks.find((candidate) => candidate.id === brickId);
-  if (!brick) return false;
+  if (!brick || brick.type === "steel") return false;
 
   const applied = Math.min(brick.hp, Math.max(0, damage));
   brick.hp -= applied;
   state.score += applied * 10;
 
   if (brick.hp <= 0) {
-    state.bricks = state.bricks.filter((candidate) => candidate.id !== brickId);
+    const cleared = brick.type === "laser"
+      ? state.bricks.filter((candidate) => candidate.row === brick.row && candidate.type !== "steel")
+      : [brick];
+    state.bricks = state.bricks.filter((candidate) => !cleared.includes(candidate));
+    state.score += cleared
+      .filter((candidate) => candidate !== brick)
+      .reduce((score, candidate) => score + candidate.hp * 10 + 40, 0);
     state.score += 40;
+    if (brick.type === "laser") state.pendingLaserTriggers.push({ row: brick.row, column: brick.column });
     return true;
   }
   return false;
+}
+
+export function consumeLaserTriggers(state: GameState): LaserTrigger[] {
+  return state.pendingLaserTriggers.splice(0);
+}
+
+export function hitBrickWithBall(state: GameState, brickId: string): boolean {
+  return damageBrick(state, brickId, state.powerTurns > 0 ? 2 : 1);
 }
 
 export function collectItem(state: GameState, itemId: string): ItemType | null {
@@ -234,6 +350,10 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
   } else if (item.type === "shield") {
     state.shield = true;
+  } else if (item.type === "power") {
+    state.powerTurns = 2;
+  } else if (item.type === "trap") {
+    state.ballCount = Math.max(1, state.ballCount - 1);
   } else {
     const targets = state.bricks.filter(
       (brick) => Math.abs(brick.row - item.row) <= 1 && Math.abs(brick.column - item.column) <= 1,
@@ -245,15 +365,12 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
 }
 
 export function advanceStageIfCleared(state: GameState): boolean {
-  if (state.bricks.length > 0) return false;
-  if (state.stage === layouts.length) {
-    state.gameStatus = "victory";
-    return true;
-  }
-
+  if (state.bricks.some((brick) => brick.type !== "steel")) return false;
   state.stage += 1;
   state.shield = false;
-  state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };
+  state.powerTurns = 0;
+  state.pendingLaserTriggers = [];
+  state.launchPosition = { x: BOARD_WIDTH / 2, y: FLOOR_Y };
   Object.assign(state, stageBoard(state.stage));
   state.gameStatus = "ready";
   return true;
@@ -276,15 +393,23 @@ function addTurnMultiball(state: GameState): void {
 export function finishVolley(state: GameState, firstLandingX: number): void {
   state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, firstLandingX));
   if (advanceStageIfCleared(state)) return;
+  state.powerTurns = Math.max(0, state.powerTurns - 1);
 
   state.bricks.forEach((brick) => (brick.row += 1));
   state.items.forEach((item) => (item.row += 1));
+
+  state.bricks = state.bricks.filter(
+    (brick) => brick.type !== "steel" || GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT <= DANGER_Y,
+  );
 
   const barrierMultiballs = state.items.filter((item) => item.type === "multiball" && item.row >= DANGER_ROW);
   state.ballCount = Math.min(MAX_BALLS, state.ballCount + barrierMultiballs.length);
   state.items = state.items.filter((item) => !barrierMultiballs.includes(item));
 
-  if (state.bricks.some((brick) => brick.row >= DANGER_ROW)) {
+  const reachedDanger = state.bricks.some(
+    (brick) => brick.type !== "steel" && GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT > DANGER_Y,
+  );
+  if (reachedDanger) {
     if (state.shield) state.shield = false;
     else {
       state.gameStatus = "gameOver";
