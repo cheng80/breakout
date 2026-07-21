@@ -47,6 +47,11 @@ button {
   padding: 0 2px;
 }
 
+.top-actions {
+  display: flex;
+  gap: 7px;
+}
+
 .topbar,
 .hud,
 .game-shell,
@@ -80,13 +85,19 @@ h1 {
   box-shadow: 0 10px 28px rgba(39, 51, 130, 0.3), inset 0 1px rgba(255, 255, 255, 0.12);
   cursor: pointer;
   font-size: 21px;
+  font-weight: 800;
   transition-property: transform, background-color;
   transition-duration: 140ms;
 }
 
 .icon-button:active,
-.result button:active {
+.result button:active,
+.item-help-card button:active {
   transform: scale(0.96);
+}
+
+.icon-button[aria-expanded="true"] {
+  background: #6c7cff;
 }
 
 .hud {
@@ -202,6 +213,81 @@ h1 {
   display: none;
 }
 
+.item-help {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(4, 11, 22, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.item-help[hidden] {
+  display: none;
+}
+
+.item-help-card {
+  width: min(100%, 300px);
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(18, 32, 52, 0.97);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.11);
+}
+
+.item-help-card > p {
+  margin: 0 0 4px;
+  color: #8795ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.17em;
+}
+
+.item-help-card h2 {
+  margin: 0 0 14px;
+  font-size: 22px;
+}
+
+.item-help-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+  list-style: none;
+}
+
+.item-help-list li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-help-list b {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11px;
+}
+
+.item-help-list span {
+  color: #9ba8bc;
+  font-size: 10px;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.item-help-list strong {
+  display: block;
+  color: #f5f8ff;
+  font-size: 12px;
+}
+
 .result > p:first-child {
   margin: 0 0 5px;
   color: #8795ff;
@@ -222,7 +308,8 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.result button {
+.result button,
+.item-help-card button {
   width: 100%;
   min-height: 44px;
   margin-top: 6px;
@@ -236,8 +323,12 @@ h1 {
   transition-duration: 140ms;
 }
 
+.item-help-card button {
+  margin-top: 16px;
+}
+
 .control-panel {
-  min-height: 64px;
+  min-height: 40px;
   padding: 7px 9px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.055);
@@ -246,7 +337,7 @@ h1 {
 
 .control-status {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 9px;
   color: #9ba8bc;
@@ -257,33 +348,6 @@ h1 {
   font-size: 12px;
   font-weight: 650;
   text-wrap: pretty;
-}
-
-.item-legend {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  margin-top: 7px;
-  color: #77869e;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.item-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.item-legend b {
-  min-width: 18px;
-  height: 18px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 9px;
 }
 
 .legend-multiball {
@@ -320,15 +384,6 @@ h1 {
   box-shadow: 0 0 12px rgba(255, 77, 109, 0.65);
 }
 
-kbd {
-  padding: 4px 6px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #708098;
-  font: 700 8px/1 system-ui;
-  letter-spacing: 0.06em;
-}
-
 @media (max-height: 650px) {
   .app {
     gap: 6px;
@@ -362,19 +417,12 @@ kbd {
     padding-inline: 5px;
   }
 
-  kbd {
-    display: none;
-  }
-
-  .item-legend {
-    gap: 3px;
-    font-size: 8px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .icon-button,
-  .result button {
+  .result button,
+  .item-help-card button {
     transition-duration: 0ms;
   }
 }

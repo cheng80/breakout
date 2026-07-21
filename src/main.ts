@@ -38,9 +38,9 @@ const state = createGame();
 let activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
-let lastDirection: Vec2 = { x: 0, y: -1 };
 let firstLandingX: number | null = null;
 let boardSignature = "";
+let helpOpen = false;
 
 const app = new Application();
 await app.init({
@@ -82,6 +82,9 @@ const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
+const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
+const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
+const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
 
 const brickRect = (brick: Brick) => ({
   x: GRID_MARGIN + brick.column * (CELL_WIDTH + GRID_GAP),
@@ -95,9 +98,8 @@ const itemCenter = (item: Item) => ({
   y: GRID_TOP + item.row * CELL_HEIGHT + BRICK_HEIGHT / 2,
 });
 
-function launch(direction = lastDirection): void {
+function launch(direction: Vec2): void {
   if (state.gameStatus !== "ready") return;
-  lastDirection = direction;
   const count = prepareVolley(state);
   firstLandingX = null;
   activeBalls = Array.from({ length: count }, (_, index) => ({
@@ -116,6 +118,7 @@ function reset(): void {
   aimCurrent = null;
   firstLandingX = null;
   boardSignature = "";
+  setHelpOpen(false);
   syncUi();
 }
 
@@ -128,7 +131,7 @@ function screenPoint(event: PointerEvent): Vec2 {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (state.gameStatus !== "ready") return;
+  if (helpOpen || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
@@ -161,15 +164,22 @@ app.canvas.addEventListener("pointercancel", () => {
   syncUi();
 });
 
-window.addEventListener("keydown", (event) => {
-  if (event.code === "Space") {
-    event.preventDefault();
-    launch();
-  }
-});
-
 document.querySelector("#restart")!.addEventListener("click", reset);
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+helpButton.addEventListener("click", () => setHelpOpen(!helpOpen));
+helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+
+function setHelpOpen(open: boolean): void {
+  helpOpen = open;
+  helpDialog.hidden = !open;
+  helpButton.setAttribute("aria-expanded", String(open));
+  if (open && state.gameStatus === "aiming") {
+    aimStart = null;
+    aimCurrent = null;
+    state.gameStatus = "ready";
+    syncUi();
+  }
+}
 
 function syncUi(): void {
   stageEl.textContent = String(state.stage).padStart(2, "0");
@@ -373,7 +383,7 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
-  if (state.gameStatus === "volley") {
+  if (!helpOpen && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];

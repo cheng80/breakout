@@ -14,7 +14,10 @@
           <p class="eyebrow">SWIPE BREAKOUT</p>
           <h1>각도를 잡고, 한 번에 쏘세요.</h1>
         </div>
-        <button id="restart" class="icon-button" type="button" aria-label="게임 다시 시작">↻</button>
+        <div class="top-actions">
+          <button id="help" class="icon-button" type="button" aria-label="아이템 설명 보기" aria-controls="item-help" aria-expanded="false">?</button>
+          <button id="restart" class="icon-button" type="button" aria-label="게임 다시 시작">↻</button>
+        </div>
       </header>
 
       <section class="hud" aria-label="게임 현황">
@@ -26,6 +29,19 @@
 
       <section class="game-shell">
         <div id="game-canvas" class="game-canvas" aria-label="벽돌깨기 게임판"></div>
+        <section id="item-help" class="item-help" role="dialog" aria-modal="true" aria-labelledby="item-help-title" hidden>
+          <div class="item-help-card">
+            <p>PAUSED</p>
+            <h2 id="item-help-title">아이템 효과</h2>
+            <ul class="item-help-list">
+              <li><b class="legend-multiball">+1</b><span><strong>공 추가</strong>다음 발사부터 공이 하나 늘어납니다.</span></li>
+              <li><b class="legend-bomb">B</b><span><strong>폭탄</strong>주변 블록에 피해를 줍니다.</span></li>
+              <li><b class="legend-power">P</b><span><strong>강화볼</strong>다음 발사까지 공격력이 2배가 됩니다.</span></li>
+              <li><b class="legend-shield">S</b><span><strong>보호막</strong>위험선 아래 진입을 한 번 막습니다.</span></li>
+            </ul>
+            <button id="item-help-close" type="button">게임 계속하기</button>
+          </div>
+        </section>
         <div id="result" class="result" hidden>
           <p>RUN OVER</p>
           <h2>다시 조준해볼까요?</h2>
@@ -38,13 +54,6 @@
         <div class="control-status">
           <span id="status-dot" aria-hidden="true"></span>
           <p id="status" aria-live="polite">아래에서 위로 드래그해 발사하세요</p>
-          <kbd>SPACE</kbd>
-        </div>
-        <div class="item-legend" aria-label="아이템 안내">
-          <span><b class="legend-multiball">+1</b>공 추가</span>
-          <span><b class="legend-bomb">B</b>주변 공격</span>
-          <span><b class="legend-power">P</b>공격력 ×2</span>
-          <span><b class="legend-shield">S</b>1회 방어</span>
         </div>
       </footer>
     </main>
