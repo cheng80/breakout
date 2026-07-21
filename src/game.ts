@@ -270,6 +270,18 @@ export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
   return { x, y };
 }
 
+export function stabilizeShallowBounce(velocity: Vec2, bounceCount: number): Vec2 {
+  const speed = Math.hypot(velocity.x, velocity.y);
+  if (speed === 0 || Math.abs(velocity.y) / speed >= 0.2) return velocity;
+
+  const verticalRatio = [0.24, 0.28, 0.32][bounceCount % 3];
+  const y = Math.sign(velocity.y || 1) * speed * verticalRatio;
+  return {
+    x: Math.sign(velocity.x || 1) * Math.sqrt(speed ** 2 - y ** 2),
+    y,
+  };
+}
+
 export function resolveCircleRectCollision(
   position: Vec2,
   velocity: Vec2,
