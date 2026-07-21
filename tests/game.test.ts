@@ -117,7 +117,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.bricks.some((brick) => brick.type === "laser")).toBe(true);
   });
 
-  it("멀티볼, 쉴드, 폭탄, 강화볼 아이템을 규칙대로 적용한다", () => {
+  it("멀티볼, 쉴드, 폭탄, 강화볼, 공 감소 함정을 규칙대로 적용한다", () => {
     const state = createGame();
     const multiball = state.items.find((item) => item.type === "multiball")!;
     collectItem(state, multiball.id);
@@ -145,6 +145,15 @@ describe("핵심 게임 규칙", () => {
     expect(state.powerTurns).toBe(1);
     finishVolley(state, 180);
     expect(state.powerTurns).toBe(0);
+
+    state.ballCount = 3;
+    state.items.push({ id: "trap", row: 1, column: 3, type: "trap" });
+    collectItem(state, "trap");
+    expect(state.ballCount).toBe(2);
+    state.items.push({ id: "last-trap", row: 1, column: 4, type: "trap" });
+    state.ballCount = 1;
+    collectItem(state, "last-trap");
+    expect(state.ballCount).toBe(1);
   });
 
   it("첫 공 착지 위치를 계승하고 벽돌 하강 및 쉴드 1회 방어를 적용한다", () => {
@@ -253,6 +262,18 @@ describe("핵심 게임 규칙", () => {
     advanceStageIfCleared(maxDensity);
     expect(maxDensity.stage).toBe(39);
     expect(maxDensity.bricks).toHaveLength(52);
+
+    const firstTrap = createGame();
+    firstTrap.stage = 10;
+    firstTrap.bricks = [];
+    advanceStageIfCleared(firstTrap);
+    expect(firstTrap.items.filter((item) => item.type === "trap")).toHaveLength(1);
+
+    const doubleTrap = createGame();
+    doubleTrap.stage = 30;
+    doubleTrap.bricks = [];
+    advanceStageIfCleared(doubleTrap);
+    expect(doubleTrap.items.filter((item) => item.type === "trap")).toHaveLength(2);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {

@@ -54,6 +54,7 @@ let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let bombEffect: BombEffect | null = null;
+let trapEffect: BombEffect | null = null;
 let laserEffects: LaserEffect[] = [];
 
 const app = new Application();
@@ -82,13 +83,19 @@ const ballCounter = new Text({
   style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
 });
 ballCounter.anchor.set(0, 0.5);
+const trapNotice = new Text({
+  text: "−1",
+  style: { fill: 0xff6b7f, fontFamily: "system-ui", fontSize: 18, fontWeight: "900" },
+});
+trapNotice.anchor.set(0.5);
+trapNotice.visible = false;
 const dangerLabel = new Text({
   text: "DANGER",
   style: { fill: 0xff718b, fontFamily: "system-ui", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
 });
 dangerLabel.anchor.set(1, 0);
 dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
-app.stage.addChild(scene, effectGlow, labels, ballCounter, dangerLabel);
+app.stage.addChild(scene, effectGlow, labels, trapNotice, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -141,6 +148,7 @@ function reset(): void {
   firstLandingX = null;
   boardSignature = "";
   bombEffect = null;
+  trapEffect = null;
   laserEffects = [];
   setHelpOpen(false);
   syncUi();
@@ -243,7 +251,7 @@ function rebuildLabels(): void {
     labels.addChild(label);
   });
 
-  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "P" } as const;
+  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "P", trap: "−1" } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     const label = new Text({
@@ -318,7 +326,7 @@ function draw(): void {
     }
   });
 
-  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff } as const;
+  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff, trap: 0xff405f } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
@@ -332,6 +340,19 @@ function draw(): void {
     scene.circle(bombEffect.x, bombEffect.y, frame.radius).fill({ color: 0xff8a32, alpha: frame.alpha * 0.24 });
     scene.circle(bombEffect.x, bombEffect.y, frame.radius).stroke({ width: 6, color: 0xffc145, alpha: frame.alpha });
     scene.circle(bombEffect.x, bombEffect.y, frame.radius * 0.58).stroke({ width: 3, color: 0xffffff, alpha: frame.alpha * 0.85 });
+  }
+
+  if (trapEffect) {
+    const frame = bombEffectFrame(trapEffect.elapsed);
+    const radius = frame.radius * 0.55;
+    effectGlow.circle(trapEffect.x, trapEffect.y, radius).stroke({ width: 18, color: 0xff405f, alpha: frame.alpha * 0.8 });
+    scene.circle(trapEffect.x, trapEffect.y, radius).fill({ color: 0xff405f, alpha: frame.alpha * 0.12 });
+    scene.circle(trapEffect.x, trapEffect.y, radius).stroke({ width: 5, color: 0xff6b7f, alpha: frame.alpha });
+    trapNotice.visible = true;
+    trapNotice.alpha = frame.alpha;
+    trapNotice.position.set(trapEffect.x, trapEffect.y - 14 - (1 - frame.alpha) * 18);
+  } else {
+    trapNotice.visible = false;
   }
 
   laserEffects.forEach((effect) => {
@@ -432,7 +453,9 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
     });
     if (hitItem) {
       const center = itemCenter(hitItem);
-      if (collectItem(state, hitItem.id) === "bomb") bombEffect = { ...center, elapsed: 0 };
+      const itemType = collectItem(state, hitItem.id);
+      if (itemType === "bomb") bombEffect = { ...center, elapsed: 0 };
+      else if (itemType === "trap") trapEffect = { ...center, elapsed: 0 };
       pullLaserEffects();
       boardSignature = "";
       syncUi();
@@ -446,6 +469,10 @@ function update(delta: number): void {
   if (!helpOpen && bombEffect) {
     bombEffect.elapsed += delta;
     if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
+  }
+  if (!helpOpen && trapEffect) {
+    trapEffect.elapsed += delta;
+    if (trapEffect.elapsed >= BOMB_EFFECT_DURATION) trapEffect = null;
   }
   if (!helpOpen) {
     laserEffects.forEach((effect) => (effect.elapsed += delta));

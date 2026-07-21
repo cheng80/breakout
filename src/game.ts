@@ -13,7 +13,7 @@ export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
-export type ItemType = "bomb" | "multiball" | "shield" | "power";
+export type ItemType = "bomb" | "multiball" | "shield" | "power" | "trap";
 export type BrickType = "normal" | "laser" | "steel";
 
 export interface Vec2 {
@@ -158,6 +158,8 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const itemOrder: ItemType[] = ["multiball", "power"];
   if (stage % 2 === 0) itemOrder.push("bomb");
   if (stage % 3 === 0) itemOrder.push("shield");
+  if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
+  if (stage >= 31 && itemOrder.length < 4) itemOrder.push("trap");
   const items = itemOrder.map((type, index) => ({
     id: `s${stage}-i${index}`,
     ...openCells[index],
@@ -350,6 +352,8 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
     state.shield = true;
   } else if (item.type === "power") {
     state.powerTurns = 2;
+  } else if (item.type === "trap") {
+    state.ballCount = Math.max(1, state.ballCount - 1);
   } else {
     const targets = state.bricks.filter(
       (brick) => Math.abs(brick.row - item.row) <= 1 && Math.abs(brick.column - item.column) <= 1,
