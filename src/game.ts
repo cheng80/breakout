@@ -13,7 +13,7 @@ export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
-export type ItemType = "bomb" | "multiball" | "shield" | "power" | "trap";
+export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap";
 export type BrickType = "normal" | "laser" | "steel";
 
 export interface Vec2 {
@@ -87,6 +87,7 @@ export interface GameState {
   gameStatus: GameStatus;
   shield: boolean;
   powerTurns: number;
+  powerMultiplier: number;
   pendingLaserTriggers: LaserTrigger[];
   turn: number;
 }
@@ -146,8 +147,9 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   });
 
   const specialBricks = [...bricks].sort(() => random() - 0.5);
-  if (specialBricks[0]) specialBricks[0].type = "laser";
-  if (specialBricks[1]) Object.assign(specialBricks[1], { type: "steel", hp: 0, maxHp: 0 });
+  const laserCount = stage >= 31 ? 3 : stage >= 16 ? 2 : 1;
+  specialBricks.slice(0, laserCount).forEach((brick) => (brick.type = "laser"));
+  if (specialBricks[laserCount]) Object.assign(specialBricks[laserCount], { type: "steel", hp: 0, maxHp: 0 });
 
   const occupied = new Set(bricks.map((brick) => `${brick.row}:${brick.column}`));
   const openCells = Array.from({ length: rows * GRID_COLUMNS }, (_, index) => ({
@@ -155,12 +157,23 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     column: index % GRID_COLUMNS,
   })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
   openCells.sort(() => random() - 0.5);
-  const itemOrder: ItemType[] = ["multiball", "power"];
-  if (stage % 2 === 0) itemOrder.push("bomb");
-  if (stage % 3 === 0) itemOrder.push("shield");
-  if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
-  if (stage >= 31 && itemOrder.length < 4) itemOrder.push("trap");
-  const items = itemOrder.map((type, index) => ({
+  let itemOrder: ItemType[];
+  if (stage >= 31) {
+    itemOrder = ["multiball", "power3", "power4", "bomb", "bomb"];
+    if (stage % 3 === 0) itemOrder.push("shield");
+    itemOrder.push("trap", "trap");
+  } else if (stage >= 16) {
+    itemOrder = ["multiball", "power", "power3", "bomb"];
+    if (stage % 3 === 0) itemOrder.push("shield");
+    itemOrder.push("trap");
+  } else {
+    itemOrder = ["multiball", "power"];
+    if (stage % 2 === 0) itemOrder.push("bomb");
+    if (stage % 3 === 0) itemOrder.push("shield");
+    if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
+  }
+  const itemLimit = stage >= 31 ? 7 : stage >= 16 ? 5 : 4;
+  const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => ({
     id: `s${stage}-i${index}`,
     ...openCells[index],
     type,
@@ -200,6 +213,7 @@ export function createGame(): GameState {
     gameStatus: "ready",
     shield: false,
     powerTurns: 0,
+    powerMultiplier: 1,
     pendingLaserTriggers: [],
     turn: 0,
   };
@@ -338,7 +352,7 @@ export function consumeLaserTriggers(state: GameState): LaserTrigger[] {
 }
 
 export function hitBrickWithBall(state: GameState, brickId: string): boolean {
-  return damageBrick(state, brickId, state.powerTurns > 0 ? 2 : 1);
+  return damageBrick(state, brickId, state.powerTurns > 0 ? state.powerMultiplier : 1);
 }
 
 export function collectItem(state: GameState, itemId: string): ItemType | null {
@@ -350,8 +364,10 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
   } else if (item.type === "shield") {
     state.shield = true;
-  } else if (item.type === "power") {
+  } else if (item.type === "power" || item.type === "power3" || item.type === "power4") {
     state.powerTurns = 2;
+    const multiplier = item.type === "power4" ? 4 : item.type === "power3" ? 3 : 2;
+    state.powerMultiplier = Math.max(state.powerMultiplier, multiplier);
   } else if (item.type === "trap") {
     state.ballCount = Math.max(1, state.ballCount - 1);
   } else {
@@ -369,6 +385,7 @@ export function advanceStageIfCleared(state: GameState): boolean {
   state.stage += 1;
   state.shield = false;
   state.powerTurns = 0;
+  state.powerMultiplier = 1;
   state.pendingLaserTriggers = [];
   state.launchPosition = { x: BOARD_WIDTH / 2, y: FLOOR_Y };
   Object.assign(state, stageBoard(state.stage));
@@ -394,6 +411,7 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
   state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, firstLandingX));
   if (advanceStageIfCleared(state)) return;
   state.powerTurns = Math.max(0, state.powerTurns - 1);
+  if (state.powerTurns === 0) state.powerMultiplier = 1;
 
   state.bricks.forEach((brick) => (brick.row += 1));
   state.items.forEach((item) => (item.row += 1));

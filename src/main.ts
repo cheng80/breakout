@@ -250,9 +250,9 @@ function syncUi(): void {
   shieldEl.classList.toggle("active", state.shield);
 
   const messages = {
-    ready: state.powerTurns > 0 ? "강화볼 준비 · 공격력 ×2" : "공의 방향을 정하고 발사 하세요.",
+    ready: state.powerTurns > 0 ? `강화볼 준비 · 공격력 ×${state.powerMultiplier}` : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
-    volley: state.powerTurns > 0 ? "강화볼 발사 중 · 공격력 ×2" : "공이 모두 돌아올 때까지 기다리세요",
+    volley: state.powerTurns > 0 ? `강화볼 발사 중 · 공격력 ×${state.powerMultiplier}` : "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
   } as const;
   statusEl.textContent = messages[state.gameStatus];
@@ -283,7 +283,7 @@ function rebuildLabels(): void {
     labels.addChild(label);
   });
 
-  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "P", trap: "−1" } as const;
+  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "×2", power3: "×3", power4: "×4", trap: "−1" } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     const label = new Text({
@@ -358,7 +358,7 @@ function draw(): void {
     }
   });
 
-  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff, trap: 0xff405f } as const;
+  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff, power3: 0xb06cff, power4: 0xb06cff, trap: 0xff405f } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
