@@ -24,6 +24,7 @@ import {
   laserEffectFrame,
   prepareVolley,
   resetGame,
+  resolveCircleRectCollision,
   shieldRewindFrame,
   traceAimPath,
   type Brick,
@@ -497,7 +498,6 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 
   const steps = 2;
   for (let step = 0; step < steps; step += 1) {
-    const previous = { x: ball.x, y: ball.y };
     ball.x += (ball.vx * delta) / steps;
     ball.y += (ball.vy * delta) / steps;
 
@@ -516,11 +516,11 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
     });
     if (hitBrick) {
       const rect = brickRect(hitBrick);
-      const cameFromSide = previous.x + BALL_RADIUS <= rect.x || previous.x - BALL_RADIUS >= rect.x + rect.width;
-      ball.x = previous.x;
-      ball.y = previous.y;
-      if (cameFromSide) ball.vx *= -1;
-      else ball.vy *= -1;
+      const collision = resolveCircleRectCollision(ball, { x: ball.vx, y: ball.vy }, rect, BALL_RADIUS)!;
+      ball.x = collision.position.x;
+      ball.y = collision.position.y;
+      ball.vx = collision.velocity.x;
+      ball.vy = collision.velocity.y;
       const destroyed = hitBrickWithBall(state, hitBrick.id);
       if (hitBrick.type !== "steel" && !destroyed) brickHitEffects.set(hitBrick.id, 0);
       else brickHitEffects.delete(hitBrick.id);

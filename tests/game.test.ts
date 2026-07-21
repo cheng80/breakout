@@ -25,6 +25,7 @@ import {
   hitBrickWithBall,
   laserEffectFrame,
   prepareVolley,
+  resolveCircleRectCollision,
   shieldRewindFrame,
   traceAimPath,
 } from "../src/game";
@@ -102,6 +103,25 @@ describe("핵심 게임 규칙", () => {
     );
     expect(brickPath[0].end.y).toBeCloseTo(135);
     expect(brickPath[1].end.y).toBeCloseTo(FLOOR_Y);
+  });
+
+  it("공이 블록 모서리에 겹쳐도 바깥으로 밀려나 다시 충돌하지 않는다", () => {
+    const rect = { x: 40, y: 40, width: 20, height: 20 };
+    const collision = resolveCircleRectCollision(
+      { x: 63, y: 63 },
+      { x: -100, y: -100 },
+      rect,
+      5,
+    );
+
+    expect(collision).not.toBeNull();
+    expect(resolveCircleRectCollision(collision!.position, collision!.velocity, rect, 5)).toBeNull();
+    expect(collision!.velocity.x).toBeGreaterThan(0);
+    expect(collision!.velocity.y).toBeGreaterThan(0);
+
+    const embedded = resolveCircleRectCollision({ x: 42, y: 50 }, { x: 100, y: 0 }, rect, 5)!;
+    expect(resolveCircleRectCollision(embedded.position, embedded.velocity, rect, 5)).toBeNull();
+    expect(embedded.velocity.x).toBeLessThan(0);
   });
 
   it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~30개로 제한한다", () => {
