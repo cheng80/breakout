@@ -55,6 +55,11 @@ interface ShieldRewindEffect {
   elapsed: number;
 }
 
+void startGame().catch((error: unknown) => {
+  console.error("게임 렌더러 초기화에 실패했습니다.", error);
+});
+
+async function startGame(): Promise<void> {
 const state = createGame();
 let bestScore = loadBestScore();
 let hasNewBestScore = false;
@@ -595,3 +600,4 @@ function update(delta: number): void {
 
 app.ticker.add((ticker) => update(ticker.deltaMS / 1000));
 syncUi();
+}
