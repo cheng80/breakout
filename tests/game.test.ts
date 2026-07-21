@@ -7,14 +7,17 @@ import {
   CELL_HEIGHT,
   GRID_TOP,
   MAX_BALLS,
+  LASER_EFFECT_DURATION,
   advanceStageIfCleared,
   aimFromDrag,
   bombEffectFrame,
   collectItem,
+  consumeLaserTriggers,
   createGame,
   damageBrick,
   finishVolley,
   hitBrickWithBall,
+  laserEffectFrame,
   prepareVolley,
   traceAimPath,
 } from "../src/game";
@@ -24,6 +27,40 @@ describe("핵심 게임 규칙", () => {
     expect(bombEffectFrame(0)).toEqual({ radius: 24, alpha: 1 });
     expect(bombEffectFrame(BOMB_EFFECT_DURATION / 2).radius).toBeGreaterThan(24);
     expect(bombEffectFrame(BOMB_EFFECT_DURATION)).toEqual({ radius: 90, alpha: 0 });
+  });
+
+  it("레이저가 가로줄을 제거하고 강철은 점수 없이 내려오며 위험선을 통과하면 사라진다", () => {
+    expect(laserEffectFrame(0)).toEqual({ spread: 0, alpha: 1 });
+    expect(laserEffectFrame(LASER_EFFECT_DURATION / 2).spread).toBe(1);
+    expect(laserEffectFrame(LASER_EFFECT_DURATION)).toEqual({ spread: 1, alpha: 0 });
+
+    const state = createGame();
+    state.score = 0;
+    state.bricks = [
+      { id: "left", row: 2, column: 0, hp: 2, maxHp: 2, type: "normal" },
+      { id: "laser", row: 2, column: 1, hp: 1, maxHp: 1, type: "laser" },
+      { id: "steel", row: 2, column: 2, hp: 0, maxHp: 0, type: "steel" },
+      { id: "below", row: 3, column: 1, hp: 2, maxHp: 2, type: "normal" },
+    ];
+
+    expect(damageBrick(state, "laser")).toBe(true);
+    expect(state.bricks.map((brick) => brick.id)).toEqual(["steel", "below"]);
+    expect(consumeLaserTriggers(state)).toEqual([{ row: 2, column: 1 }]);
+    expect(state.score).toBe(110);
+
+    const steelRow = state.bricks[0].row;
+    expect(hitBrickWithBall(state, "steel")).toBe(false);
+    expect(state.score).toBe(110);
+    state.bricks.push({ id: "edge-steel", row: DANGER_ROW, column: 7, hp: 0, maxHp: 0, type: "steel" });
+    finishVolley(state, 180);
+    expect(state.bricks.find((brick) => brick.id === "steel")?.row).toBe(steelRow + 1);
+    expect(state.bricks.some((brick) => brick.id === "edge-steel")).toBe(false);
+
+    state.bricks = state.bricks.filter((brick) => brick.type === "steel");
+    expect(advanceStageIfCleared(state)).toBe(true);
+    state.bricks = [];
+    expect(advanceStageIfCleared(state)).toBe(true);
+    expect(state.bricks.some((brick) => brick.type === "steel")).toBe(true);
   });
 
   it("벽과 벽돌 충돌을 따라 조준 경로를 2회 반사한다", () => {
@@ -73,6 +110,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.stage).toBe(2);
     expect(state.ballCount).toBe(3);
     expect(state.items.some((item) => item.type === "power")).toBe(true);
+    expect(state.bricks.some((brick) => brick.type === "laser")).toBe(true);
   });
 
   it("멀티볼, 쉴드, 폭탄, 강화볼 아이템을 규칙대로 적용한다", () => {
@@ -147,6 +185,8 @@ describe("핵심 게임 규칙", () => {
     expect(first.gameStatus).toBe("ready");
     expect(first.bricks.length).toBeGreaterThan(0);
     expect(first.items.some((item) => item.type === "multiball")).toBe(true);
+    expect(first.bricks.some((brick) => brick.type === "laser")).toBe(true);
+    expect(first.bricks.some((brick) => brick.type === "steel")).toBe(true);
 
     const second = createGame();
     second.stage = 5;
