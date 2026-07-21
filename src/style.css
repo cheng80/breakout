@@ -298,6 +298,10 @@ h1 {
   background: #428ed0;
 }
 
+.legend-power {
+  background: #9855d6;
+}
+
 #status-dot {
   width: 7px;
   height: 7px;

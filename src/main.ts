@@ -11,8 +11,8 @@ import {
   aimFromDrag,
   collectItem,
   createGame,
-  damageBrick,
   finishVolley,
+  hitBrickWithBall,
   prepareVolley,
   resetGame,
   traceAimPath,
@@ -179,9 +179,9 @@ function syncUi(): void {
   shieldEl.classList.toggle("active", state.shield);
 
   const messages = {
-    ready: "아래에서 위로 드래그해 발사하세요",
+    ready: state.powerTurns > 0 ? "강화볼 준비 · 공격력 ×2" : "아래에서 위로 드래그해 발사하세요",
     aiming: "손을 떼면 발사합니다",
-    volley: "공이 모두 돌아올 때까지 기다리세요",
+    volley: state.powerTurns > 0 ? "강화볼 발사 중 · 공격력 ×2" : "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
   } as const;
   statusEl.textContent = messages[state.gameStatus];
@@ -208,7 +208,7 @@ function rebuildLabels(): void {
     labels.addChild(label);
   });
 
-  const itemLabel = { bomb: "B", multiball: "+1", shield: "S" } as const;
+  const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "P" } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     const label = new Text({
@@ -273,7 +273,7 @@ function draw(): void {
     scene.roundRect(rect.x, rect.y, rect.width, rect.height, 8).fill(brickColor(brick));
   });
 
-  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff } as const;
+  const itemColors = { bomb: 0xffc145, multiball: 0x45d5a1, shield: 0x5db7ff, power: 0xb06cff } as const;
   state.items.forEach((item) => {
     const center = itemCenter(item);
     scene.circle(center.x, center.y, 12).fill(itemColors[item.type]);
@@ -281,9 +281,10 @@ function draw(): void {
   });
 
   const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
+  const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
   const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
   if (showLaunchBall) {
-    scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(0xf4f8ff);
+    scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(ballColor);
     scene.circle(state.launchPosition.x, state.launchPosition.y, 13).stroke({ width: 1, color: 0x6c7cff, alpha: 0.7 });
   }
 
@@ -308,7 +309,7 @@ function draw(): void {
   }
 
   activeBalls.forEach((ball) => {
-    if (ball.delay <= 0) scene.circle(ball.x, ball.y, BALL_RADIUS).fill(0xffffff);
+    if (ball.delay <= 0) scene.circle(ball.x, ball.y, BALL_RADIUS).fill(ballColor);
   });
   rebuildLabels();
 }
@@ -351,7 +352,7 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       ball.y = previous.y;
       if (cameFromSide) ball.vx *= -1;
       else ball.vy *= -1;
-      damageBrick(state, hitBrick.id);
+      hitBrickWithBall(state, hitBrick.id);
       boardSignature = "";
       syncUi();
       break;

@@ -9,7 +9,7 @@ export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const MAX_BALLS = 8;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
-export type ItemType = "bomb" | "multiball" | "shield";
+export type ItemType = "bomb" | "multiball" | "shield" | "power";
 
 export interface Vec2 {
   x: number;
@@ -59,12 +59,13 @@ export interface GameState {
   items: Item[];
   gameStatus: GameStatus;
   shield: boolean;
+  powerTurns: number;
   turn: number;
 }
 
 const layouts = [
   [".1.11.1.", "..1111..", "...M...."],
-  ["2.2..2.2", ".222222.", "..B..M..", ".2.22.2.", "2..22..2"],
+  ["2.2..2.2", ".222222.", ".PB..M..", ".2.22.2.", "2..22..2"],
   ["333..333", "3..33..3", ".3.S..3.", "..3333..", "3.M..B.3"],
   ["44.44.44", ".444444.", "4.B..M.4", ".44..44.", "44.SS.44"],
   ["55555555", "5.5..5.5", ".555555.", "5.BMS..5", ".55..55.", "555..555"],
@@ -74,6 +75,7 @@ const itemTypes: Record<string, ItemType> = {
   B: "bomb",
   M: "multiball",
   S: "shield",
+  P: "power",
 };
 
 function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
@@ -111,7 +113,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     column: index % GRID_COLUMNS,
   })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
   openCells.sort(() => random() - 0.5);
-  const itemOrder: ItemType[] = ["multiball"];
+  const itemOrder: ItemType[] = ["multiball", "power"];
   if (stage % 2 === 0) itemOrder.push("bomb");
   if (stage % 3 === 0) itemOrder.push("shield");
   const items = itemOrder.map((type, index) => ({
@@ -152,6 +154,7 @@ export function createGame(): GameState {
     ...stageBoard(1),
     gameStatus: "ready",
     shield: false,
+    powerTurns: 0,
     turn: 0,
   };
 }
@@ -277,6 +280,10 @@ export function damageBrick(state: GameState, brickId: string, damage = 1): bool
   return false;
 }
 
+export function hitBrickWithBall(state: GameState, brickId: string): boolean {
+  return damageBrick(state, brickId, state.powerTurns > 0 ? 2 : 1);
+}
+
 export function collectItem(state: GameState, itemId: string): ItemType | null {
   const item = state.items.find((candidate) => candidate.id === itemId);
   if (!item) return null;
@@ -286,6 +293,8 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
   } else if (item.type === "shield") {
     state.shield = true;
+  } else if (item.type === "power") {
+    state.powerTurns = 2;
   } else {
     const targets = state.bricks.filter(
       (brick) => Math.abs(brick.row - item.row) <= 1 && Math.abs(brick.column - item.column) <= 1,
@@ -300,6 +309,7 @@ export function advanceStageIfCleared(state: GameState): boolean {
   if (state.bricks.length > 0) return false;
   state.stage += 1;
   state.shield = false;
+  state.powerTurns = 0;
   state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };
   Object.assign(state, stageBoard(state.stage));
   state.gameStatus = "ready";
@@ -323,6 +333,7 @@ function addTurnMultiball(state: GameState): void {
 export function finishVolley(state: GameState, firstLandingX: number): void {
   state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, firstLandingX));
   if (advanceStageIfCleared(state)) return;
+  state.powerTurns = Math.max(0, state.powerTurns - 1);
 
   state.bricks.forEach((brick) => (brick.row += 1));
   state.items.forEach((item) => (item.row += 1));

@@ -12,6 +12,7 @@ import {
   createGame,
   damageBrick,
   finishVolley,
+  hitBrickWithBall,
   prepareVolley,
   traceAimPath,
 } from "../src/game";
@@ -63,9 +64,10 @@ describe("핵심 게임 규칙", () => {
     expect(advanceStageIfCleared(state)).toBe(true);
     expect(state.stage).toBe(2);
     expect(state.ballCount).toBe(3);
+    expect(state.items.some((item) => item.type === "power")).toBe(true);
   });
 
-  it("멀티볼, 쉴드, 폭탄 아이템을 규칙대로 적용한다", () => {
+  it("멀티볼, 쉴드, 폭탄, 강화볼 아이템을 규칙대로 적용한다", () => {
     const state = createGame();
     const multiball = state.items.find((item) => item.type === "multiball")!;
     collectItem(state, multiball.id);
@@ -81,6 +83,18 @@ describe("핵심 게임 규칙", () => {
     collectItem(state, "bomb");
     const after = state.bricks.find((brick) => brick.id === bombTarget.id)?.hp ?? 0;
     expect(after).toBeLessThan(before);
+
+    const powerTarget = state.bricks.find((brick) => brick.hp >= 1)!;
+    powerTarget.hp = 3;
+    state.items.push({ id: "power", row: 1, column: 2, type: "power" });
+    collectItem(state, "power");
+    expect(state.powerTurns).toBe(2);
+    hitBrickWithBall(state, powerTarget.id);
+    expect(powerTarget.hp).toBe(1);
+    finishVolley(state, 180);
+    expect(state.powerTurns).toBe(1);
+    finishVolley(state, 180);
+    expect(state.powerTurns).toBe(0);
   });
 
   it("첫 공 착지 위치를 계승하고 벽돌 하강 및 쉴드 1회 방어를 적용한다", () => {
