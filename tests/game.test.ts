@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BOARD_HEIGHT,
+  BLACK_HOLE_CYCLE_DURATION,
+  BLACK_HOLE_INFLUENCE_RADIUS,
   BRICK_HIT_EFFECT_DURATION,
   DANGER_ROW,
   DANGER_Y,
@@ -15,8 +17,11 @@ import {
   SHIELD_REWIND_DURATION,
   advanceStageIfCleared,
   aimFromDrag,
+  blackHolePresence,
+  blackHolePullStrength,
   bombEffectFrame,
   brickHitEffectFrame,
+  captureBallByBlackHole,
   collectItem,
   consumeLaserTriggers,
   createGame,
@@ -25,6 +30,7 @@ import {
   hitBrickWithBall,
   laserEffectFrame,
   prepareVolley,
+  relocateBlackHoles,
   resolveCircleRectCollision,
   shieldRewindFrame,
   stabilizeShallowBounce,
@@ -50,6 +56,50 @@ describe("핵심 게임 규칙", () => {
     expect(shieldRewindFrame(SHIELD_REWIND_DURATION * 0.34).offset).toBe(CELL_HEIGHT);
     expect(shieldRewindFrame(SHIELD_REWIND_DURATION * 0.48).flash).toBe(1);
     expect(shieldRewindFrame(SHIELD_REWIND_DURATION)).toEqual({ offset: 0, flash: 0 });
+  });
+
+  it("블랙홀은 가까울수록 강하게 끌고 후반 흡수 횟수만큼 공을 제거한다", () => {
+    expect(blackHolePullStrength(BLACK_HOLE_INFLUENCE_RADIUS)).toBe(0);
+    expect(blackHolePullStrength(20)).toBeGreaterThan(blackHolePullStrength(50));
+    expect(blackHolePullStrength(BLACK_HOLE_INFLUENCE_RADIUS / 2)).toBe(0.25);
+    expect(blackHolePullStrength(0)).toBe(1);
+    expect(blackHolePresence(0)).toBe(0);
+    expect(blackHolePresence(0.3)).toBe(1);
+    expect(blackHolePresence(4.8)).toBe(0);
+    expect(blackHolePresence(BLACK_HOLE_CYCLE_DURATION)).toBe(0);
+
+    const state = createGame();
+    state.ballCount = 5;
+    state.items = [{ id: "blackhole", row: 2, column: 3, type: "blackhole", charges: 2 }];
+    expect(captureBallByBlackHole(state, "blackhole")).toBe(1);
+    expect(state.ballCount).toBe(4);
+    expect(state.items[0].charges).toBe(1);
+    expect(captureBallByBlackHole(state, "blackhole")).toBe(0);
+    expect(state.ballCount).toBe(3);
+    expect(state.items).toHaveLength(0);
+
+    state.items = [{ id: "last-blackhole", row: 2, column: 3, type: "blackhole", charges: 1 }];
+    state.ballCount = 1;
+    expect(captureBallByBlackHole(state, "last-blackhole")).toBeNull();
+    expect(state.items).toHaveLength(1);
+  });
+
+  it("블랙홀은 재등장할 때 점유 칸과 위험선 주변을 피해 빈칸으로 이동한다", () => {
+    const state = createGame();
+    state.stage = 16;
+    state.bricks = [{ id: "occupied-brick", row: 0, column: 0, hp: 1, maxHp: 1, type: "normal" }];
+    state.items = [
+      { id: "blackhole", row: 2, column: 3, type: "blackhole", charges: 1 },
+      { id: "occupied-item", row: 1, column: 1, type: "bomb" },
+    ];
+
+    expect(relocateBlackHoles(state, 1)).toBe(true);
+    const blackHole = state.items.find((item) => item.type === "blackhole")!;
+    expect(`${blackHole.row}:${blackHole.column}`).not.toBe("2:3");
+    expect(`${blackHole.row}:${blackHole.column}`).not.toBe("0:0");
+    expect(`${blackHole.row}:${blackHole.column}`).not.toBe("1:1");
+    const centerY = GRID_TOP + blackHole.row * CELL_HEIGHT + BRICK_HEIGHT / 2;
+    expect(DANGER_Y - centerY).toBeGreaterThan(BLACK_HOLE_INFLUENCE_RADIUS);
   });
 
   it("레이저가 가로줄을 제거하고 강철은 점수 없이 내려오며 위험선을 통과하면 사라진다", () => {
@@ -307,7 +357,7 @@ describe("핵심 게임 규칙", () => {
     expect(corridor.bricks.every((brick) => brick.column !== 3 && brick.column !== 4)).toBe(true);
 
     const late = createGame();
-    late.stage = 19;
+    late.stage = 18;
     late.bricks = [];
     advanceStageIfCleared(late);
     expect(late.bricks.length).toBeGreaterThan(first.bricks.length);
@@ -315,6 +365,7 @@ describe("핵심 게임 규칙", () => {
     expect(late.items.filter((item) => item.type === "power" || item.type === "power3")).toHaveLength(2);
     expect(late.items.some((item) => item.type === "power3")).toBe(true);
     expect(late.items.filter((item) => item.type === "bomb")).toHaveLength(1);
+    expect(late.items.find((item) => item.type === "blackhole")?.charges).toBe(1);
 
     const sevenRows = createGame();
     sevenRows.stage = 30;
@@ -326,6 +377,7 @@ describe("핵심 게임 규칙", () => {
     expect(sevenRows.items.some((item) => item.type === "power3")).toBe(true);
     expect(sevenRows.items.some((item) => item.type === "power4")).toBe(true);
     expect(sevenRows.items.filter((item) => item.type === "bomb")).toHaveLength(2);
+    expect(sevenRows.items.find((item) => item.type === "blackhole")?.charges).toBe(2);
 
     const maxDensity = createGame();
     maxDensity.stage = 38;
@@ -336,11 +388,19 @@ describe("핵심 게임 규칙", () => {
     expect(maxDensity.items).toHaveLength(4);
     expect(maxDensity.items.every((item) => Number.isInteger(item.row) && Number.isInteger(item.column))).toBe(true);
 
+    const firstBlackHole = createGame();
+    firstBlackHole.stage = 9;
+    firstBlackHole.bricks = [];
+    advanceStageIfCleared(firstBlackHole);
+    expect(firstBlackHole.stage).toBe(10);
+    expect(firstBlackHole.items.find((item) => item.type === "blackhole")?.charges).toBe(1);
+
     const firstTrap = createGame();
     firstTrap.stage = 10;
     firstTrap.bricks = [];
     advanceStageIfCleared(firstTrap);
     expect(firstTrap.items.filter((item) => item.type === "trap")).toHaveLength(1);
+    expect(firstTrap.items.some((item) => item.type === "blackhole")).toBe(false);
 
     const doubleTrap = createGame();
     doubleTrap.stage = 30;
