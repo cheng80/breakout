@@ -136,6 +136,7 @@ const labelPool = new ObjectPool<Text>(
   },
   (label) => {
     label.text = "";
+    label.alpha = 1;
     label.position.set(0, 0);
   },
 );
