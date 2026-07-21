@@ -3,7 +3,10 @@ import "./style.css";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  DANGER_ROW,
+  BRICK_HEIGHT,
+  CELL_HEIGHT,
+  DANGER_Y,
+  GRID_TOP,
   GRID_COLUMNS,
   aimFromDrag,
   collectItem,
@@ -18,11 +21,8 @@ import {
   type Vec2,
 } from "./game";
 
-const GRID_TOP = 42;
 const GRID_GAP = 4;
 const GRID_MARGIN = 12;
-const CELL_HEIGHT = 42;
-const BRICK_HEIGHT = 34;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
 const BALL_SPEED = 360;
@@ -69,7 +69,7 @@ const dangerLabel = new Text({
   style: { fill: 0xff718b, fontFamily: "system-ui", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
 });
 dangerLabel.anchor.set(1, 1);
-dangerLabel.position.set(BOARD_WIDTH - 12, GRID_TOP + DANGER_ROW * CELL_HEIGHT - 9);
+dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y - 4);
 app.stage.addChild(scene, labels, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
@@ -261,9 +261,8 @@ function draw(): void {
     .roundRect(state.launchPosition.x - 19, FLOOR_Y + 4, 38, 8, 4)
     .fill({ color: 0x6c7cff, alpha: 0.75 });
 
-  const dangerY = GRID_TOP + DANGER_ROW * CELL_HEIGHT - 5;
   for (let x = 10; x < BOARD_WIDTH - 10; x += 16) {
-    scene.moveTo(x, dangerY).lineTo(Math.min(x + 8, BOARD_WIDTH - 10), dangerY);
+    scene.moveTo(x, DANGER_Y).lineTo(Math.min(x + 8, BOARD_WIDTH - 10), DANGER_Y);
   }
   scene.stroke({ width: 1.5, color: 0xff4d6d, alpha: 0.7 });
 

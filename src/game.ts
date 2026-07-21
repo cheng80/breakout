@@ -1,7 +1,11 @@
 export const BOARD_WIDTH = 360;
 export const BOARD_HEIGHT = 560;
 export const GRID_COLUMNS = 8;
-export const DANGER_ROW = 10;
+export const GRID_TOP = 42;
+export const CELL_HEIGHT = 42;
+export const BRICK_HEIGHT = 34;
+export const DANGER_ROW = 9;
+export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const MAX_BALLS = 8;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
@@ -327,7 +331,10 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
   state.ballCount = Math.min(MAX_BALLS, state.ballCount + barrierMultiballs.length);
   state.items = state.items.filter((item) => !barrierMultiballs.includes(item));
 
-  if (state.bricks.some((brick) => brick.row >= DANGER_ROW)) {
+  const reachedDanger = state.bricks.some(
+    (brick) => GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT >= DANGER_Y,
+  );
+  if (reachedDanger) {
     if (state.shield) state.shield = false;
     else {
       state.gameStatus = "gameOver";

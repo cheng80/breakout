@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DANGER_ROW,
+  DANGER_Y,
+  BRICK_HEIGHT,
+  CELL_HEIGHT,
+  GRID_TOP,
   MAX_BALLS,
   advanceStageIfCleared,
   aimFromDrag,
@@ -95,6 +99,17 @@ describe("핵심 게임 규칙", () => {
     expect(state.items.some((item) => item.type === "multiball" && item.row === 0)).toBe(true);
 
     finishVolley(state, 51);
+    expect(state.gameStatus).toBe("gameOver");
+  });
+
+  it("벽돌 하단이 화면 위험선에 닿는 즉시 게임오버다", () => {
+    expect(DANGER_Y).toBe(GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT);
+    const state = createGame();
+    state.bricks = [{ ...state.bricks[0], row: DANGER_ROW - 1 }];
+    state.items = [];
+
+    finishVolley(state, 180);
+    expect(state.bricks[0].row).toBe(DANGER_ROW);
     expect(state.gameStatus).toBe("gameOver");
   });
 
