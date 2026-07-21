@@ -44,8 +44,8 @@ describe("핵심 게임 규칙", () => {
 
     const state = createGame();
     expect(state.ballCount).toBe(1);
-    expect(state.bricks).toHaveLength(6);
-    expect(state.bricks.every((brick) => brick.row === 0 && brick.hp === 1)).toBe(true);
+    expect(state.bricks).toHaveLength(8);
+    expect(state.bricks.every((brick) => brick.row <= 1 && brick.hp === 1)).toBe(true);
     state.ballCount = 99;
     expect(prepareVolley(state)).toBe(MAX_BALLS);
     expect(state.gameStatus).toBe("volley");
