@@ -70,6 +70,7 @@ let aimCurrent: Vec2 | null = null;
 let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
+let resetConfirmOpen = false;
 let bombEffect: BombEffect | null = null;
 let trapEffect: BombEffect | null = null;
 let laserEffects: LaserEffect[] = [];
@@ -130,6 +131,10 @@ const resultBestScore = document.querySelector<HTMLElement>("#result-best-score"
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
+const restartButton = document.querySelector<HTMLButtonElement>("#restart")!;
+const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
+const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
+const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
 
 const brickRect = (brick: Brick) => ({
   x: GRID_MARGIN + brick.column * (CELL_WIDTH + GRID_GAP),
@@ -163,6 +168,7 @@ function launch(direction: Vec2): void {
 }
 
 function reset(): void {
+  setResetConfirmOpen(false);
   resetGame(state);
   hasNewBestScore = false;
   activeBalls = [];
@@ -188,7 +194,7 @@ function screenPoint(event: PointerEvent): Vec2 {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (helpOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
+  if (helpOpen || resetConfirmOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
@@ -221,10 +227,33 @@ app.canvas.addEventListener("pointercancel", () => {
   syncUi();
 });
 
-document.querySelector("#restart")!.addEventListener("click", reset);
+restartButton.addEventListener("click", () => setResetConfirmOpen(true));
 document.querySelector("#result-restart")!.addEventListener("click", reset);
-helpButton.addEventListener("click", () => setHelpOpen(!helpOpen));
+helpButton.addEventListener("click", () => {
+  if (!resetConfirmOpen) setHelpOpen(!helpOpen);
+});
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
+resetConfirmButton.addEventListener("click", reset);
+
+function setResetConfirmOpen(open: boolean): void {
+  const wasOpen = resetConfirmOpen;
+  resetConfirmOpen = open;
+  resetConfirmDialog.hidden = !open;
+  restartButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setHelpOpen(false);
+    if (state.gameStatus === "aiming") {
+      aimStart = null;
+      aimCurrent = null;
+      state.gameStatus = "ready";
+      syncUi();
+    }
+    resetCancelButton.focus();
+  } else if (wasOpen) {
+    restartButton.focus();
+  }
+}
 
 function setHelpOpen(open: boolean): void {
   helpOpen = open;
@@ -549,33 +578,34 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
 }
 
 function update(delta: number): void {
-  if (!helpOpen) {
+  const paused = helpOpen || resetConfirmOpen;
+  if (!paused) {
     brickHitEffects.forEach((elapsed, brickId) => {
       const nextElapsed = elapsed + delta;
       if (nextElapsed >= BRICK_HIT_EFFECT_DURATION) brickHitEffects.delete(brickId);
       else brickHitEffects.set(brickId, nextElapsed);
     });
   }
-  if (!helpOpen && shieldRewindEffect) {
+  if (!paused && shieldRewindEffect) {
     shieldRewindEffect.elapsed += delta;
     if (shieldRewindEffect.elapsed >= SHIELD_REWIND_DURATION) {
       shieldRewindEffect = null;
       syncUi();
     }
   }
-  if (!helpOpen && bombEffect) {
+  if (!paused && bombEffect) {
     bombEffect.elapsed += delta;
     if (bombEffect.elapsed >= BOMB_EFFECT_DURATION) bombEffect = null;
   }
-  if (!helpOpen && trapEffect) {
+  if (!paused && trapEffect) {
     trapEffect.elapsed += delta;
     if (trapEffect.elapsed >= BOMB_EFFECT_DURATION) trapEffect = null;
   }
-  if (!helpOpen) {
+  if (!paused) {
     laserEffects.forEach((effect) => (effect.elapsed += delta));
     laserEffects = laserEffects.filter((effect) => effect.elapsed < LASER_EFFECT_DURATION);
   }
-  if (!helpOpen && state.gameStatus === "volley") {
+  if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];
