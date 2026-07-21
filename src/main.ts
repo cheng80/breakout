@@ -54,6 +54,8 @@ await app.init({
 
 const host = document.querySelector<HTMLDivElement>("#game-canvas")!;
 host.appendChild(app.canvas);
+app.canvas.style.width = "100%";
+app.canvas.style.height = "100%";
 app.canvas.setAttribute("role", "application");
 app.canvas.setAttribute("aria-label", "아래에서 위로 드래그해 공을 발사하는 게임판");
 
