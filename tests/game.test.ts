@@ -86,8 +86,8 @@ describe("핵심 게임 규칙", () => {
   it("첫 공 착지 위치를 계승하고 벽돌 하강 및 쉴드 1회 방어를 적용한다", () => {
     const state = createGame();
     state.shield = true;
-    state.bricks[0].row = DANGER_ROW - 1;
-    state.items.push({ id: "barrier-multiball", row: DANGER_ROW - 1, column: 7, type: "multiball" });
+    state.bricks[0].row = DANGER_ROW;
+    state.items.push({ id: "barrier-multiball", row: DANGER_ROW, column: 7, type: "multiball" });
     const priorRows = state.bricks.map((brick) => brick.row);
 
     finishVolley(state, 37);
@@ -102,7 +102,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.gameStatus).toBe("gameOver");
   });
 
-  it("벽돌 하단이 화면 위험선에 닿는 즉시 게임오버다", () => {
+  it("벽돌 하단이 위험선에 닿는 것은 허용하고 아래로 내려오면 게임오버다", () => {
     expect(DANGER_Y).toBe(GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT);
     const state = createGame();
     state.bricks = [{ ...state.bricks[0], row: DANGER_ROW - 1 }];
@@ -110,6 +110,9 @@ describe("핵심 게임 규칙", () => {
 
     finishVolley(state, 180);
     expect(state.bricks[0].row).toBe(DANGER_ROW);
+    expect(state.gameStatus).toBe("ready");
+
+    finishVolley(state, 180);
     expect(state.gameStatus).toBe("gameOver");
   });
 

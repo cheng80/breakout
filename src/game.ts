@@ -332,7 +332,7 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
   state.items = state.items.filter((item) => !barrierMultiballs.includes(item));
 
   const reachedDanger = state.bricks.some(
-    (brick) => GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT >= DANGER_Y,
+    (brick) => GRID_TOP + brick.row * CELL_HEIGHT + BRICK_HEIGHT > DANGER_Y,
   );
   if (reachedDanger) {
     if (state.shield) state.shield = false;
