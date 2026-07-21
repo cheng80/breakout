@@ -239,6 +239,20 @@ describe("핵심 게임 규칙", () => {
     late.bricks = [];
     advanceStageIfCleared(late);
     expect(late.bricks.length).toBeGreaterThan(first.bricks.length);
+
+    const sevenRows = createGame();
+    sevenRows.stage = 30;
+    sevenRows.bricks = [];
+    advanceStageIfCleared(sevenRows);
+    expect(sevenRows.stage).toBe(31);
+    expect(new Set(sevenRows.bricks.map((brick) => brick.row)).size).toBe(7);
+
+    const maxDensity = createGame();
+    maxDensity.stage = 38;
+    maxDensity.bricks = [];
+    advanceStageIfCleared(maxDensity);
+    expect(maxDensity.stage).toBe(39);
+    expect(maxDensity.bricks).toHaveLength(52);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {

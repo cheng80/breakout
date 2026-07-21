@@ -112,7 +112,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 0x100000000;
   };
-  const rows = Math.min(6, 4 + Math.floor((stage - 6) / 5));
+  const rows = stage >= 31 ? 7 : Math.min(6, 4 + Math.floor((stage - 6) / 5));
   const targetPairs = Math.min(rows * 4 - 2, Math.ceil((12 + stage) / 2));
   const candidates = Array.from({ length: rows * 4 }, (_, index) => ({
     row: Math.floor(index / 4),
