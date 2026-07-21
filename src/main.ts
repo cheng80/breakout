@@ -64,7 +64,13 @@ const ballCounter = new Text({
   style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
 });
 ballCounter.anchor.set(0, 0.5);
-app.stage.addChild(scene, labels, ballCounter);
+const dangerLabel = new Text({
+  text: "DANGER",
+  style: { fill: 0xff718b, fontFamily: "system-ui", fontSize: 8, fontWeight: "800", letterSpacing: 1.5 },
+});
+dangerLabel.anchor.set(1, 1);
+dangerLabel.position.set(BOARD_WIDTH - 12, GRID_TOP + DANGER_ROW * CELL_HEIGHT - 9);
+app.stage.addChild(scene, labels, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -73,8 +79,6 @@ const shieldEl = document.querySelector<HTMLElement>("#shield")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
-const resultKicker = document.querySelector<HTMLElement>("#result-kicker")!;
-const resultTitle = document.querySelector<HTMLElement>("#result-title")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 
 const brickRect = (brick: Brick) => ({
@@ -166,7 +170,7 @@ document.querySelector("#restart")!.addEventListener("click", reset);
 document.querySelector("#result-restart")!.addEventListener("click", reset);
 
 function syncUi(): void {
-  stageEl.textContent = `${state.stage} / 5`;
+  stageEl.textContent = String(state.stage).padStart(2, "0");
   scoreEl.textContent = state.score.toLocaleString("ko-KR");
   ballsEl.textContent = `× ${state.ballCount}`;
   shieldEl.textContent = state.shield ? "ON" : "OFF";
@@ -177,19 +181,12 @@ function syncUi(): void {
     aiming: "손을 떼면 발사합니다",
     volley: "공이 모두 돌아올 때까지 기다리세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
-    victory: "5개 스테이지를 모두 돌파했습니다",
   } as const;
   statusEl.textContent = messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
 
-  const terminal = state.gameStatus === "gameOver" || state.gameStatus === "victory";
-  result.hidden = !terminal;
-  if (terminal) {
-    const victory = state.gameStatus === "victory";
-    resultKicker.textContent = victory ? "ALL CLEAR" : "RUN OVER";
-    resultTitle.textContent = victory ? "완벽한 클리어!" : "한 번 더 도전할까요?";
-    resultScore.textContent = state.score.toLocaleString("ko-KR");
-  }
+  result.hidden = state.gameStatus !== "gameOver";
+  if (state.gameStatus === "gameOver") resultScore.textContent = state.score.toLocaleString("ko-KR");
 }
 
 function rebuildLabels(): void {
@@ -243,7 +240,7 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
       .lineTo(start.x + unit.x * dashEnd, start.y + unit.y * dashEnd);
   }
   scene.stroke({
-    width: reflection === 0 ? 2.4 : 1.5,
+    width: reflection === 0 ? 3.4 : 2.2,
     color: 0xffffff,
     alpha: [0.92, 0.44, 0.28][reflection],
   });
@@ -252,6 +249,17 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
 function draw(): void {
   scene.clear();
   scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
+
+  scene
+    .roundRect(8, FLOOR_Y + 7, BOARD_WIDTH - 16, BOARD_HEIGHT - FLOOR_Y - 10, 11)
+    .fill(0x14263d);
+  scene
+    .moveTo(14, FLOOR_Y + 7)
+    .lineTo(BOARD_WIDTH - 14, FLOOR_Y + 7)
+    .stroke({ width: 3, color: 0x365274, alpha: 0.95 });
+  scene
+    .roundRect(state.launchPosition.x - 19, FLOOR_Y + 4, 38, 8, 4)
+    .fill({ color: 0x6c7cff, alpha: 0.75 });
 
   const dangerY = GRID_TOP + DANGER_ROW * CELL_HEIGHT - 5;
   for (let x = 10; x < BOARD_WIDTH - 10; x += 16) {

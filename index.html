@@ -12,32 +12,39 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">SWIPE BREAKOUT</p>
-          <h1>한 번에, 끝까지.</h1>
+          <h1>각도를 잡고, 한 번에 쏘세요.</h1>
         </div>
         <button id="restart" class="icon-button" type="button" aria-label="게임 다시 시작">↻</button>
       </header>
 
       <section class="hud" aria-label="게임 현황">
-        <div><span>STAGE</span><strong id="stage">1 / 5</strong></div>
-        <div><span>SCORE</span><strong id="score">0</strong></div>
-        <div><span>BALLS</span><strong id="balls">× 1</strong></div>
-        <div><span>SHIELD</span><strong id="shield">OFF</strong></div>
+        <div class="stat stat-level"><span>레벨</span><strong id="stage">01</strong></div>
+        <div class="stat"><span>점수</span><strong id="score">0</strong></div>
+        <div class="stat stat-balls"><span>공</span><strong id="balls">× 1</strong></div>
+        <div class="stat stat-shield"><span>보호막</span><strong id="shield">OFF</strong></div>
       </section>
 
       <section class="game-shell">
         <div id="game-canvas" class="game-canvas" aria-label="벽돌깨기 게임판"></div>
         <div id="result" class="result" hidden>
-          <p id="result-kicker">RUN OVER</p>
-          <h2 id="result-title">다시 도전할까요?</h2>
+          <p>RUN OVER</p>
+          <h2>다시 조준해볼까요?</h2>
           <p>최종 점수 <strong id="result-score">0</strong></p>
           <button id="result-restart" type="button">다시 시작</button>
         </div>
       </section>
 
-      <footer class="control-copy">
-        <span id="status-dot" aria-hidden="true"></span>
-        <p id="status">아래에서 위로 드래그해 발사하세요</p>
-        <kbd>SPACE</kbd>
+      <footer class="control-panel">
+        <div class="control-status">
+          <span id="status-dot" aria-hidden="true"></span>
+          <p id="status" aria-live="polite">아래에서 위로 드래그해 발사하세요</p>
+          <kbd>SPACE</kbd>
+        </div>
+        <div class="item-legend" aria-label="아이템 안내">
+          <span><b class="legend-multiball">+1</b>공 추가</span>
+          <span><b class="legend-bomb">B</b>주변 공격</span>
+          <span><b class="legend-shield">S</b>1회 방어</span>
+        </div>
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>

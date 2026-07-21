@@ -17,7 +17,8 @@ body {
   margin: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% -15%, rgba(85, 103, 255, 0.28), transparent 42%),
+    radial-gradient(circle at 50% -12%, rgba(101, 120, 255, 0.38), transparent 38%),
+    radial-gradient(circle at 10% 92%, rgba(69, 213, 161, 0.1), transparent 30%),
     #07111f;
 }
 
@@ -54,8 +55,9 @@ button {
 
 h1 {
   margin: 0;
-  font-size: clamp(18px, 2.8dvh, 25px);
-  line-height: 1.05;
+  max-width: 290px;
+  font-size: clamp(18px, 2.6dvh, 24px);
+  line-height: 1.12;
   letter-spacing: -0.04em;
   text-wrap: balance;
 }
@@ -65,8 +67,8 @@ h1 {
   height: 42px;
   border: 0;
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(126, 140, 255, 0.28), rgba(255, 255, 255, 0.08));
+  box-shadow: 0 10px 28px rgba(39, 51, 130, 0.3), inset 0 1px rgba(255, 255, 255, 0.12);
   cursor: pointer;
   font-size: 21px;
   transition-property: transform, background-color;
@@ -81,21 +83,34 @@ h1 {
 .hud {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 7px;
 }
 
-.hud div {
+.hud .stat {
   min-width: 0;
-  padding: 8px 7px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
+  padding: 9px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.hud .stat-level {
+  background: linear-gradient(145deg, #6677ff, #4858cf);
+  box-shadow: 0 10px 28px rgba(81, 97, 224, 0.3), inset 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.hud .stat-balls {
+  background: rgba(69, 213, 161, 0.12);
+}
+
+.hud .stat-shield {
+  background: rgba(93, 183, 255, 0.1);
 }
 
 .hud span {
   display: block;
   margin-bottom: 2px;
-  color: #71809a;
+  color: #8d9ab0;
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -104,7 +119,7 @@ h1 {
 .hud strong {
   display: block;
   overflow: hidden;
-  font-size: clamp(11px, 1.8dvh, 14px);
+  font-size: clamp(13px, 2dvh, 17px);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -122,7 +137,7 @@ h1 {
 }
 
 .game-canvas {
-  width: min(100%, calc((100dvh - 160px) * 360 / 560));
+  width: min(100%, calc((100dvh - 190px) * 360 / 560));
   height: auto;
   max-width: 100%;
   max-height: 100%;
@@ -191,20 +206,66 @@ h1 {
   transition-duration: 140ms;
 }
 
-.control-copy {
-  min-height: 42px;
+.control-panel {
+  min-height: 64px;
+  padding: 7px 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16), inset 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.control-status {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 9px;
-  padding: 0 4px;
   color: #9ba8bc;
 }
 
-.control-copy p {
+.control-status p {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 650;
   text-wrap: pretty;
+}
+
+.item-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 7px;
+  color: #77869e;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.item-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.item-legend b {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 9px;
+}
+
+.legend-multiball {
+  background: #32bc8c;
+}
+
+.legend-bomb {
+  background: #df9832;
+}
+
+.legend-shield {
+  background: #428ed0;
 }
 
 #status-dot {
@@ -269,6 +330,11 @@ kbd {
 
   kbd {
     display: none;
+  }
+
+  .item-legend {
+    gap: 3px;
+    font-size: 8px;
   }
 }
 

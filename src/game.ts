@@ -4,7 +4,7 @@ export const GRID_COLUMNS = 8;
 export const DANGER_ROW = 10;
 export const MAX_BALLS = 8;
 
-export type GameStatus = "ready" | "aiming" | "volley" | "gameOver" | "victory";
+export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
 export type ItemType = "bomb" | "multiball" | "shield";
 
 export interface Vec2 {
@@ -59,7 +59,7 @@ export interface GameState {
 }
 
 const layouts = [
-  ["..1111..", ".1....1.", "1..M...1", ".1....1.", "..1111.."],
+  [".111111.", "...M...."],
   ["2.2..2.2", ".222222.", "..B..M..", ".2.22.2.", "2..22..2"],
   ["333..333", "3..33..3", ".3.S..3.", "..3333..", "3.M..B.3"],
   ["44.44.44", ".444444.", "4.B..M.4", ".44..44.", "44.SS.44"],
@@ -72,7 +72,55 @@ const itemTypes: Record<string, ItemType> = {
   S: "shield",
 };
 
+function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
+  let seed = Math.imul(stage, 0x9e3779b1) >>> 0;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const rows = Math.min(6, 4 + Math.floor((stage - 6) / 5));
+  const targetPairs = Math.min(rows * 4 - 2, Math.ceil((12 + stage) / 2));
+  const candidates = Array.from({ length: rows * 4 }, (_, index) => ({
+    row: Math.floor(index / 4),
+    column: index % 4,
+  }));
+  candidates.sort(() => random() - 0.5);
+
+  const bricks: Brick[] = [];
+  const baseHp = Math.min(12, stage + 1);
+  candidates.slice(0, targetPairs).forEach(({ row, column }, index) => {
+    const hp = Math.min(12, Math.max(1, baseHp + Math.floor(random() * 3) - 1));
+    for (const mirroredColumn of new Set([column, GRID_COLUMNS - 1 - column])) {
+      bricks.push({
+        id: `s${stage}-b${row}-${mirroredColumn}-${index}`,
+        row,
+        column: mirroredColumn,
+        hp,
+        maxHp: hp,
+      });
+    }
+  });
+
+  const occupied = new Set(bricks.map((brick) => `${brick.row}:${brick.column}`));
+  const openCells = Array.from({ length: rows * GRID_COLUMNS }, (_, index) => ({
+    row: Math.floor(index / GRID_COLUMNS),
+    column: index % GRID_COLUMNS,
+  })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
+  openCells.sort(() => random() - 0.5);
+  const itemOrder: ItemType[] = ["multiball"];
+  if (stage % 2 === 0) itemOrder.push("bomb");
+  if (stage % 3 === 0) itemOrder.push("shield");
+  const items = itemOrder.map((type, index) => ({
+    id: `s${stage}-i${index}`,
+    ...openCells[index],
+    type,
+  }));
+
+  return { bricks, items };
+}
+
 function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
+  if (stage > layouts.length) return proceduralBoard(stage);
   const bricks: Brick[] = [];
   const items: Item[] = [];
   const layout = layouts[stage - 1];
@@ -246,11 +294,6 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
 
 export function advanceStageIfCleared(state: GameState): boolean {
   if (state.bricks.length > 0) return false;
-  if (state.stage === layouts.length) {
-    state.gameStatus = "victory";
-    return true;
-  }
-
   state.stage += 1;
   state.shield = false;
   state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };

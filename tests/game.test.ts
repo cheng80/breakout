@@ -40,6 +40,8 @@ describe("핵심 게임 규칙", () => {
 
     const state = createGame();
     expect(state.ballCount).toBe(1);
+    expect(state.bricks).toHaveLength(6);
+    expect(state.bricks.every((brick) => brick.row === 0 && brick.hp === 1)).toBe(true);
     state.ballCount = 99;
     expect(prepareVolley(state)).toBe(MAX_BALLS);
     expect(state.gameStatus).toBe("volley");
@@ -96,12 +98,30 @@ describe("핵심 게임 규칙", () => {
     expect(state.gameStatus).toBe("gameOver");
   });
 
-  it("5번째 스테이지를 비우면 승리한다", () => {
-    const state = createGame();
-    state.stage = 5;
-    state.bricks = [];
-    expect(advanceStageIfCleared(state)).toBe(true);
-    expect(state.gameStatus).toBe("victory");
+  it("5번째 이후에도 결정적인 절차 stage를 계속 생성한다", () => {
+    const first = createGame();
+    first.stage = 5;
+    first.bricks = [];
+    expect(advanceStageIfCleared(first)).toBe(true);
+    expect(first.stage).toBe(6);
+    expect(first.gameStatus).toBe("ready");
+    expect(first.bricks.length).toBeGreaterThan(0);
+    expect(first.items.some((item) => item.type === "multiball")).toBe(true);
+
+    const second = createGame();
+    second.stage = 5;
+    second.bricks = [];
+    advanceStageIfCleared(second);
+    expect(second.bricks).toEqual(first.bricks);
+    expect(second.items).toEqual(first.items);
+
+    const far = createGame();
+    far.stage = 99;
+    far.bricks = [];
+    advanceStageIfCleared(far);
+    expect(far.stage).toBe(100);
+    expect(far.bricks.length).toBeGreaterThan(0);
+    expect(Math.max(...far.bricks.map((brick) => brick.hp))).toBeLessThanOrEqual(12);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {
