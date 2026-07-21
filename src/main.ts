@@ -5,7 +5,6 @@ import {
   BOARD_WIDTH,
   DANGER_ROW,
   GRID_COLUMNS,
-  advanceStageIfCleared,
   aimFromDrag,
   collectItem,
   createGame,
@@ -13,6 +12,7 @@ import {
   finishVolley,
   prepareVolley,
   resetGame,
+  traceAimPath,
   type Brick,
   type Item,
   type Vec2,
@@ -59,7 +59,12 @@ app.canvas.setAttribute("aria-label", "아래에서 위로 드래그해 공을 �
 
 const scene = new Graphics();
 const labels = new Container();
-app.stage.addChild(scene, labels);
+const ballCounter = new Text({
+  text: "×1",
+  style: { fill: 0xc5d0e3, fontFamily: "system-ui", fontSize: 13, fontWeight: "700" },
+});
+ballCounter.anchor.set(0, 0.5);
+app.stage.addChild(scene, labels, ballCounter);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -224,6 +229,26 @@ function brickColor(brick: Brick): number {
   return 0x6c7cff;
 }
 
+function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  const unit = { x: dx / length, y: dy / length };
+  const dash = reflection === 0 ? 10 : 7;
+  const gap = reflection === 0 ? 6 : 9;
+  for (let distance = 0; distance < length; distance += dash + gap) {
+    const dashEnd = Math.min(distance + dash, length);
+    scene
+      .moveTo(start.x + unit.x * distance, start.y + unit.y * distance)
+      .lineTo(start.x + unit.x * dashEnd, start.y + unit.y * dashEnd);
+  }
+  scene.stroke({
+    width: reflection === 0 ? 2.4 : 1.5,
+    color: 0xffffff,
+    alpha: [0.92, 0.44, 0.28][reflection],
+  });
+}
+
 function draw(): void {
   scene.clear();
   scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
@@ -246,19 +271,31 @@ function draw(): void {
     scene.circle(center.x, center.y, 15).stroke({ width: 1, color: itemColors[item.type], alpha: 0.35 });
   });
 
-  if (state.gameStatus === "ready" || state.gameStatus === "aiming") {
+  const queuedBalls = activeBalls.filter((ball) => ball.delay > 0).length;
+  const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
+  if (showLaunchBall) {
     scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(0xf4f8ff);
     scene.circle(state.launchPosition.x, state.launchPosition.y, 13).stroke({ width: 1, color: 0x6c7cff, alpha: 0.7 });
   }
 
+  const displayedBallCount = state.gameStatus === "volley" ? queuedBalls : state.ballCount;
+  ballCounter.visible = showLaunchBall;
+  ballCounter.text = `×${displayedBallCount}`;
+  ballCounter.position.set(state.launchPosition.x + 16, state.launchPosition.y);
+
   const direction = aimStart && aimCurrent ? aimFromDrag(aimStart, aimCurrent) : null;
   if (direction) {
-    for (let distance = 20; distance < 155; distance += 18) {
-      scene
-        .moveTo(state.launchPosition.x + direction.x * distance, state.launchPosition.y + direction.y * distance)
-        .lineTo(state.launchPosition.x + direction.x * (distance + 9), state.launchPosition.y + direction.y * (distance + 9));
-    }
-    scene.stroke({ width: 2, color: 0xffffff, alpha: 0.85 });
+    traceAimPath(
+      state.launchPosition,
+      direction,
+      { minX: BALL_RADIUS, maxX: BOARD_WIDTH - BALL_RADIUS, minY: BALL_RADIUS, maxY: FLOOR_Y },
+      state.bricks.map(brickRect),
+      2,
+      BALL_RADIUS,
+    ).forEach((segment, reflection) => {
+      drawAimSegment(segment.start, segment.end, reflection);
+      if (reflection < 2) scene.circle(segment.end.x, segment.end.y, 2.5).fill({ color: 0xffffff, alpha: [0.75, 0.4][reflection] });
+    });
   }
 
   activeBalls.forEach((ball) => {
@@ -308,12 +345,6 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       damageBrick(state, hitBrick.id);
       boardSignature = "";
       syncUi();
-      if (advanceStageIfCleared(state)) {
-        activeBalls = [];
-        boardSignature = "";
-        syncUi();
-        return true;
-      }
       break;
     }
 
@@ -325,11 +356,6 @@ function updateBall(ball: ActiveBall, delta: number): boolean {
       collectItem(state, hitItem.id);
       boardSignature = "";
       syncUi();
-      if (advanceStageIfCleared(state)) {
-        activeBalls = [];
-        syncUi();
-        return true;
-      }
     }
   }
 
@@ -341,7 +367,9 @@ function update(delta: number): void {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];
-      if (updateBall(ball, safeDelta)) {
+      const returned = updateBall(ball, safeDelta);
+      if (state.gameStatus !== "volley") break;
+      if (returned) {
         firstLandingX ??= ball.x;
         activeBalls.splice(index, 1);
       }

@@ -12,6 +12,25 @@ export interface Vec2 {
   y: number;
 }
 
+export interface AimBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+export interface AimObstacle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AimSegment {
+  start: Vec2;
+  end: Vec2;
+}
+
 export interface Brick {
   id: string;
   row: number;
@@ -36,6 +55,7 @@ export interface GameState {
   items: Item[];
   gameStatus: GameStatus;
   shield: boolean;
+  turn: number;
 }
 
 const layouts = [
@@ -51,8 +71,6 @@ const itemTypes: Record<string, ItemType> = {
   M: "multiball",
   S: "shield",
 };
-
-const stageBallCount = (stage: number) => Math.min(MAX_BALLS, stage + 2);
 
 function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const bricks: Brick[] = [];
@@ -77,11 +95,12 @@ export function createGame(): GameState {
   return {
     stage: 1,
     score: 0,
-    ballCount: stageBallCount(1),
+    ballCount: 1,
     launchPosition: { x: BOARD_WIDTH / 2, y: 520 },
     ...stageBoard(1),
     gameStatus: "ready",
     shield: false,
+    turn: 0,
   };
 }
 
@@ -105,6 +124,83 @@ export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
   }
 
   return { x, y };
+}
+
+function rayRectHit(origin: Vec2, direction: Vec2, obstacle: AimObstacle, padding: number) {
+  const ranges = [
+    { origin: origin.x, direction: direction.x, min: obstacle.x - padding, max: obstacle.x + obstacle.width + padding, axis: "x" },
+    { origin: origin.y, direction: direction.y, min: obstacle.y - padding, max: obstacle.y + obstacle.height + padding, axis: "y" },
+  ] as const;
+  let near = -Infinity;
+  let far = Infinity;
+  let normal: Vec2 = { x: 0, y: 0 };
+
+  for (const range of ranges) {
+    if (Math.abs(range.direction) < 0.0001) {
+      if (range.origin < range.min || range.origin > range.max) return null;
+      continue;
+    }
+    const first = (range.min - range.origin) / range.direction;
+    const second = (range.max - range.origin) / range.direction;
+    const axisNear = Math.min(first, second);
+    const axisFar = Math.max(first, second);
+    if (axisNear > near) {
+      near = axisNear;
+      normal = range.axis === "x"
+        ? { x: range.direction > 0 ? -1 : 1, y: 0 }
+        : { x: 0, y: range.direction > 0 ? -1 : 1 };
+    }
+    far = Math.min(far, axisFar);
+    if (near > far) return null;
+  }
+
+  return near > 0.01 ? { distance: near, normal } : null;
+}
+
+export function traceAimPath(
+  origin: Vec2,
+  direction: Vec2,
+  bounds: AimBounds,
+  obstacles: AimObstacle[],
+  maxReflections = 2,
+  padding = 0,
+): AimSegment[] {
+  const length = Math.hypot(direction.x, direction.y);
+  let rayDirection = { x: direction.x / length, y: direction.y / length };
+  let rayOrigin = { ...origin };
+  let segmentStart = { ...origin };
+  const segments: AimSegment[] = [];
+
+  for (let reflection = 0; reflection <= maxReflections; reflection += 1) {
+    const hits: Array<{ distance: number; normal: Vec2; terminal?: boolean }> = [];
+    if (rayDirection.x < 0) hits.push({ distance: (bounds.minX - rayOrigin.x) / rayDirection.x, normal: { x: 1, y: 0 } });
+    if (rayDirection.x > 0) hits.push({ distance: (bounds.maxX - rayOrigin.x) / rayDirection.x, normal: { x: -1, y: 0 } });
+    if (rayDirection.y < 0) hits.push({ distance: (bounds.minY - rayOrigin.y) / rayDirection.y, normal: { x: 0, y: 1 } });
+    if (rayDirection.y > 0) hits.push({ distance: (bounds.maxY - rayOrigin.y) / rayDirection.y, normal: { x: 0, y: -1 }, terminal: true });
+    obstacles.forEach((obstacle) => {
+      const hit = rayRectHit(rayOrigin, rayDirection, obstacle, padding);
+      if (hit) hits.push(hit);
+    });
+
+    const hit = hits.filter((candidate) => candidate.distance > 0.01).sort((a, b) => a.distance - b.distance)[0];
+    if (!hit) break;
+    const end = {
+      x: rayOrigin.x + rayDirection.x * hit.distance,
+      y: rayOrigin.y + rayDirection.y * hit.distance,
+    };
+    segments.push({ start: segmentStart, end });
+    if (hit.terminal || reflection === maxReflections) break;
+
+    const dot = rayDirection.x * hit.normal.x + rayDirection.y * hit.normal.y;
+    rayDirection = {
+      x: rayDirection.x - 2 * dot * hit.normal.x,
+      y: rayDirection.y - 2 * dot * hit.normal.y,
+    };
+    segmentStart = end;
+    rayOrigin = { x: end.x + rayDirection.x * 0.05, y: end.y + rayDirection.y * 0.05 };
+  }
+
+  return segments;
 }
 
 export function prepareVolley(state: GameState): number {
@@ -156,12 +252,25 @@ export function advanceStageIfCleared(state: GameState): boolean {
   }
 
   state.stage += 1;
-  state.ballCount = stageBallCount(state.stage);
   state.shield = false;
   state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };
   Object.assign(state, stageBoard(state.stage));
   state.gameStatus = "ready";
   return true;
+}
+
+function addTurnMultiball(state: GameState): void {
+  const occupied = new Set(
+    [...state.bricks, ...state.items].filter((entity) => entity.row === 0).map((entity) => entity.column),
+  );
+  const firstColumn = (state.turn * 3 + state.stage) % GRID_COLUMNS;
+  for (let offset = 0; offset < GRID_COLUMNS; offset += 1) {
+    const column = (firstColumn + offset) % GRID_COLUMNS;
+    if (!occupied.has(column)) {
+      state.items.push({ id: `turn-${state.turn}-${column}`, row: 0, column, type: "multiball" });
+      return;
+    }
+  }
 }
 
 export function finishVolley(state: GameState, firstLandingX: number): void {
@@ -171,6 +280,10 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
   state.bricks.forEach((brick) => (brick.row += 1));
   state.items.forEach((item) => (item.row += 1));
 
+  const barrierMultiballs = state.items.filter((item) => item.type === "multiball" && item.row >= DANGER_ROW);
+  state.ballCount = Math.min(MAX_BALLS, state.ballCount + barrierMultiballs.length);
+  state.items = state.items.filter((item) => !barrierMultiballs.includes(item));
+
   if (state.bricks.some((brick) => brick.row >= DANGER_ROW)) {
     if (state.shield) state.shield = false;
     else {
@@ -178,5 +291,7 @@ export function finishVolley(state: GameState, firstLandingX: number): void {
       return;
     }
   }
+  state.turn += 1;
+  addTurnMultiball(state);
   state.gameStatus = "ready";
 }
