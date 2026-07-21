@@ -351,6 +351,46 @@ button {
   margin-top: 16px;
 }
 
+.reset-confirm-card {
+  width: min(100%, 280px);
+  overflow: visible;
+  text-align: center;
+}
+
+.reset-confirm-card h2 {
+  margin-bottom: 8px;
+  text-wrap: balance;
+}
+
+.reset-confirm-card #reset-confirm-description {
+  margin: 0;
+  color: #a9b4c8;
+  font-size: 12px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.reset-confirm-actions {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.reset-confirm-actions button {
+  margin: 0;
+}
+
+.reset-confirm-actions .reset-cancel {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.reset-confirm-actions #reset-confirm-button {
+  background: #ff4d6d;
+  box-shadow: 0 10px 28px rgba(255, 77, 109, 0.28);
+}
+
 .control-panel {
   min-height: 40px;
   padding: 7px 9px;
