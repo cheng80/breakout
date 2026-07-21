@@ -163,6 +163,16 @@ button {
   color: #5db7ff;
 }
 
+#score {
+  transition-property: color, text-shadow;
+  transition-duration: 180ms;
+}
+
+#score.new-best {
+  color: #ffd166;
+  text-shadow: 0 0 14px rgba(255, 193, 69, 0.6);
+}
+
 .game-shell {
   position: relative;
   min-height: 0;
@@ -298,9 +308,28 @@ button {
   text-wrap: balance;
 }
 
-.result p {
+.result-scores {
+  margin: 16px 0;
+  display: grid;
+  gap: 9px;
+}
+
+.result-scores p {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   color: #a9b4c8;
   font-variant-numeric: tabular-nums;
+}
+
+.result-scores strong {
+  color: #fff;
+  font-size: 20px;
+}
+
+.result-scores p:last-child strong {
+  color: #ffd166;
 }
 
 .result button,
@@ -423,6 +452,7 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #score,
   .icon-button,
   .result button,
   .item-help-card button {
