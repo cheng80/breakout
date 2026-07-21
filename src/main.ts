@@ -7,6 +7,7 @@ import {
   BRICK_HEIGHT,
   CELL_HEIGHT,
   DANGER_Y,
+  FLOOR_Y,
   GRID_TOP,
   GRID_COLUMNS,
   LASER_EFFECT_DURATION,
@@ -31,8 +32,6 @@ const GRID_MARGIN = 12;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
 const BALL_SPEED = 360;
-const FLOOR_Y = 520;
-
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;

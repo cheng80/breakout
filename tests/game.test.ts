@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOARD_HEIGHT,
   DANGER_ROW,
   DANGER_Y,
+  FLOOR_Y,
   BRICK_HEIGHT,
   BOMB_EFFECT_DURATION,
   CELL_HEIGHT,
@@ -65,7 +67,7 @@ describe("핵심 게임 규칙", () => {
   });
 
   it("벽과 벽돌 충돌을 따라 조준 경로를 2회 반사한다", () => {
-    const bounds = { minX: 5, maxX: 355, minY: 5, maxY: 520 };
+    const bounds = { minX: 5, maxX: 355, minY: 5, maxY: FLOOR_Y };
     const wallPath = traceAimPath({ x: 50, y: 100 }, { x: -1, y: -1 }, bounds, [], 2);
     expect(wallPath).toHaveLength(3);
     expect(wallPath[0].end.x).toBeCloseTo(5);
@@ -81,7 +83,7 @@ describe("핵심 게임 규칙", () => {
       5,
     );
     expect(brickPath[0].end.y).toBeCloseTo(135);
-    expect(brickPath[1].end.y).toBeCloseTo(520);
+    expect(brickPath[1].end.y).toBeCloseTo(FLOOR_Y);
   });
 
   it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~20개로 제한한다", () => {
@@ -165,6 +167,9 @@ describe("핵심 게임 규칙", () => {
   });
 
   it("벽돌 하단이 위험선에 닿는 것은 허용하고 아래로 내려오면 게임오버다", () => {
+    expect(BOARD_HEIGHT).toBe(602);
+    expect(DANGER_ROW).toBe(10);
+    expect(FLOOR_Y).toBe(562);
     expect(DANGER_Y).toBe(GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT);
     const state = createGame();
     state.bricks = [{ ...state.bricks[0], row: DANGER_ROW - 1 }];

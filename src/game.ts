@@ -1,11 +1,12 @@
 export const BOARD_WIDTH = 360;
-export const BOARD_HEIGHT = 560;
+export const BOARD_HEIGHT = 602;
 export const GRID_COLUMNS = 8;
 export const GRID_TOP = 42;
 export const CELL_HEIGHT = 42;
 export const BRICK_HEIGHT = 34;
-export const DANGER_ROW = 9;
+export const DANGER_ROW = 10;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
+export const FLOOR_Y = BOARD_HEIGHT - 40;
 export const MAX_BALLS = 20;
 export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
@@ -192,7 +193,7 @@ export function createGame(): GameState {
     stage: 1,
     score: 0,
     ballCount: 1,
-    launchPosition: { x: BOARD_WIDTH / 2, y: 520 },
+    launchPosition: { x: BOARD_WIDTH / 2, y: FLOOR_Y },
     ...stageBoard(1),
     gameStatus: "ready",
     shield: false,
@@ -365,7 +366,7 @@ export function advanceStageIfCleared(state: GameState): boolean {
   state.shield = false;
   state.powerTurns = 0;
   state.pendingLaserTriggers = [];
-  state.launchPosition = { x: BOARD_WIDTH / 2, y: 520 };
+  state.launchPosition = { x: BOARD_WIDTH / 2, y: FLOOR_Y };
   Object.assign(state, stageBoard(state.stage));
   state.gameStatus = "ready";
   return true;
