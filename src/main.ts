@@ -32,6 +32,7 @@ const GRID_MARGIN = 12;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 const BALL_RADIUS = 5;
 const BALL_SPEED = 360;
+const BEST_SCORE_KEY = "swipe-breakout-best-score";
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -47,6 +48,8 @@ interface LaserEffect extends Vec2 {
 }
 
 const state = createGame();
+let bestScore = loadBestScore();
+let hasNewBestScore = false;
 let activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
@@ -105,6 +108,7 @@ const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
+const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
@@ -142,6 +146,7 @@ function launch(direction: Vec2): void {
 
 function reset(): void {
   resetGame(state);
+  hasNewBestScore = false;
   activeBalls = [];
   aimStart = null;
   aimCurrent = null;
@@ -213,9 +218,33 @@ function setHelpOpen(open: boolean): void {
   }
 }
 
+function loadBestScore(): number {
+  try {
+    const storedScore = Number(localStorage.getItem(BEST_SCORE_KEY));
+    return Number.isFinite(storedScore) && storedScore > 0 ? Math.floor(storedScore) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveBestScore(): void {
+  try {
+    localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
+  }
+}
+
 function syncUi(): void {
+  if (state.score > bestScore) {
+    bestScore = state.score;
+    hasNewBestScore = true;
+    saveBestScore();
+  }
+
   stageEl.textContent = String(state.stage).padStart(2, "0");
   scoreEl.textContent = state.score.toLocaleString("ko-KR");
+  scoreEl.classList.toggle("new-best", hasNewBestScore);
   ballsEl.textContent = `× ${state.ballCount}`;
   shieldEl.textContent = state.shield ? "ON" : "OFF";
   shieldEl.classList.toggle("active", state.shield);
@@ -230,7 +259,10 @@ function syncUi(): void {
   statusDot.dataset.state = state.gameStatus;
 
   result.hidden = state.gameStatus !== "gameOver";
-  if (state.gameStatus === "gameOver") resultScore.textContent = state.score.toLocaleString("ko-KR");
+  if (state.gameStatus === "gameOver") {
+    resultScore.textContent = state.score.toLocaleString("ko-KR");
+    resultBestScore.textContent = bestScore.toLocaleString("ko-KR");
+  }
 }
 
 function rebuildLabels(): void {
