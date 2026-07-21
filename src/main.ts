@@ -90,6 +90,8 @@ app.canvas.setAttribute("aria-label", "아래에서 위로 드래그해 공을 �
 const scene = new Graphics();
 const effectGlow = new Graphics();
 effectGlow.filters = [new BlurFilter({ strength: 10, quality: 3 })];
+const brickHitGlow = new Graphics();
+brickHitGlow.filters = [new BlurFilter({ strength: 7, quality: 3 })];
 const labels = new Container();
 const ballCounter = new Text({
   text: "×1",
@@ -108,7 +110,7 @@ const dangerLabel = new Text({
 });
 dangerLabel.anchor.set(1, 0);
 dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
-app.stage.addChild(scene, effectGlow, labels, trapNotice, ballCounter, dangerLabel);
+app.stage.addChild(scene, effectGlow, brickHitGlow, labels, trapNotice, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -340,6 +342,7 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
 function draw(): void {
   scene.clear();
   effectGlow.clear();
+  brickHitGlow.clear();
   scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
   const shieldFrame = shieldRewindEffect ? shieldRewindFrame(shieldRewindEffect.elapsed) : null;
   const boardOffset = shieldFrame?.offset ?? 0;
@@ -391,7 +394,7 @@ function draw(): void {
     const height = logicalRect.height * frame.scale;
     const x = logicalRect.x - (width - logicalRect.width) / 2;
     const y = logicalRect.y + boardOffset - (height - logicalRect.height) / 2;
-    effectGlow.roundRect(x, y, width, height, 9)
+    brickHitGlow.roundRect(x, y, width, height, 9)
       .stroke({ width: 14, color: 0xff8a32, alpha: frame.alpha * 0.85 });
     scene.roundRect(x, y, width, height, 9)
       .stroke({ width: 3, color: 0xffc15d, alpha: frame.alpha });
