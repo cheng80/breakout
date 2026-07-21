@@ -270,6 +270,50 @@ export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
   return { x, y };
 }
 
+export function resolveCircleRectCollision(
+  position: Vec2,
+  velocity: Vec2,
+  rect: AimObstacle,
+  radius: number,
+): { position: Vec2; velocity: Vec2 } | null {
+  const nearestX = Math.max(rect.x, Math.min(position.x, rect.x + rect.width));
+  const nearestY = Math.max(rect.y, Math.min(position.y, rect.y + rect.height));
+  const offsetX = position.x - nearestX;
+  const offsetY = position.y - nearestY;
+  const distanceSquared = offsetX ** 2 + offsetY ** 2;
+  if (distanceSquared > radius ** 2) return null;
+
+  let normal: Vec2;
+  let correctedPosition: Vec2;
+  if (distanceSquared > 0) {
+    const distance = Math.sqrt(distanceSquared);
+    normal = { x: offsetX / distance, y: offsetY / distance };
+    const correction = radius - distance + 0.01;
+    correctedPosition = {
+      x: position.x + normal.x * correction,
+      y: position.y + normal.y * correction,
+    };
+  } else {
+    const exits = [
+      { distance: Math.abs(position.x - (rect.x - radius)), position: { x: rect.x - radius - 0.01, y: position.y }, normal: { x: -1, y: 0 } },
+      { distance: Math.abs(position.x - (rect.x + rect.width + radius)), position: { x: rect.x + rect.width + radius + 0.01, y: position.y }, normal: { x: 1, y: 0 } },
+      { distance: Math.abs(position.y - (rect.y - radius)), position: { x: position.x, y: rect.y - radius - 0.01 }, normal: { x: 0, y: -1 } },
+      { distance: Math.abs(position.y - (rect.y + rect.height + radius)), position: { x: position.x, y: rect.y + rect.height + radius + 0.01 }, normal: { x: 0, y: 1 } },
+    ];
+    const exit = exits.sort((a, b) => a.distance - b.distance)[0];
+    normal = exit.normal;
+    correctedPosition = exit.position;
+  }
+
+  const dot = velocity.x * normal.x + velocity.y * normal.y;
+  return {
+    position: correctedPosition,
+    velocity: dot < 0
+      ? { x: velocity.x - 2 * dot * normal.x, y: velocity.y - 2 * dot * normal.y }
+      : velocity,
+  };
+}
+
 function rayRectHit(origin: Vec2, direction: Vec2, obstacle: AimObstacle, padding: number) {
   const ranges = [
     { origin: origin.x, direction: direction.x, min: obstacle.x - padding, max: obstacle.x + obstacle.width + padding, axis: "x" },
