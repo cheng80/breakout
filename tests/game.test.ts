@@ -207,6 +207,33 @@ describe("핵심 게임 규칙", () => {
     expect(MAX_BRICK_HP).toBe(50);
     expect(Math.min(...farHp)).toBeGreaterThanOrEqual(49);
     expect(Math.max(...farHp)).toBe(50);
+
+    const generated = Array.from({ length: 5 }, (_, index) => {
+      const state = createGame();
+      state.stage = 5 + index;
+      state.bricks = [];
+      advanceStageIfCleared(state);
+      return state;
+    });
+    const signatures = generated.map((state) => state.bricks
+      .map((brick) => `${brick.row}:${brick.column}`)
+      .sort()
+      .join("|"));
+    expect(new Set(signatures).size).toBe(5);
+
+    const checker = generated[0];
+    expect(checker.bricks.filter(
+      (brick) => brick.column < 4 && (brick.row + brick.column + checker.stage) % 2 === 0,
+    ).length).toBeGreaterThanOrEqual(8);
+
+    const corridor = generated[2];
+    expect(corridor.bricks.every((brick) => brick.column !== 3 && brick.column !== 4)).toBe(true);
+
+    const late = createGame();
+    late.stage = 19;
+    late.bricks = [];
+    advanceStageIfCleared(late);
+    expect(late.bricks.length).toBeGreaterThan(first.bricks.length);
   });
 
   it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {

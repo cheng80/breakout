@@ -116,8 +116,17 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const candidates = Array.from({ length: rows * 4 }, (_, index) => ({
     row: Math.floor(index / 4),
     column: index % 4,
+    noise: random(),
   }));
-  candidates.sort(() => random() - 0.5);
+  const pattern = stage % 5;
+  const priority = ({ row, column, noise }: (typeof candidates)[number]) => {
+    if (pattern === 1) return ((row + column + stage) % 2 === 0 ? 0 : 2) + noise;
+    if (pattern === 2) return Math.abs(column - ((row + Math.floor(stage / 5)) % 4)) + noise * 0.35;
+    if (pattern === 3) return column + noise * 0.35;
+    if (pattern === 4) return Math.min(row, rows - 1 - row, column, 3 - column) + noise * 0.35;
+    return noise;
+  };
+  candidates.sort((a, b) => priority(a) - priority(b));
 
   const bricks: Brick[] = [];
   const baseHp = Math.min(MAX_BRICK_HP, stage + 1);
