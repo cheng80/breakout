@@ -5,6 +5,7 @@ import musicIcon from "lucide-static/icons/music-2.svg?raw";
 import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
 import volumeIcon from "lucide-static/icons/volume.svg?raw";
 import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
+import homeIcon from "lucide-static/icons/house.svg?raw";
 import closeIcon from "lucide-static/icons/x.svg?raw";
 import trophyIcon from "lucide-static/icons/trophy.svg?raw";
 import {
@@ -230,6 +231,7 @@ const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
 const optionsCloseButton = document.querySelector<HTMLButtonElement>("#options-close")!;
 const optionsRestartButton = document.querySelector<HTMLButtonElement>("#options-restart")!;
+const optionsHomeButton = document.querySelector<HTMLButtonElement>("#options-home")!;
 const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")!;
 const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
 const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
@@ -244,6 +246,7 @@ const iconMarkup: Record<string, string> = {
   "audio-lines": effectIcon,
   volume: volumeIcon,
   "rotate-ccw": restartIcon,
+  house: homeIcon,
   x: closeIcon,
   trophy: trophyIcon,
 };
@@ -320,6 +323,15 @@ function reset(): void {
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
+}
+
+function returnToEntryScreen(): void {
+  reset();
+  entryNameInput.value = loadPlayerName();
+  entryFeedback.textContent = "";
+  entryScreen.hidden = false;
+  appRoot.hidden = true;
+  entryNameInput.focus();
 }
 
 function screenPoint(event: PointerEvent): Vec2 {
@@ -404,6 +416,7 @@ optionsRestartButton.addEventListener("click", () => {
   setOptionsOpen(false);
   setResetConfirmOpen(true);
 });
+optionsHomeButton.addEventListener("click", returnToEntryScreen);
 bgmToggleButton.addEventListener("click", () => {
   setBgmMuted(!isBgmMuted());
   syncAudioOptions();
