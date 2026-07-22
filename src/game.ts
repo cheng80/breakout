@@ -7,7 +7,7 @@ export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 10;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const FLOOR_Y = BOARD_HEIGHT - 40;
-export const MAX_BALLS = 100;
+export const MAX_BALLS = 80;
 export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
@@ -21,7 +21,13 @@ export const BLACK_HOLE_CLEAR_FADE_DURATION = 0.15;
 export const MULTIBALL_SCORE = 50;
 
 export function maxBallsForStage(stage: number): number {
-  return Math.min(MAX_BALLS, 30 + Math.floor(Math.max(1, stage) / 10) * 10);
+  const normalizedStage = Math.max(1, stage);
+  if (normalizedStage <= 20) return 30;
+  if (normalizedStage <= 30) return 40;
+  if (normalizedStage <= 40) return 50;
+  if (normalizedStage <= 50) return 60;
+  if (normalizedStage <= 70) return 70;
+  return MAX_BALLS;
 }
 
 export function volleySpeedMultiplier(ballCount: number): number {

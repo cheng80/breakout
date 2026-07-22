@@ -336,15 +336,18 @@ describe("핵심 게임 규칙", () => {
     expect(state.stageTargetScore).toBe(450);
     expect(state.stageTargetTimeMs).toBeGreaterThan(0);
     state.ballCount = 99;
-    expect(MAX_BALLS).toBe(100);
+    expect(MAX_BALLS).toBe(80);
     expect(maxBallsForStage(1)).toBe(30);
-    expect(maxBallsForStage(10)).toBe(40);
-    expect(maxBallsForStage(40)).toBe(70);
-    expect(maxBallsForStage(70)).toBe(MAX_BALLS);
+    expect(maxBallsForStage(20)).toBe(30);
+    expect(maxBallsForStage(21)).toBe(40);
+    expect(maxBallsForStage(40)).toBe(50);
+    expect(maxBallsForStage(50)).toBe(60);
+    expect(maxBallsForStage(70)).toBe(70);
+    expect(maxBallsForStage(71)).toBe(MAX_BALLS);
     expect(maxBallsForStage(100)).toBe(MAX_BALLS);
     expect(volleySpeedMultiplier(30)).toBe(1);
     expect(volleySpeedMultiplier(70)).toBeCloseTo(1.2857, 3);
-    expect(volleySpeedMultiplier(100)).toBe(1.5);
+    expect(volleySpeedMultiplier(100)).toBeCloseTo(1.357, 3);
     expect(prepareVolley(state)).toBe(30);
     expect(state.gameStatus).toBe("volley");
   });
@@ -441,7 +444,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.ballCount).toBe(2);
     expect(state.score).toBe(MULTIBALL_SCORE);
 
-    state.stage = 70;
+    state.stage = 71;
     state.ballCount = MAX_BALLS;
     state.score = 0;
     state.items.push({ id: "overflow-multiball", row: 1, column: 1, type: "multiball" });
