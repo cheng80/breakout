@@ -32,6 +32,13 @@ npm run dev
 
 로컬 개발 중 진입 화면과 베스트 스코어를 초기화하려면 브라우저 콘솔에서 `resetBreakoutForDevelopment()`를 실행합니다. 운영 주소에서는 이 함수가 노출되지 않습니다.
 
+궁극기 테스트 픽스처가 필요한 경우에만 전용 mode로 실행합니다. 일반 개발 서버와 빌드에서는 테스트 패널을 표시하지 않습니다.
+
+```bash
+npm run dev:ultimate-fixture
+npm run build:ultimate-fixture
+```
+
 ## 테스트
 
 ```bash

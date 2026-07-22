@@ -660,13 +660,17 @@ helpButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
-debugTools.hidden = !import.meta.env.DEV;
-debugUltimateButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const type = button.dataset.debugUltimate as UltimateItemType;
-    if (type in ultimateDetails) startDebugUltimate(type);
+if (import.meta.env.MODE === "ultimate-fixture") {
+  debugTools.hidden = false;
+  debugUltimateButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const type = button.dataset.debugUltimate as UltimateItemType;
+      if (type in ultimateDetails) startDebugUltimate(type);
+    });
   });
-});
+} else {
+  debugTools.remove();
+}
 optionsButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !rankingOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
 });
