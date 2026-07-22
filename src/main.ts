@@ -114,7 +114,7 @@ const MISSILE_LAUNCH_SPAN = 0.32;
 const MISSILE_LOCAL_DURATION = 0.62;
 const MISSILE_IMPACT_LOCAL_PROGRESS = 0.76;
 const ULTIMATE_RESULT_DELAY = 0.35;
-const MULTIBALL_SPLIT_ANGLE = Math.PI / 12;
+const MULTIBALL_TRAIL_DISTANCE = BALL_RADIUS * 2 + 2;
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -2140,13 +2140,10 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
       const itemType = collectedItem?.type;
       if (itemType) ball.bounceCount = 0;
       if (collectedItem?.ballCountDelta === 1) {
-        const cosine = Math.cos(MULTIBALL_SPLIT_ANGLE);
-        const sine = Math.sin(MULTIBALL_SPLIT_ANGLE) * Math.sign(ball.vx * ball.vy || 1);
-        const velocity = stabilizeBounce({
-          x: ball.vx * cosine - ball.vy * sine,
-          y: ball.vx * sine + ball.vy * cosine,
-        }, 0);
-        activeBalls.push(Object.assign(ballPool.acquire(), ball, velocity, {
+        const speed = Math.hypot(ball.vx, ball.vy) || 1;
+        activeBalls.push(Object.assign(ballPool.acquire(), ball, {
+          x: ball.x - ball.vx / speed * MULTIBALL_TRAIL_DISTANCE,
+          y: ball.y - ball.vy / speed * MULTIBALL_TRAIL_DISTANCE,
           delay: 0,
           bounceCount: 0,
           blackHoleId: null,
