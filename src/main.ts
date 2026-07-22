@@ -56,6 +56,7 @@ import {
   discardUltimateReward,
   finishVolley,
   hitBrickWithBall,
+  isGrowthUltimate,
   laserEffectFrame,
   maxBallsForStage,
   orbitalLaserStartColumn,
@@ -67,6 +68,8 @@ import {
   shieldRewindFrame,
   stabilizeBounce,
   traceAimPath,
+  ultimateItemLevel,
+  ultimateItemType,
   useUltimateItem,
   volleySpeedMultiplier,
   type Brick,
@@ -345,6 +348,7 @@ const rewardTargetScore = document.querySelector<HTMLElement>("#reward-target-sc
 const rewardResult = document.querySelector<HTMLElement>("#reward-result")!;
 const rewardResultSymbol = document.querySelector<HTMLElement>("#reward-result-symbol")!;
 const rewardResultImage = document.querySelector<HTMLImageElement>("#reward-result-image")!;
+const rewardResultLevel = document.querySelector<HTMLElement>("#reward-result-level")!;
 const rewardResultName = document.querySelector<HTMLElement>("#reward-result-name")!;
 const rewardResultCopy = document.querySelector<HTMLElement>("#reward-result-copy")!;
 const rewardActions = document.querySelector<HTMLElement>("#reward-actions")!;
@@ -589,7 +593,7 @@ function startDebugUltimate(type: UltimateItemType): void {
     pendingLaserTriggers: [...state.pendingLaserTriggers],
   };
   debugUltimateActive = true;
-  state.ultimateInventory[0] = type;
+  state.ultimateInventory[0] = isGrowthUltimate(type) ? { type, level: 4 } : type;
   const target = { row: targetBrick.row, column: targetBrick.column };
   const activation = useUltimateItem(state, 0, target, true);
   if (!activation) {
@@ -1144,7 +1148,7 @@ function syncUi(): void {
   const selectedUltimate = selectedUltimateSlot === null ? null : state.ultimateInventory[selectedUltimateSlot];
   const messages = {
     ready: selectedUltimate
-      ? `${ultimateDetails[selectedUltimate].name} · 터뜨릴 위치를 선택하세요`
+      ? `${ultimateDetails[ultimateItemType(selectedUltimate)].name} · 터뜨릴 위치를 선택하세요`
       : state.powerTurns > 0 ? `강화볼 준비 · 공격력 ×${state.powerMultiplier}` : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
     volley: state.powerTurns > 0 ? `강화볼 발사 중 · 공격력 ×${state.powerMultiplier}` : "공이 모두 돌아올 때까지 기다리세요",
@@ -1180,9 +1184,12 @@ function syncUltimateUi(): void {
   const stored = state.ultimateInventory.filter(Boolean).length;
   ultimateSlotCount.textContent = `${stored} / ${state.ultimateInventory.length}`;
   ultimateSlotButtons.forEach((button, index) => {
-    const type = state.ultimateInventory[index];
+    const item = state.ultimateInventory[index];
+    const type = item ? ultimateItemType(item) : null;
+    const itemLevel = item ? ultimateItemLevel(item) : null;
     const symbol = button.querySelector<HTMLElement>(".ultimate-slot-symbol")!;
     const image = button.querySelector<HTMLImageElement>(".ultimate-slot-image")!;
+    const level = button.querySelector<HTMLElement>(".ultimate-level-badge")!;
     const name = button.querySelector<HTMLElement>("strong")!;
     const hint = button.querySelector<HTMLElement>("small")!;
     symbol.className = "ultimate-slot-symbol";
@@ -1193,6 +1200,7 @@ function syncUltimateUi(): void {
       symbol.hidden = false;
       image.hidden = true;
       image.removeAttribute("src");
+      level.hidden = true;
       name.textContent = "비어 있음";
       hint.textContent = "클리어 보상";
       button.classList.remove("filled");
@@ -1200,6 +1208,11 @@ function syncUltimateUi(): void {
       return;
     }
     const detail = ultimateDetails[type];
+    level.hidden = itemLevel === null;
+    if (itemLevel !== null) {
+      level.textContent = `LV.${itemLevel}`;
+      level.dataset.level = String(itemLevel);
+    }
     symbol.textContent = detail.symbol;
     symbol.classList.add(detail.className);
     if (detail.image) {
@@ -1232,11 +1245,19 @@ function syncUltimateUi(): void {
   rewardScore.textContent = stageResult.score.toLocaleString("ko-KR");
   rewardTargetScore.textContent = `/ ${stageResult.targetScore.toLocaleString("ko-KR")}`;
   rewardResultSymbol.className = "ultimate-symbol";
+  rewardResultLevel.hidden = true;
   rewardResultImage.hidden = true;
   rewardResultImage.removeAttribute("src");
   rewardResult.classList.toggle("no-reward", !state.pendingUltimateReward);
   if (state.pendingUltimateReward) {
-    const detail = ultimateDetails[state.pendingUltimateReward];
+    const rewardType = ultimateItemType(state.pendingUltimateReward);
+    const rewardLevel = ultimateItemLevel(state.pendingUltimateReward);
+    const detail = ultimateDetails[rewardType];
+    rewardResultLevel.hidden = rewardLevel === null;
+    if (rewardLevel !== null) {
+      rewardResultLevel.textContent = `LV.${rewardLevel}`;
+      rewardResultLevel.dataset.level = String(rewardLevel);
+    }
     rewardResultSymbol.textContent = detail.symbol;
     rewardResultSymbol.classList.add(detail.className);
     if (detail.image) {
@@ -1262,9 +1283,9 @@ function syncUltimateUi(): void {
     rewardSkipButton.hidden = true;
   }
   rewardReplacementButtons.forEach((button, index) => {
-    const storedType = state.ultimateInventory[index];
-    button.textContent = storedType
-      ? `${index + 1}번 · ${ultimateDetails[storedType].name} 교체`
+    const storedItem = state.ultimateInventory[index];
+    button.textContent = storedItem
+      ? `${index + 1}번 · ${ultimateDetails[ultimateItemType(storedItem)].name} 교체`
       : `${index + 1}번 · 빈 슬롯`;
   });
 }
