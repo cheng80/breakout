@@ -8,7 +8,21 @@
     <title>Swipe Breakout</title>
   </head>
   <body>
-    <main class="app" aria-label="Swipe Breakout 게임">
+    <section id="entry-screen" class="entry-screen" aria-labelledby="entry-title">
+      <div class="entry-card">
+        <p class="entry-kicker">SWIPE BREAKOUT</p>
+        <h1 id="entry-title">닉네임을 정하고<br />게임을 시작하세요.</h1>
+        <p class="entry-description">게임오버 시 이 닉네임으로 랭킹에 기록됩니다.</p>
+        <form id="entry-form" class="entry-form">
+          <label for="entry-name">닉네임</label>
+          <input id="entry-name" name="name" type="text" maxlength="12" autocomplete="nickname" placeholder="닉네임 입력" required />
+          <button type="submit">게임 시작</button>
+          <p id="entry-feedback" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <main class="app" aria-label="Swipe Breakout 게임" hidden>
       <header class="topbar">
         <h1 class="brand-title">SWIPE BREAKOUT</h1>
         <div class="top-actions">

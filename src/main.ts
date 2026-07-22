@@ -194,6 +194,11 @@ const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
+const appRoot = document.querySelector<HTMLElement>(".app")!;
+const entryScreen = document.querySelector<HTMLElement>("#entry-screen")!;
+const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
+const entryNameInput = document.querySelector<HTMLInputElement>("#entry-name")!;
+const entryFeedback = document.querySelector<HTMLElement>("#entry-feedback")!;
 const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
 const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
 const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
@@ -338,6 +343,23 @@ app.canvas.addEventListener("pointercancel", () => {
 });
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+entryNameInput.value = loadPlayerName();
+entryForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = normalizePlayerName(entryNameInput.value);
+  if (!name) {
+    entryFeedback.textContent = "닉네임을 입력하세요.";
+    entryNameInput.focus();
+    return;
+  }
+  savePlayerName(name);
+  entryNameInput.value = name;
+  rankingNameInput.value = name;
+  entryFeedback.textContent = "";
+  entryScreen.hidden = true;
+  appRoot.hidden = false;
+  syncUi();
+});
 rankingForm.addEventListener("submit", (event) => {
   event.preventDefault();
   void submitCurrentScore();
