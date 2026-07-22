@@ -299,6 +299,25 @@ button {
   background: rgba(93, 183, 255, 0.1);
 }
 
+.hud-debug {
+  grid-column: 1 / -1;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px dashed rgba(255, 193, 69, 0.45);
+  border-radius: 9px;
+  background: rgba(255, 193, 69, 0.08);
+  color: #ffd166;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.hud-debug:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .hud span {
   display: block;
   margin-bottom: 5px;
@@ -577,6 +596,64 @@ button {
 
 .item-help-card h2 + h3 {
   margin-top: 0;
+}
+
+.debug-card {
+  width: min(100%, 340px);
+  padding: 16px;
+}
+
+.debug-card h2 {
+  margin-bottom: 6px;
+}
+
+.debug-copy {
+  margin: 0 0 12px;
+  color: #a9b4c8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.debug-ultimate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.debug-ultimate {
+  min-width: 0;
+  min-height: 62px;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(164, 177, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #e7ecff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.debug-ultimate:active {
+  transform: scale(0.97);
+}
+
+.debug-ultimate img {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  filter: saturate(0.82) brightness(0.84);
+}
+
+.debug-ultimate strong {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-help-list {

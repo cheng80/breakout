@@ -65,6 +65,8 @@ import {
   useUltimateItem,
   type Brick,
   type FieldItem,
+  type GameState,
+  type UltimateActivation,
   type UltimateItemType,
   type Vec2,
 } from "./game";
@@ -109,6 +111,17 @@ interface UltimateEffect extends PositionedEffect {
   targets: Vec2[];
 }
 
+interface DebugSnapshot {
+  bricks: Brick[];
+  score: number;
+  stageScore: number;
+  gameStatus: GameStatus;
+  ultimateInventory: GameState["ultimateInventory"];
+  pendingUltimateReward: GameState["pendingUltimateReward"];
+  stageResult: GameState["stageResult"];
+  pendingLaserTriggers: GameState["pendingLaserTriggers"];
+}
+
 type BallExit = "landed" | "captured" | null;
 
 void startGame().catch((error: unknown) => {
@@ -138,6 +151,7 @@ let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
+let debugOpen = false;
 let resetConfirmOpen = false;
 let rankingOpen = false;
 let rankingTrigger: HTMLButtonElement | null = null;
@@ -148,6 +162,8 @@ let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
 let rewardReplacementOpen = false;
 let selectedUltimateSlot: number | null = null;
+let debugUltimateActive = false;
+let debugSnapshot: DebugSnapshot | null = null;
 let purePlayTimeMs = 0;
 let fpsVisible = loadFpsVisibility();
 let fpsSampleElapsedMs = 0;
@@ -260,6 +276,10 @@ const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
+const debugOpenButton = document.querySelector<HTMLButtonElement>("#debug-open")!;
+const debugDialog = document.querySelector<HTMLElement>("#debug-panel")!;
+const debugCloseButton = document.querySelector<HTMLButtonElement>("#debug-close")!;
+const debugUltimateButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-debug-ultimate]")];
 const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
 const optionsCloseButton = document.querySelector<HTMLButtonElement>("#options-close")!;
@@ -389,6 +409,8 @@ function reset(): void {
   resetGame(state);
   rewardReplacementOpen = false;
   selectedUltimateSlot = null;
+  debugUltimateActive = false;
+  debugSnapshot = null;
   hasNewBestScore = false;
   aimStart = null;
   aimCurrent = null;
@@ -416,6 +438,7 @@ function reset(): void {
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
   rankingPrediction.textContent = "계산 중";
+  setDebugOpen(false);
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
@@ -442,18 +465,9 @@ function screenPoint(event: PointerEvent): Vec2 {
   };
 }
 
-function useSelectedUltimate(point: Vec2): void {
-  if (selectedUltimateSlot === null) return;
-  const target = {
-    row: Math.max(0, Math.min(DANGER_ROW - 1, Math.floor((point.y - GRID_TOP) / CELL_HEIGHT))),
-    column: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.floor((point.x - GRID_MARGIN) / (CELL_WIDTH + GRID_GAP)))),
-  };
-  const center = itemCenter(target);
-  const activation = useUltimateItem(state, selectedUltimateSlot, target);
-  if (!activation) return;
-
+function beginUltimateEffect(activation: UltimateActivation, target: Pick<Brick, "row" | "column">): void {
   ultimateEffect = {
-    ...center,
+    ...itemCenter(target),
     elapsed: 0,
     type: activation.type,
     targets: activation.targets.map(itemCenter),
@@ -465,6 +479,63 @@ function useSelectedUltimate(point: Vec2): void {
   pullLaserEffects();
   boardSignature = "";
   syncUi();
+}
+
+function useSelectedUltimate(point: Vec2): void {
+  if (selectedUltimateSlot === null) return;
+  const target = {
+    row: Math.max(0, Math.min(DANGER_ROW - 1, Math.floor((point.y - GRID_TOP) / CELL_HEIGHT))),
+    column: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.floor((point.x - GRID_MARGIN) / (CELL_WIDTH + GRID_GAP)))),
+  };
+  const activation = useUltimateItem(state, selectedUltimateSlot, target);
+  if (!activation) return;
+  beginUltimateEffect(activation, target);
+}
+
+function restoreDebugState(): void {
+  const snapshot = debugSnapshot;
+  if (!snapshot) return;
+  debugSnapshot = null;
+  debugUltimateActive = false;
+  positionedEffectPool.releaseAll(laserEffects);
+  state.bricks = snapshot.bricks;
+  state.score = snapshot.score;
+  state.stageScore = snapshot.stageScore;
+  state.gameStatus = snapshot.gameStatus;
+  state.ultimateInventory = [...snapshot.ultimateInventory];
+  state.pendingUltimateReward = snapshot.pendingUltimateReward;
+  state.stageResult = snapshot.stageResult;
+  state.pendingLaserTriggers = [...snapshot.pendingLaserTriggers];
+  selectedUltimateSlot = null;
+  ultimateResultDelay = 0;
+  boardSignature = "";
+  syncUi();
+}
+
+function startDebugUltimate(type: UltimateItemType): void {
+  if (state.gameStatus !== "ready" || debugUltimateActive || ultimateEffect) return;
+  const targetBrick = state.bricks.find((brick) => brick.type !== "steel");
+  if (!targetBrick) return;
+  debugSnapshot = {
+    bricks: state.bricks.map((brick) => ({ ...brick })),
+    score: state.score,
+    stageScore: state.stageScore,
+    gameStatus: state.gameStatus,
+    ultimateInventory: [...state.ultimateInventory],
+    pendingUltimateReward: state.pendingUltimateReward,
+    stageResult: state.stageResult ? { ...state.stageResult } : null,
+    pendingLaserTriggers: [...state.pendingLaserTriggers],
+  };
+  debugUltimateActive = true;
+  state.ultimateInventory[0] = type;
+  const target = { row: targetBrick.row, column: targetBrick.column };
+  const activation = useUltimateItem(state, 0, target);
+  if (!activation) {
+    restoreDebugState();
+    return;
+  }
+  setDebugOpen(false);
+  beginUltimateEffect(activation, target);
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
@@ -566,11 +637,20 @@ rankingForm.addEventListener("submit", (event) => {
   void submitCurrentScore();
 });
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen && !rankingOpen && !debugOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+debugOpenButton.hidden = !import.meta.env.DEV;
+debugOpenButton.addEventListener("click", () => setDebugOpen(!debugOpen));
+debugCloseButton.addEventListener("click", () => setDebugOpen(false));
+debugUltimateButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const type = button.dataset.debugUltimate as UltimateItemType;
+    if (type in ultimateDetails) startDebugUltimate(type);
+  });
+});
 optionsButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !rankingOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
+  if (!resetConfirmOpen && !rankingOpen && !debugOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
 });
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
@@ -712,6 +792,7 @@ function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | 
     resetConfirmTitle.textContent = copy[0];
     resetConfirmDescription.textContent = copy[1];
     resetConfirmButton.textContent = copy[2];
+    setDebugOpen(false);
     setHelpOpen(false);
     setOptionsOpen(false);
     setRankingOpen(false);
@@ -724,6 +805,23 @@ function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | 
     resetCancelButton.focus();
   } else if (wasOpen) {
     optionsButton.focus();
+  }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
+}
+
+function setDebugOpen(open: boolean): void {
+  if (open && (state.gameStatus !== "ready" || debugUltimateActive)) return;
+  const wasOpen = debugOpen;
+  debugOpen = open;
+  debugDialog.hidden = !open;
+  debugOpenButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setHelpOpen(false);
+    setOptionsOpen(false);
+    setRankingOpen(false);
+    debugCloseButton.focus();
+  } else if (wasOpen) {
+    debugOpenButton.focus();
   }
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
@@ -964,7 +1062,7 @@ function syncUi(): void {
     lastClearedScore = state.score;
     lastClearedDurationMs = Math.max(0, Math.round(purePlayTimeMs));
   }
-  if (state.score > bestScore) {
+  if (!debugUltimateActive && state.score > bestScore) {
     bestScore = state.score;
     hasNewBestScore = true;
     saveBestScore();
@@ -987,8 +1085,11 @@ function syncUi(): void {
     reward: "스테이지 클리어 · 보상을 확인하세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
   } as const;
-  statusEl.textContent = shieldRewindEffect ? "보호막 발동 · 한 칸 되돌리는 중" : messages[state.gameStatus];
+  statusEl.textContent = debugUltimateActive
+    ? "디버그 궁극기 테스트 중 · 잠시 후 벽돌을 복구합니다"
+    : shieldRewindEffect ? "보호막 발동 · 한 칸 되돌리는 중" : messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
+  debugOpenButton.disabled = state.gameStatus !== "ready" || debugUltimateActive;
 
   result.hidden = state.gameStatus !== "gameOver";
   syncUltimateUi();
@@ -1641,7 +1742,8 @@ function update(delta: number): void {
     ultimateEffect.elapsed += delta;
     if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATION) {
       ultimateEffect = null;
-      if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;
+      if (debugUltimateActive) restoreDebugState();
+      else if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;
     }
   }
   if (ultimateResultDelay > 0) {

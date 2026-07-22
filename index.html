@@ -67,6 +67,7 @@
         <div class="stat"><span>점수</span><strong id="score">0</strong></div>
         <div class="stat stat-balls"><span>공</span><strong id="balls">× 1</strong></div>
         <div class="stat stat-shield"><span>보호막</span><strong id="shield">OFF</strong></div>
+        <button id="debug-open" class="hud-debug" type="button" aria-controls="debug-panel" aria-expanded="false" hidden>DEBUG · 궁극기 테스트</button>
       </section>
 
       <section class="game-shell">
@@ -103,6 +104,26 @@
               <li><img class="legend-ultimate-image" data-ultimate-image="missileBarrage" alt="" /><span><strong>미사일 포화</strong>다수의 블록을 자동 조준해 공격합니다.</span></li>
             </ul>
             <button id="item-help-close" type="button">게임 계속하기</button>
+          </div>
+        </section>
+        <section id="debug-panel" class="item-help debug-panel" role="dialog" aria-modal="true" aria-labelledby="debug-panel-title" hidden>
+          <div class="item-help-card debug-card">
+            <button id="debug-close" class="dialog-close" type="button" aria-label="디버그 패널 닫기">
+              <span data-icon="x" aria-hidden="true"></span>
+            </button>
+            <p>DEBUG</p>
+            <h2 id="debug-panel-title">궁극기 테스트</h2>
+            <p class="debug-copy">버튼을 누르면 중앙에 발동하고 효과가 끝난 뒤 벽돌을 복구합니다.</p>
+            <div class="debug-ultimate-grid">
+              <button class="debug-ultimate" type="button" data-debug-ultimate="antimatter"><img data-ultimate-image="antimatter" alt="" /><strong>반물질 폭탄</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="orbitalLaser"><img data-ultimate-image="orbitalLaser" alt="" /><strong>궤도 레이저</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="chainLightning"><img data-ultimate-image="chainLightning" alt="" /><strong>연쇄 번개</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="meteorImpact"><img data-ultimate-image="meteorImpact" alt="" /><strong>운석 충돌</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="blackHoleCollapse"><img data-ultimate-image="blackHoleCollapse" alt="" /><strong>블랙홀 붕괴</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="crossfire"><img data-ultimate-image="crossfire" alt="" /><strong>십자포화</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="fusionChain"><img data-ultimate-image="fusionChain" alt="" /><strong>핵융합 연쇄</strong></button>
+              <button class="debug-ultimate" type="button" data-debug-ultimate="missileBarrage"><img data-ultimate-image="missileBarrage" alt="" /><strong>미사일 포화</strong></button>
+            </div>
           </div>
         </section>
         <section id="options-panel" class="item-help options-panel" role="dialog" aria-modal="true" aria-labelledby="options-title" hidden>
