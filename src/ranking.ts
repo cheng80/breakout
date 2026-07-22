@@ -59,6 +59,10 @@ export function normalizePlayerName(value: string): string {
   return value.trim().replace(/\s+/g, " ").slice(0, 12);
 }
 
+export function estimateRankingPosition(entries: RankingEntry[], score: number): number {
+  return entries.filter((entry) => entry.score > score).length + 1;
+}
+
 export async function fetchTopRanking(limit = 10): Promise<RankingEntry[] | null> {
   const body = await request(`?action=list&limit=${Math.min(30, Math.max(1, Math.floor(limit)))}`);
   if (!body || !Array.isArray(body.ranking)) return null;

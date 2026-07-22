@@ -23,6 +23,11 @@
           <span data-icon="trophy" aria-hidden="true"></span>
           <span>랭킹 보기</span>
         </button>
+        <button id="entry-audio-toggle" class="sound-setting entry-audio-toggle" data-audio-control type="button" role="switch" aria-checked="true">
+          <span class="sound-setting-icon" data-icon="volume" aria-hidden="true"></span>
+          <span class="sound-setting-copy"><strong>전체 사운드</strong><small id="entry-audio-status">전체 사운드 켜짐</small></span>
+          <span class="ios-switch" aria-hidden="true"><span></span></span>
+        </button>
       </div>
     </section>
 
@@ -194,8 +199,12 @@
           </div>
           <section class="ranking-result" aria-labelledby="ranking-title">
             <div class="ranking-heading">
-              <h3 id="ranking-title">TOP 10</h3>
+              <h3 id="ranking-title">TOP 3</h3>
               <span id="ranking-status">불러오는 중</span>
+            </div>
+            <div class="ranking-prediction" aria-live="polite">
+              <span>등록 예상 순위</span>
+              <strong id="ranking-prediction">계산 중</strong>
             </div>
             <ol id="ranking-list" class="ranking-list">
               <li class="ranking-empty">랭킹을 불러오는 중입니다.</li>

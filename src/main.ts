@@ -20,7 +20,7 @@ import {
   setSfxMuted,
   unlockAudio,
 } from "./audio";
-import { fetchTopRanking, normalizePlayerName, submitRanking, type RankingEntry } from "./ranking";
+import { estimateRankingPosition, fetchTopRanking, normalizePlayerName, submitRanking, type RankingEntry } from "./ranking";
 import { ObjectPool } from "./object-pool";
 import { FPS_SAMPLE_INTERVAL_MS, formatFps, getFpsLevel } from "./fps-monitor";
 import {
@@ -243,6 +243,8 @@ const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
 const entryNameInput = document.querySelector<HTMLInputElement>("#entry-name")!;
 const entryFeedback = document.querySelector<HTMLElement>("#entry-feedback")!;
 const entryRankingButton = document.querySelector<HTMLButtonElement>("#entry-ranking")!;
+const entryAudioToggleButton = document.querySelector<HTMLButtonElement>("#entry-audio-toggle")!;
+const entryAudioStatus = document.querySelector<HTMLElement>("#entry-audio-status")!;
 const rankingButton = document.querySelector<HTMLButtonElement>("#ranking-open")!;
 const rankingDialog = document.querySelector<HTMLElement>("#ranking-panel")!;
 const rankingCloseButton = document.querySelector<HTMLButtonElement>("#ranking-close")!;
@@ -250,6 +252,7 @@ const rankingPanelStatus = document.querySelector<HTMLElement>("#ranking-panel-s
 const rankingPanelList = document.querySelector<HTMLOListElement>("#ranking-panel-list")!;
 const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
 const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
+const rankingPrediction = document.querySelector<HTMLElement>("#ranking-prediction")!;
 const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
 const rankingNameInput = document.querySelector<HTMLInputElement>("#ranking-name")!;
 const rankingSubmitButton = document.querySelector<HTMLButtonElement>("#ranking-submit")!;
@@ -404,6 +407,7 @@ function reset(): void {
   challengeAbandoned = false;
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
+  rankingPrediction.textContent = "계산 중";
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
@@ -541,6 +545,12 @@ entryForm.addEventListener("submit", (event) => {
   syncUi();
 });
 entryRankingButton.addEventListener("click", () => setRankingOpen(true, entryRankingButton));
+entryAudioToggleButton.addEventListener("click", () => {
+  const nextMuted = !isAllMuted();
+  setAllMuted(nextMuted);
+  syncAudioOptions();
+  if (!nextMuted && !isSfxMuted()) playSound("ui_click");
+});
 rankingButton.addEventListener("click", () => setRankingOpen(!rankingOpen, rankingButton));
 rankingCloseButton.addEventListener("click", () => setRankingOpen(false));
 rankingForm.addEventListener("submit", (event) => {
@@ -636,6 +646,8 @@ function syncAudioOptions(): void {
   const sfxMuted = isSfxMuted();
   const allMuted = isAllMuted();
   allAudioStatus.textContent = allMuted ? "모든 소리를 끕니다" : "개별 설정 유지";
+  entryAudioStatus.textContent = allMuted ? "전체 사운드 꺼짐" : "전체 사운드 켜짐";
+  entryAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
   bgmToggleButton.setAttribute("aria-checked", String(!(allMuted || bgmMuted)));
   sfxToggleButton.setAttribute("aria-checked", String(!(allMuted || sfxMuted)));
   allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
@@ -846,10 +858,11 @@ async function loadRanking(): Promise<void> {
   loading.textContent = "랭킹을 불러오는 중입니다.";
   rankingList.append(loading);
 
-  const entries = await fetchTopRanking(10);
+  const entries = await fetchTopRanking(30);
   if (requestId !== rankingRequestId) return;
   if (entries === null) {
     rankingStatus.textContent = "연결 안 됨";
+    rankingPrediction.textContent = "확인할 수 없음";
     rankingList.replaceChildren();
     const unavailable = document.createElement("li");
     unavailable.className = "ranking-empty";
@@ -857,8 +870,17 @@ async function loadRanking(): Promise<void> {
     rankingList.append(unavailable);
     return;
   }
-  rankingStatus.textContent = entries.length > 0 ? `상위 ${entries.length}명` : "기록 없음";
-  renderRanking(entries, rankingList);
+  const score = challengeAbandoned ? lastClearedScore : state.score;
+  rankingStatus.textContent = entries.length > 3 ? "상위 3명" : entries.length > 0 ? `상위 ${entries.length}명` : "기록 없음";
+  if (score < 1) {
+    rankingPrediction.textContent = "등록 불가";
+  } else {
+    const predictedRank = estimateRankingPosition(entries, score);
+    rankingPrediction.textContent = entries.length === 30 && predictedRank > entries.length
+      ? `${predictedRank}위 이하`
+      : `${predictedRank}위`;
+  }
+  renderRanking(entries.slice(0, 3), rankingList);
 }
 
 async function loadRankingPanel(): Promise<void> {

@@ -10,7 +10,7 @@ import {
   setBgmVolume,
   setSfxMuted,
 } from "../src/audio";
-import { normalizePlayerName } from "../src/ranking";
+import { estimateRankingPosition, normalizePlayerName } from "../src/ranking";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -81,6 +81,14 @@ describe("핵심 게임 규칙", () => {
 
   it("랭킹 닉네임은 공백을 정리하고 12자로 제한한다", () => {
     expect(normalizePlayerName("  Swipe   Breakout  ")).toBe("Swipe Breako");
+  });
+
+  it("랭킹 등록 전 점수 기준 예상 순위를 계산한다", () => {
+    expect(estimateRankingPosition([
+      { rank: 1, name: "A", score: 900, stage: 3, durationMs: 1000 },
+      { rank: 2, name: "B", score: 700, stage: 2, durationMs: 2000 },
+    ], 800)).toBe(2);
+    expect(estimateRankingPosition([], 800)).toBe(1);
   });
 
   it("BGM·효과음·전체 음소거를 각각 제어한다", () => {
