@@ -8,6 +8,7 @@ import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
 import homeIcon from "lucide-static/icons/house.svg?raw";
 import closeIcon from "lucide-static/icons/x.svg?raw";
 import trophyIcon from "lucide-static/icons/trophy.svg?raw";
+import gaugeIcon from "lucide-static/icons/gauge.svg?raw";
 import {
   isAllMuted,
   isBgmMuted,
@@ -21,6 +22,7 @@ import {
 } from "./audio";
 import { fetchTopRanking, normalizePlayerName, submitRanking, type RankingEntry } from "./ranking";
 import { ObjectPool } from "./object-pool";
+import { FPS_SAMPLE_INTERVAL_MS, formatFps, getFpsLevel } from "./fps-monitor";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -78,6 +80,7 @@ const BLACK_HOLE_PULL_ACCELERATION = 4000;
 const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
 const PLAYER_NAME_KEY = "swipe-breakout-player-name";
+const FPS_VISIBLE_KEY = "swipe-breakout-fps-visible";
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -131,6 +134,8 @@ let rankingSubmitting = false;
 let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
 let purePlayTimeMs = 0;
+let fpsVisible = loadFpsVisibility();
+let fpsSampleElapsedMs = 0;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -238,6 +243,9 @@ const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")
 const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
 const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
 const allAudioStatus = document.querySelector<HTMLElement>("#all-audio-status")!;
+const fpsToggleButton = document.querySelector<HTMLButtonElement>("#fps-toggle")!;
+const fpsMonitor = document.querySelector<HTMLOutputElement>("#fps-monitor")!;
+const fpsValue = document.querySelector<HTMLElement>("#fps-value")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
 const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
@@ -251,6 +259,7 @@ const iconMarkup: Record<string, string> = {
   house: homeIcon,
   x: closeIcon,
   trophy: trophyIcon,
+  gauge: gaugeIcon,
 };
 
 document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
@@ -441,6 +450,11 @@ allAudioToggleButton.addEventListener("click", () => {
   syncAudioOptions();
   if (!nextMuted && !isSfxMuted()) playSound("ui_click");
 });
+fpsToggleButton.addEventListener("click", () => {
+  fpsVisible = !fpsVisible;
+  saveFpsVisibility();
+  syncFpsOption();
+});
 resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
 resetConfirmButton.addEventListener("click", reset);
 document.querySelectorAll<HTMLButtonElement>("button:not([data-audio-control])").forEach((button) => {
@@ -456,6 +470,16 @@ function syncAudioOptions(): void {
   bgmToggleButton.setAttribute("aria-checked", String(!(allMuted || bgmMuted)));
   sfxToggleButton.setAttribute("aria-checked", String(!(allMuted || sfxMuted)));
   allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
+}
+
+function syncFpsOption(): void {
+  fpsToggleButton.setAttribute("aria-checked", String(fpsVisible));
+  fpsMonitor.hidden = !fpsVisible;
+  if (!fpsVisible) {
+    fpsSampleElapsedMs = 0;
+    fpsValue.textContent = "--";
+    delete fpsMonitor.dataset.level;
+  }
 }
 
 function setRankingOpen(open: boolean, trigger?: HTMLButtonElement): void {
@@ -532,6 +556,7 @@ function setOptionsOpen(open: boolean): void {
     setHelpOpen(false);
     setRankingOpen(false);
     syncAudioOptions();
+    syncFpsOption();
     optionsCloseButton.focus();
   } else if (wasOpen) {
     optionsButton.focus();
@@ -553,6 +578,22 @@ function saveBestScore(): void {
     localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
   } catch {
     // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
+  }
+}
+
+function loadFpsVisibility(): boolean {
+  try {
+    return localStorage.getItem(FPS_VISIBLE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function saveFpsVisibility(): void {
+  try {
+    localStorage.setItem(FPS_VISIBLE_KEY, String(fpsVisible));
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 설정은 유지합니다.
   }
 }
 
@@ -1248,8 +1289,17 @@ if (["127.0.0.1", "localhost"].includes(location.hostname) && location.search ==
   window.setTimeout(() => location.reload(), 7000);
 }
 
-app.ticker.add((ticker) => update(ticker.deltaMS / 1000));
+app.ticker.add((ticker) => {
+  update(ticker.deltaMS / 1000);
+  if (!fpsVisible) return;
+  fpsSampleElapsedMs += ticker.elapsedMS;
+  if (fpsSampleElapsedMs < FPS_SAMPLE_INTERVAL_MS) return;
+  fpsSampleElapsedMs %= FPS_SAMPLE_INTERVAL_MS;
+  fpsValue.textContent = formatFps(ticker.FPS);
+  fpsMonitor.dataset.level = getFpsLevel(ticker.FPS);
+});
 syncAudioOptions();
+syncFpsOption();
 void preloadAudio();
 syncUi();
 }
