@@ -12,9 +12,10 @@
       <header class="topbar">
         <h1 class="brand-title">SWIPE BREAKOUT</h1>
         <div class="top-actions">
-          <button id="audio-toggle" class="icon-button" type="button" aria-label="소리 끄기" aria-pressed="false">🔊</button>
           <button id="help" class="icon-button" type="button" aria-label="아이템 설명 보기" aria-controls="item-help" aria-expanded="false">?</button>
-          <button id="restart" class="icon-button" type="button" aria-label="게임 다시 시작" aria-controls="reset-confirm" aria-expanded="false">↻</button>
+          <button id="options" class="icon-button" type="button" aria-label="게임 옵션 열기" aria-controls="options-panel" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.7 1.7 0 1 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a1.7 1.7 0 1 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 1 1-2.4-2.4l.1-.1A1.7 1.7 0 0 0 6.2 12a1.7 1.7 0 0 0-1.8-1.7h-.2a1.7 1.7 0 1 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 1 1 2.4-2.4l.1.1A1.7 1.7 0 0 0 10.9 2h.2a1.7 1.7 0 1 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 1 1 2.4 2.4l-.1.1A1.7 1.7 0 0 0 18.6 9v.2a1.7 1.7 0 0 0 1.7 1.7h.2a1.7 1.7 0 1 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z"/></svg>
+          </button>
         </div>
       </header>
 
@@ -42,6 +43,37 @@
               <li><b class="legend-steel">◆</b><span><strong>강철 블록</strong>공만 반사하며 위험선 아래에서 사라집니다.</span></li>
             </ul>
             <button id="item-help-close" type="button">게임 계속하기</button>
+          </div>
+        </section>
+        <section id="options-panel" class="item-help options-panel" role="dialog" aria-modal="true" aria-labelledby="options-title" hidden>
+          <div class="item-help-card options-card">
+            <p>OPTIONS</p>
+            <h2 id="options-title">게임 옵션</h2>
+            <div class="options-section">
+              <p class="options-section-label">사운드</p>
+              <button id="bgm-toggle" class="sound-setting" data-audio-control type="button" aria-pressed="false">
+                <span class="sound-setting-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="3"/><circle cx="16.5" cy="16" r="3"/></svg></span>
+                <span class="sound-setting-copy"><strong>BGM</strong><small>게임 배경 음악</small></span>
+                <span class="sound-setting-state" id="bgm-state">켜짐</span>
+              </button>
+              <button id="sfx-toggle" class="sound-setting" data-audio-control type="button" aria-pressed="false">
+                <span class="sound-setting-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9.5a4 4 0 0 1 0 5M18.5 7a7.5 7.5 0 0 1 0 10"/></svg></span>
+                <span class="sound-setting-copy"><strong>효과음</strong><small>게임 효과음</small></span>
+                <span class="sound-setting-state" id="sfx-state">켜짐</span>
+              </button>
+              <button id="all-audio-toggle" class="sound-setting sound-setting-master" data-audio-control type="button" aria-pressed="false">
+                <span class="sound-setting-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12"/></svg></span>
+                <span class="sound-setting-copy"><strong>전체 사운드</strong><small id="all-audio-status">개별 설정 유지</small></span>
+                <span class="sound-setting-state" id="all-audio-state">켜짐</span>
+              </button>
+            </div>
+            <div class="options-actions">
+              <button id="options-restart" class="options-restart" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg>
+                <span>게임 다시 시작</span>
+              </button>
+              <button id="options-close" class="options-close" type="button">닫기</button>
+            </div>
           </div>
         </section>
         <section id="reset-confirm" class="item-help reset-confirm" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title" aria-describedby="reset-confirm-description" hidden>
