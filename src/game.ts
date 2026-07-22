@@ -289,11 +289,17 @@ export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
   return { x, y };
 }
 
-export function stabilizeShallowBounce(velocity: Vec2, bounceCount: number): Vec2 {
+export function stabilizeBounce(velocity: Vec2, bounceCount: number): Vec2 {
   const speed = Math.hypot(velocity.x, velocity.y);
-  if (speed === 0 || Math.abs(velocity.y) / speed >= 0.2) return velocity;
+  if (speed === 0) return velocity;
 
-  const verticalRatio = [0.24, 0.28, 0.32][bounceCount % 3];
+  const currentRatio = Math.abs(velocity.y) / speed;
+  const escapeBounce = bounceCount > 0 && bounceCount % 8 === 0;
+  if (currentRatio >= 0.2 && !escapeBounce) return velocity;
+
+  const verticalRatio = currentRatio < 0.2
+    ? [0.24, 0.28, 0.32][bounceCount % 3]
+    : Math.max(0.24, Math.min(0.85, currentRatio + (Math.floor(bounceCount / 8) % 2 ? 0.06 : -0.06)));
   const y = Math.sign(velocity.y || 1) * speed * verticalRatio;
   return {
     x: Math.sign(velocity.x || 1) * Math.sqrt(speed ** 2 - y ** 2),
