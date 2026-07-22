@@ -151,7 +151,6 @@ let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
-let debugOpen = false;
 let resetConfirmOpen = false;
 let rankingOpen = false;
 let rankingTrigger: HTMLButtonElement | null = null;
@@ -276,9 +275,7 @@ const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
-const debugOpenButton = document.querySelector<HTMLButtonElement>("#debug-open")!;
-const debugDialog = document.querySelector<HTMLElement>("#debug-panel")!;
-const debugCloseButton = document.querySelector<HTMLButtonElement>("#debug-close")!;
+const debugTools = document.querySelector<HTMLElement>("#debug-tools")!;
 const debugUltimateButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-debug-ultimate]")];
 const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
@@ -438,7 +435,6 @@ function reset(): void {
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
   rankingPrediction.textContent = "계산 중";
-  setDebugOpen(false);
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
@@ -534,7 +530,6 @@ function startDebugUltimate(type: UltimateItemType): void {
     restoreDebugState();
     return;
   }
-  setDebugOpen(false);
   beginUltimateEffect(activation, target);
 }
 
@@ -637,12 +632,10 @@ rankingForm.addEventListener("submit", (event) => {
   void submitCurrentScore();
 });
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !optionsOpen && !rankingOpen && !debugOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
-debugOpenButton.hidden = !import.meta.env.DEV;
-debugOpenButton.addEventListener("click", () => setDebugOpen(!debugOpen));
-debugCloseButton.addEventListener("click", () => setDebugOpen(false));
+debugTools.hidden = !import.meta.env.DEV;
 debugUltimateButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const type = button.dataset.debugUltimate as UltimateItemType;
@@ -650,7 +643,7 @@ debugUltimateButtons.forEach((button) => {
   });
 });
 optionsButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !rankingOpen && !debugOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
+  if (!resetConfirmOpen && !rankingOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
 });
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
@@ -792,7 +785,6 @@ function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | 
     resetConfirmTitle.textContent = copy[0];
     resetConfirmDescription.textContent = copy[1];
     resetConfirmButton.textContent = copy[2];
-    setDebugOpen(false);
     setHelpOpen(false);
     setOptionsOpen(false);
     setRankingOpen(false);
@@ -805,23 +797,6 @@ function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | 
     resetCancelButton.focus();
   } else if (wasOpen) {
     optionsButton.focus();
-  }
-  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
-}
-
-function setDebugOpen(open: boolean): void {
-  if (open && (state.gameStatus !== "ready" || debugUltimateActive)) return;
-  const wasOpen = debugOpen;
-  debugOpen = open;
-  debugDialog.hidden = !open;
-  debugOpenButton.setAttribute("aria-expanded", String(open));
-  if (open) {
-    setHelpOpen(false);
-    setOptionsOpen(false);
-    setRankingOpen(false);
-    debugCloseButton.focus();
-  } else if (wasOpen) {
-    debugOpenButton.focus();
   }
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
@@ -1089,7 +1064,9 @@ function syncUi(): void {
     ? "디버그 궁극기 테스트 중 · 잠시 후 벽돌을 복구합니다"
     : shieldRewindEffect ? "보호막 발동 · 한 칸 되돌리는 중" : messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
-  debugOpenButton.disabled = state.gameStatus !== "ready" || debugUltimateActive;
+  debugUltimateButtons.forEach((button) => {
+    button.disabled = state.gameStatus !== "ready" || debugUltimateActive;
+  });
 
   result.hidden = state.gameStatus !== "gameOver";
   syncUltimateUi();
