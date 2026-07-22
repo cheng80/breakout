@@ -77,13 +77,16 @@ describe("핵심 게임 규칙", () => {
     state.score = 1200;
     state.ballCount = 8;
     state.gameStatus = "volley";
-    resetGame(state, 16);
+    resetGame(state, 16, 12);
 
     expect(state.stage).toBe(16);
     expect(state.score).toBe(0);
-    expect(state.ballCount).toBe(1);
+    expect(state.ballCount).toBe(12);
     expect(state.gameStatus).toBe("ready");
     expect(state.bricks.every((brick) => brick.id.startsWith("s16-"))).toBe(true);
+
+    resetGame(state, 16, 99);
+    expect(state.ballCount).toBe(maxBallsForStage(16));
   });
 
   it("같은 효과음은 설정된 간격이 지나기 전에는 중복 재생하지 않는다", () => {

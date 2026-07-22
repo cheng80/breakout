@@ -57,6 +57,7 @@ import {
   finishVolley,
   hitBrickWithBall,
   laserEffectFrame,
+  maxBallsForStage,
   orbitalLaserStartColumn,
   prepareVolley,
   relocateBlackHoles,
@@ -313,6 +314,7 @@ const debugStageTools = document.querySelector<HTMLElement>("#debug-stage-tools"
 const debugTools = document.querySelector<HTMLElement>("#debug-tools")!;
 const debugStageForm = document.querySelector<HTMLFormElement>("#debug-stage-form")!;
 const debugStageInput = document.querySelector<HTMLInputElement>("#debug-stage-input")!;
+const debugBallCountInput = document.querySelector<HTMLInputElement>("#debug-ball-count-input")!;
 const debugUltimateButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-debug-ultimate]")];
 const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
@@ -433,7 +435,7 @@ function launch(direction: Vec2): void {
   syncUi();
 }
 
-function reset(stage = 1): void {
+function reset(stage = 1, ballCount = 1): void {
   setResetConfirmOpen(false);
   setRankingOpen(false);
   ballPool.releaseAll(activeBalls);
@@ -442,7 +444,7 @@ function reset(stage = 1): void {
   positionedEffectPool.releaseAll(laserEffects);
   if (shieldRewindEffect) timedEffectPool.release(shieldRewindEffect);
   brickHitEffects.forEach((effect) => timedEffectPool.release(effect));
-  resetGame(state, stage);
+  resetGame(state, stage, ballCount);
   rewardReplacementOpen = false;
   selectedUltimateSlot = null;
   debugUltimateActive = false;
@@ -701,10 +703,18 @@ helpButton.addEventListener("click", () => {
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
 if (import.meta.env.MODE === "stage-fixture") {
   debugStageTools.hidden = false;
+  const syncDebugBallCountLimit = () => {
+    const limit = maxBallsForStage(Number(debugStageInput.value));
+    debugBallCountInput.max = String(limit);
+    if (Number(debugBallCountInput.value) > limit) debugBallCountInput.value = String(limit);
+  };
+  syncDebugBallCountLimit();
+  debugStageInput.addEventListener("input", syncDebugBallCountLimit);
   debugStageForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    syncDebugBallCountLimit();
     if (!debugStageForm.reportValidity()) return;
-    reset(Number(debugStageInput.value));
+    reset(Number(debugStageInput.value), Number(debugBallCountInput.value));
   });
 } else {
   debugStageTools.remove();

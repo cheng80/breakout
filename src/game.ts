@@ -341,10 +341,11 @@ export function createGame(): GameState {
   };
 }
 
-export function resetGame(state: GameState, stage = 1): void {
+export function resetGame(state: GameState, stage = 1, ballCount = 1): void {
   const nextStage = Number.isSafeInteger(stage) && stage >= 1 ? stage : 1;
   const board = stageBoard(nextStage);
-  Object.assign(state, createGame(), board, stageGoals(board.bricks, board.items), { stage: nextStage });
+  const nextBallCount = Number.isSafeInteger(ballCount) ? Math.max(1, Math.min(maxBallsForStage(nextStage), ballCount)) : 1;
+  Object.assign(state, createGame(), board, stageGoals(board.bricks, board.items), { stage: nextStage, ballCount: nextBallCount });
 }
 
 export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
