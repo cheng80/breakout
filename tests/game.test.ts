@@ -806,4 +806,26 @@ describe("핵심 게임 규칙", () => {
     expect(state.bricks).toHaveLength(0);
     expect(state.gameStatus).toBe("reward");
   });
+
+  it("궁극기 타격 완료 후 결과 처리를 연출 종료 시점까지 미룰 수 있다", () => {
+    const state = createGame();
+    state.bricks = [{
+      id: "last-brick",
+      row: 0,
+      column: 0,
+      hp: 1,
+      maxHp: 1,
+      type: "normal",
+    }];
+    state.ultimateInventory = ["missileBarrage", null];
+
+    const activation = useUltimateItem(state, 0, { row: 0, column: 0 }, true)!;
+
+    resolveUltimateHits(state, activation, 1, true);
+
+    expect(state.bricks).toHaveLength(0);
+    expect(state.gameStatus).toBe("ready");
+    expect(advanceStageIfCleared(state)).toBe(true);
+    expect(state.gameStatus).toBe("reward");
+  });
 });

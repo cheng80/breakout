@@ -687,7 +687,12 @@ export function resolveUltimateActivation(state: GameState, activation: Ultimate
   resolveUltimateHits(state, activation, activation.hits.length);
 }
 
-export function resolveUltimateHits(state: GameState, activation: UltimateActivation, hitCount: number): number {
+export function resolveUltimateHits(
+  state: GameState,
+  activation: UltimateActivation,
+  hitCount: number,
+  deferStageAdvance = false,
+): number {
   const targetCount = Math.max(0, Math.min(activation.hits.length, Math.floor(hitCount)));
   let applied = 0;
   while (activation.resolvedHitCount < targetCount) {
@@ -698,7 +703,7 @@ export function resolveUltimateHits(state: GameState, activation: UltimateActiva
   }
   if (!activation.resolved && activation.resolvedHitCount === activation.hits.length) {
     activation.resolved = true;
-    advanceStageIfCleared(state);
+    if (!deferStageAdvance) advanceStageIfCleared(state);
   }
   return applied;
 }
