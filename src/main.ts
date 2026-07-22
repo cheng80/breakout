@@ -308,7 +308,10 @@ const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
+const debugStageTools = document.querySelector<HTMLElement>("#debug-stage-tools")!;
 const debugTools = document.querySelector<HTMLElement>("#debug-tools")!;
+const debugStageForm = document.querySelector<HTMLFormElement>("#debug-stage-form")!;
+const debugStageInput = document.querySelector<HTMLInputElement>("#debug-stage-input")!;
 const debugUltimateButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-debug-ultimate]")];
 const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
@@ -427,7 +430,7 @@ function launch(direction: Vec2): void {
   syncUi();
 }
 
-function reset(): void {
+function reset(stage = 1): void {
   setResetConfirmOpen(false);
   setRankingOpen(false);
   ballPool.releaseAll(activeBalls);
@@ -436,7 +439,7 @@ function reset(): void {
   positionedEffectPool.releaseAll(laserEffects);
   if (shieldRewindEffect) timedEffectPool.release(shieldRewindEffect);
   brickHitEffects.forEach((effect) => timedEffectPool.release(effect));
-  resetGame(state);
+  resetGame(state, stage);
   rewardReplacementOpen = false;
   selectedUltimateSlot = null;
   debugUltimateActive = false;
@@ -629,7 +632,7 @@ app.canvas.addEventListener("pointercancel", () => {
   syncUi();
 });
 
-document.querySelector("#result-restart")!.addEventListener("click", reset);
+document.querySelector("#result-restart")!.addEventListener("click", () => reset());
 
 function exitFromGameOver(): void {
   if (state.gameStatus !== "gameOver") return;
@@ -693,6 +696,16 @@ helpButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+if (import.meta.env.MODE === "stage-fixture") {
+  debugStageTools.hidden = false;
+  debugStageForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!debugStageForm.reportValidity()) return;
+    reset(Number(debugStageInput.value));
+  });
+} else {
+  debugStageTools.remove();
+}
 if (import.meta.env.MODE === "ultimate-fixture") {
   debugTools.hidden = false;
   debugUltimateButtons.forEach((button) => {

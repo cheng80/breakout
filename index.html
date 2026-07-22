@@ -67,6 +67,14 @@
         <div class="stat"><span>점수</span><strong id="score">0</strong></div>
         <div class="stat stat-balls"><span>공</span><strong id="balls">× 1</strong></div>
         <div class="stat stat-shield"><span>보호막</span><strong id="shield">OFF</strong></div>
+        <div id="debug-stage-tools" class="hud-debug-tools" hidden>
+          <strong>DEBUG · 스테이지 시작</strong>
+          <form id="debug-stage-form" class="debug-stage-form">
+            <label for="debug-stage-input">스테이지</label>
+            <input id="debug-stage-input" name="stage" type="number" min="1" step="1" value="1" inputmode="numeric" required />
+            <button type="submit">스테이지 시작</button>
+          </form>
+        </div>
         <div id="debug-tools" class="hud-debug-tools" hidden>
           <strong>DEBUG · 궁극기 테스트</strong>
           <div class="debug-ultimate-grid" aria-label="궁극기 테스트 목록">

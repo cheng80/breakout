@@ -333,8 +333,10 @@ export function createGame(): GameState {
   };
 }
 
-export function resetGame(state: GameState): void {
-  Object.assign(state, createGame());
+export function resetGame(state: GameState, stage = 1): void {
+  const nextStage = Number.isSafeInteger(stage) && stage >= 1 ? stage : 1;
+  const board = stageBoard(nextStage);
+  Object.assign(state, createGame(), board, stageGoals(board.bricks, board.items), { stage: nextStage });
 }
 
 export function aimFromDrag(start: Vec2, current: Vec2): Vec2 | null {
