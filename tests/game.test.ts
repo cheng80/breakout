@@ -594,7 +594,9 @@ describe("핵심 게임 규칙", () => {
     expect(late.items.filter((item) => item.type === "power" || item.type === "power3")).toHaveLength(2);
     expect(late.items.some((item) => item.type === "power3")).toBe(true);
     expect(late.items.filter((item) => item.type === "bomb")).toHaveLength(1);
-    expect(late.items.find((item) => item.type === "blackhole")?.charges).toBe(1);
+    const lateBlackHole = late.items.find((item) => item.type === "blackhole");
+    expect(lateBlackHole?.charges).toBe(1);
+    expect(lateBlackHole?.row).toBe(7);
 
     const sevenRows = createGame();
     sevenRows.stage = 30;
@@ -606,7 +608,9 @@ describe("핵심 게임 규칙", () => {
     expect(sevenRows.items.some((item) => item.type === "power3")).toBe(true);
     expect(sevenRows.items.some((item) => item.type === "power4")).toBe(true);
     expect(sevenRows.items.filter((item) => item.type === "bomb")).toHaveLength(2);
-    expect(sevenRows.items.find((item) => item.type === "blackhole")?.charges).toBe(2);
+    const sevenRowsBlackHole = sevenRows.items.find((item) => item.type === "blackhole");
+    expect(sevenRowsBlackHole?.charges).toBe(2);
+    expect(sevenRowsBlackHole?.row).toBe(7);
 
     const maxDensity = createGame();
     maxDensity.stage = 38;
