@@ -1262,10 +1262,14 @@ function rebuildLabels(): void {
 
   const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "×2", power3: "×3", power4: "×4", trap: "−1" } as const;
   state.items.forEach((item) => {
+    if (item.type === "blackhole" && (item.charges ?? 1) <= 0) return;
     const center = itemCenter(item);
     const label = labelPool.acquire();
     label.text = item.type === "blackhole" ? String(item.charges ?? 1) : itemLabel[item.type];
     label.style.fontSize = item.type === "multiball" || item.type === "blackhole" ? 10 : 12;
+    if (item.type === "blackhole") {
+      label.alpha = blackHolePresence(blackHoleTime) * blackHoleClearFade(blackHoleClearFadeTime);
+    }
     label.position.set(center.x, center.y);
     labels.addChild(label);
     activeLabels.push(label);
