@@ -241,9 +241,15 @@ button {
   max-height: calc(100% - 20px);
   padding: 20px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border-radius: 18px;
   background: rgba(18, 32, 52, 0.97);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.11);
+}
+
+.item-help-card::-webkit-scrollbar {
+  display: none;
 }
 
 .item-help-card > p {
