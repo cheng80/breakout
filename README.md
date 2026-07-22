@@ -30,6 +30,8 @@ npm run dev
 
 기본 주소는 [http://localhost:5173](http://localhost:5173)입니다. 해당 포트가 사용 중이면 터미널에 표시되는 주소로 접속합니다.
 
+로컬 개발 중 진입 화면과 베스트 스코어를 초기화하려면 브라우저 콘솔에서 `resetBreakoutForDevelopment()`를 실행합니다. 운영 주소에서는 이 함수가 노출되지 않습니다.
+
 ## 테스트
 
 ```bash
@@ -88,7 +90,7 @@ npx vite preview --host 0.0.0.0
 
 ## 배포
 
-게임 배포에는 별도 서버 런타임이나 환경 변수가 필요하지 않습니다. 빌드가 끝난 뒤 `dist/` 안의 파일을 정적 호스팅 서비스에 배포하면 됩니다.
+게임만 배포할 때는 별도 서버 런타임이나 환경 변수가 필요하지 않습니다. 빌드가 끝난 뒤 `dist/` 안의 파일을 정적 호스팅 서비스에 배포하면 됩니다. 랭킹을 사용할 때는 아래 PHP API를 NAS에 추가로 배포합니다.
 
 `/breakout/` 하위 경로로 빌드했다면 `dist` 디렉터리 자체가 아니라 그 안의 파일을 서버의 `breakout` 디렉터리에 올립니다.
 
@@ -101,6 +103,24 @@ npx vite preview --host 0.0.0.0
 ```
 
 배포 후 `https://example.com/breakout/`으로 접속합니다. `src/`, `node_modules/`, `package.json`, `.DS_Store`는 서버에 올리지 않습니다.
+
+### 랭킹 API 배포
+
+랭킹 서버 파일은 [server/breakoutranking/ranking.php](server/breakoutranking/ranking.php)입니다. NAS의 다음 경로에 `ranking.php`로 업로드합니다.
+
+```text
+/Web/breakoutranking/ranking.php
+```
+
+랭킹 데이터는 PHP의 `__DIR__` 기준으로 같은 경로에 자동 생성됩니다.
+
+```text
+/Web/breakoutranking/ranking_data.json
+```
+
+게임은 `/breakout/`에서 `../breakoutranking/ranking.php` 상대경로로 API를 호출합니다. 다른 호스트나 경로를 사용할 때만 `.env`에 `VITE_RANKING_URL`을 지정한 뒤 다시 빌드합니다.
+
+랭킹은 점수 내림차순, 스테이지 내림차순으로 정렬하고, 점수와 스테이지가 같으면 1스테이지부터 게임오버까지의 순수 플레이 시간이 짧은 기록을 우선합니다. 발사 조준·공 비행만 누적하며 일시정지와 발사 대기 시간은 제외합니다.
 
 ## 문제 해결
 

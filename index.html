@@ -8,10 +8,48 @@
     <title>Swipe Breakout</title>
   </head>
   <body>
-    <main class="app" aria-label="Swipe Breakout 게임">
+    <section id="entry-screen" class="entry-screen" aria-labelledby="entry-title">
+      <div class="entry-card">
+        <p class="entry-kicker">SWIPE BREAKOUT</p>
+        <h1 id="entry-title">닉네임을 정하고<br />게임을 시작하세요.</h1>
+        <p class="entry-description">게임오버 시 이 닉네임으로 랭킹에 기록됩니다.</p>
+        <form id="entry-form" class="entry-form">
+          <label for="entry-name">닉네임</label>
+          <input id="entry-name" name="name" type="text" maxlength="12" autocomplete="nickname" placeholder="닉네임 입력" required />
+          <button type="submit">게임 시작</button>
+          <p id="entry-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <button id="entry-ranking" class="entry-ranking-button" type="button" aria-controls="ranking-panel" aria-expanded="false">
+          <span data-icon="trophy" aria-hidden="true"></span>
+          <span>랭킹 보기</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="ranking-panel" class="item-help ranking-dialog" role="dialog" aria-modal="true" aria-labelledby="ranking-panel-title" hidden>
+      <div class="item-help-card ranking-card">
+        <button id="ranking-close" class="dialog-close" type="button" aria-label="랭킹 닫기">
+          <span data-icon="x" aria-hidden="true"></span>
+        </button>
+        <p>LEADERBOARD</p>
+        <h2 id="ranking-panel-title">상위 30명</h2>
+        <div class="ranking-heading">
+          <h3>순위 · 닉네임</h3>
+          <span id="ranking-panel-status">불러오는 중</span>
+        </div>
+        <ol id="ranking-panel-list" class="ranking-list">
+          <li class="ranking-empty">랭킹을 불러오는 중입니다.</li>
+        </ol>
+      </div>
+    </section>
+
+    <main class="app" aria-label="Swipe Breakout 게임" hidden>
       <header class="topbar">
         <h1 class="brand-title">SWIPE BREAKOUT</h1>
         <div class="top-actions">
+          <button id="ranking-open" class="icon-button" type="button" aria-label="랭킹 보기" aria-controls="ranking-panel" aria-expanded="false">
+            <span data-icon="trophy" aria-hidden="true"></span>
+          </button>
           <button id="help" class="icon-button" type="button" aria-label="아이템 설명 보기" aria-controls="item-help" aria-expanded="false">?</button>
           <button id="options" class="icon-button" type="button" aria-label="게임 옵션 열기" aria-controls="options-panel" aria-expanded="false">
             <span data-icon="settings" aria-hidden="true"></span>
@@ -75,6 +113,10 @@
                 <span data-icon="rotate-ccw" aria-hidden="true"></span>
                 <span>게임 다시 시작</span>
               </button>
+              <button id="options-home" class="options-home" type="button">
+                <span data-icon="house" aria-hidden="true"></span>
+                <span>첫 화면으로</span>
+              </button>
             </div>
           </div>
         </section>
@@ -95,7 +137,25 @@
           <div class="result-scores">
             <p><span>현재 점수</span><strong id="result-score">0</strong></p>
             <p><span>베스트 스코어</span><strong id="result-best-score">0</strong></p>
+            <p><span>순수 플레이 시간</span><strong id="result-duration">0:00.00</strong></p>
           </div>
+          <section class="ranking-result" aria-labelledby="ranking-title">
+            <div class="ranking-heading">
+              <h3 id="ranking-title">TOP 10</h3>
+              <span id="ranking-status">불러오는 중</span>
+            </div>
+            <ol id="ranking-list" class="ranking-list">
+              <li class="ranking-empty">랭킹을 불러오는 중입니다.</li>
+            </ol>
+          </section>
+          <form id="ranking-form" class="ranking-form">
+            <label for="ranking-name">닉네임</label>
+            <div class="ranking-form-row">
+              <input id="ranking-name" name="name" type="text" maxlength="12" autocomplete="nickname" placeholder="닉네임 입력" />
+              <button id="ranking-submit" type="submit">랭킹 등록</button>
+            </div>
+            <p id="ranking-feedback" role="status" aria-live="polite"></p>
+          </form>
           <button id="result-restart" type="button">다시 시작</button>
         </div>
       </section>

@@ -5,7 +5,9 @@ import musicIcon from "lucide-static/icons/music-2.svg?raw";
 import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
 import volumeIcon from "lucide-static/icons/volume.svg?raw";
 import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
+import homeIcon from "lucide-static/icons/house.svg?raw";
 import closeIcon from "lucide-static/icons/x.svg?raw";
+import trophyIcon from "lucide-static/icons/trophy.svg?raw";
 import {
   isAllMuted,
   isBgmMuted,
@@ -17,6 +19,7 @@ import {
   setSfxMuted,
   unlockAudio,
 } from "./audio";
+import { fetchTopRanking, normalizePlayerName, submitRanking, type RankingEntry } from "./ranking";
 import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
@@ -35,6 +38,7 @@ import {
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   aimFromDrag,
+  blackHoleDeflectionAngle,
   blackHolePullStrength,
   blackHolePresence,
   bombEffectFrame,
@@ -59,6 +63,12 @@ import {
 } from "./game";
 import type { GameStatus } from "./game";
 
+declare global {
+  interface Window {
+    resetBreakoutForDevelopment?: () => void;
+  }
+}
+
 const GRID_GAP = 4;
 const GRID_MARGIN = 12;
 const CELL_WIDTH = (BOARD_WIDTH - GRID_MARGIN * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
@@ -67,11 +77,13 @@ const BALL_SPEED = 600;
 const BLACK_HOLE_PULL_ACCELERATION = 4000;
 const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
+const PLAYER_NAME_KEY = "swipe-breakout-player-name";
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
   delay: number;
   bounceCount: number;
+  blackHoleId: string | null;
 }
 
 interface PositionedEffect extends Vec2 {
@@ -91,8 +103,8 @@ void startGame().catch((error: unknown) => {
 async function startGame(): Promise<void> {
 const state = createGame();
 const ballPool = new ObjectPool<ActiveBall>(
-  () => ({ x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
-  (ball) => Object.assign(ball, { x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
+  () => ({ x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0, blackHoleId: null }),
+  (ball) => Object.assign(ball, { x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0, blackHoleId: null }),
 );
 const positionedEffectPool = new ObjectPool<PositionedEffect>(
   () => ({ x: 0, y: 0, elapsed: 0 }),
@@ -112,6 +124,13 @@ let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
 let resetConfirmOpen = false;
+let rankingOpen = false;
+let rankingTrigger: HTMLButtonElement | null = null;
+let rankingLoaded = false;
+let rankingSubmitting = false;
+let rankingRequestId = 0;
+let rankingPanelRequestId = 0;
+let purePlayTimeMs = 0;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -189,6 +208,24 @@ const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
+const resultDuration = document.querySelector<HTMLElement>("#result-duration")!;
+const appRoot = document.querySelector<HTMLElement>(".app")!;
+const entryScreen = document.querySelector<HTMLElement>("#entry-screen")!;
+const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
+const entryNameInput = document.querySelector<HTMLInputElement>("#entry-name")!;
+const entryFeedback = document.querySelector<HTMLElement>("#entry-feedback")!;
+const entryRankingButton = document.querySelector<HTMLButtonElement>("#entry-ranking")!;
+const rankingButton = document.querySelector<HTMLButtonElement>("#ranking-open")!;
+const rankingDialog = document.querySelector<HTMLElement>("#ranking-panel")!;
+const rankingCloseButton = document.querySelector<HTMLButtonElement>("#ranking-close")!;
+const rankingPanelStatus = document.querySelector<HTMLElement>("#ranking-panel-status")!;
+const rankingPanelList = document.querySelector<HTMLOListElement>("#ranking-panel-list")!;
+const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
+const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
+const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
+const rankingNameInput = document.querySelector<HTMLInputElement>("#ranking-name")!;
+const rankingSubmitButton = document.querySelector<HTMLButtonElement>("#ranking-submit")!;
+const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")!;
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
@@ -196,6 +233,7 @@ const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
 const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
 const optionsCloseButton = document.querySelector<HTMLButtonElement>("#options-close")!;
 const optionsRestartButton = document.querySelector<HTMLButtonElement>("#options-restart")!;
+const optionsHomeButton = document.querySelector<HTMLButtonElement>("#options-home")!;
 const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")!;
 const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
 const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
@@ -210,7 +248,9 @@ const iconMarkup: Record<string, string> = {
   "audio-lines": effectIcon,
   volume: volumeIcon,
   "rotate-ccw": restartIcon,
+  house: homeIcon,
   x: closeIcon,
+  trophy: trophyIcon,
 };
 
 document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
@@ -248,6 +288,7 @@ function launch(direction: Vec2): void {
       vy: direction.y * BALL_SPEED,
       delay: index * 0.075,
       bounceCount: 0,
+      blackHoleId: null,
     }));
   }
   syncUi();
@@ -255,6 +296,7 @@ function launch(direction: Vec2): void {
 
 function reset(): void {
   setResetConfirmOpen(false);
+  setRankingOpen(false);
   ballPool.releaseAll(activeBalls);
   if (bombEffect) positionedEffectPool.release(bombEffect);
   if (trapEffect) positionedEffectPool.release(trapEffect);
@@ -274,9 +316,29 @@ function reset(): void {
   trapEffect = null;
   shieldRewindEffect = null;
   brickHitEffects.clear();
+  rankingLoaded = false;
+  rankingSubmitting = false;
+  rankingRequestId += 1;
+  rankingPanelRequestId += 1;
+  purePlayTimeMs = 0;
+  rankingSubmitButton.disabled = false;
+  rankingFeedback.textContent = "";
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
+}
+
+function returnToEntryScreen(): void {
+  reset();
+  showEntryScreen();
+  entryNameInput.focus();
+}
+
+function showEntryScreen(): void {
+  entryNameInput.value = loadPlayerName();
+  entryFeedback.textContent = "";
+  entryScreen.hidden = false;
+  appRoot.hidden = true;
 }
 
 function screenPoint(event: PointerEvent): Vec2 {
@@ -322,18 +384,46 @@ app.canvas.addEventListener("pointercancel", () => {
 });
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+showEntryScreen();
+if (["127.0.0.1", "localhost"].includes(location.hostname)) {
+  window.resetBreakoutForDevelopment = resetForDevelopment;
+}
+entryForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = normalizePlayerName(entryNameInput.value);
+  if (!name) {
+    entryFeedback.textContent = "닉네임을 입력하세요.";
+    entryNameInput.focus();
+    return;
+  }
+  savePlayerName(name);
+  entryNameInput.value = name;
+  rankingNameInput.value = name;
+  entryFeedback.textContent = "";
+  entryScreen.hidden = true;
+  appRoot.hidden = false;
+  syncUi();
+});
+entryRankingButton.addEventListener("click", () => setRankingOpen(true, entryRankingButton));
+rankingButton.addEventListener("click", () => setRankingOpen(!rankingOpen, rankingButton));
+rankingCloseButton.addEventListener("click", () => setRankingOpen(false));
+rankingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void submitCurrentScore();
+});
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !optionsOpen) setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen && !rankingOpen) setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
 optionsButton.addEventListener("click", () => {
-  if (!resetConfirmOpen) setOptionsOpen(!optionsOpen);
+  if (!resetConfirmOpen && !rankingOpen) setOptionsOpen(!optionsOpen);
 });
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
   setOptionsOpen(false);
   setResetConfirmOpen(true);
 });
+optionsHomeButton.addEventListener("click", returnToEntryScreen);
 bgmToggleButton.addEventListener("click", () => {
   setBgmMuted(!isBgmMuted());
   syncAudioOptions();
@@ -368,6 +458,32 @@ function syncAudioOptions(): void {
   allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
 }
 
+function setRankingOpen(open: boolean, trigger?: HTMLButtonElement): void {
+  const wasOpen = rankingOpen;
+  if (open && trigger) rankingTrigger = trigger;
+  rankingOpen = open;
+  rankingDialog.hidden = !open;
+  entryRankingButton.setAttribute("aria-expanded", String(open));
+  rankingButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setHelpOpen(false);
+    setOptionsOpen(false);
+    if (state.gameStatus === "aiming") {
+      aimStart = null;
+      aimCurrent = null;
+      state.gameStatus = "ready";
+      syncUi();
+    }
+    rankingCloseButton.focus();
+    void loadRankingPanel();
+  } else {
+    rankingPanelRequestId += 1;
+    if (wasOpen) (rankingTrigger ?? rankingButton).focus();
+    rankingTrigger = null;
+  }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
+}
+
 function setResetConfirmOpen(open: boolean): void {
   const wasOpen = resetConfirmOpen;
   resetConfirmOpen = open;
@@ -375,6 +491,7 @@ function setResetConfirmOpen(open: boolean): void {
   if (open) {
     setHelpOpen(false);
     setOptionsOpen(false);
+    setRankingOpen(false);
     if (state.gameStatus === "aiming") {
       aimStart = null;
       aimCurrent = null;
@@ -393,7 +510,10 @@ function setHelpOpen(open: boolean): void {
   helpOpen = open;
   helpDialog.hidden = !open;
   helpButton.setAttribute("aria-expanded", String(open));
-  if (open) setOptionsOpen(false);
+  if (open) {
+    setOptionsOpen(false);
+    setRankingOpen(false);
+  }
   if (open && state.gameStatus === "aiming") {
     aimStart = null;
     aimCurrent = null;
@@ -410,6 +530,7 @@ function setOptionsOpen(open: boolean): void {
   optionsButton.setAttribute("aria-expanded", String(open));
   if (open) {
     setHelpOpen(false);
+    setRankingOpen(false);
     syncAudioOptions();
     optionsCloseButton.focus();
   } else if (wasOpen) {
@@ -433,6 +554,154 @@ function saveBestScore(): void {
   } catch {
     // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
   }
+}
+
+function loadPlayerName(): string {
+  try {
+    return normalizePlayerName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function savePlayerName(name: string): void {
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
+  }
+}
+
+function resetForDevelopment(): void {
+  if (!["127.0.0.1", "localhost"].includes(location.hostname)) return;
+  try {
+    localStorage.removeItem(BEST_SCORE_KEY);
+    localStorage.removeItem(PLAYER_NAME_KEY);
+  } catch {
+    // 저장소를 사용할 수 없어도 페이지를 다시 불러옵니다.
+  }
+  location.reload();
+}
+
+function formatPlayTime(durationMs: number | null): string {
+  if (durationMs === null || !Number.isFinite(durationMs) || durationMs < 0) return "기록 없음";
+  const centiseconds = Math.floor(durationMs / 10);
+  const seconds = Math.floor(centiseconds / 100);
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}.${String(centiseconds % 100).padStart(2, "0")}`;
+}
+
+function renderRanking(entries: RankingEntry[], list: HTMLOListElement): void {
+  list.replaceChildren();
+  if (entries.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "ranking-empty";
+    empty.textContent = "아직 등록된 기록이 없습니다.";
+    list.append(empty);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const row = document.createElement("li");
+    const rank = document.createElement("span");
+    const name = document.createElement("strong");
+    const score = document.createElement("span");
+    rank.className = "ranking-rank";
+    name.className = "ranking-name";
+    score.className = "ranking-score";
+    rank.textContent = String(entry.rank).padStart(2, "0");
+    name.textContent = entry.name;
+    score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage} · ${formatPlayTime(entry.durationMs)}`;
+    row.append(rank, name, score);
+    list.append(row);
+  });
+}
+
+async function loadRanking(): Promise<void> {
+  const requestId = ++rankingRequestId;
+  rankingStatus.textContent = "불러오는 중";
+  rankingList.replaceChildren();
+  const loading = document.createElement("li");
+  loading.className = "ranking-empty";
+  loading.textContent = "랭킹을 불러오는 중입니다.";
+  rankingList.append(loading);
+
+  const entries = await fetchTopRanking(10);
+  if (requestId !== rankingRequestId) return;
+  if (entries === null) {
+    rankingStatus.textContent = "연결 안 됨";
+    rankingList.replaceChildren();
+    const unavailable = document.createElement("li");
+    unavailable.className = "ranking-empty";
+    unavailable.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    rankingList.append(unavailable);
+    return;
+  }
+  rankingStatus.textContent = entries.length > 0 ? `상위 ${entries.length}명` : "기록 없음";
+  renderRanking(entries, rankingList);
+}
+
+async function loadRankingPanel(): Promise<void> {
+  const requestId = ++rankingPanelRequestId;
+  rankingPanelStatus.textContent = "불러오는 중";
+  rankingPanelList.replaceChildren();
+  const loading = document.createElement("li");
+  loading.className = "ranking-empty";
+  loading.textContent = "랭킹을 불러오는 중입니다.";
+  rankingPanelList.append(loading);
+
+  const entries = await fetchTopRanking(30);
+  if (requestId !== rankingPanelRequestId || !rankingOpen) return;
+  if (entries === null) {
+    rankingPanelStatus.textContent = "연결 안 됨";
+    rankingPanelList.replaceChildren();
+    const unavailable = document.createElement("li");
+    unavailable.className = "ranking-empty";
+    unavailable.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    rankingPanelList.append(unavailable);
+    return;
+  }
+  rankingPanelStatus.textContent = entries.length > 0 ? `${entries.length}명` : "기록 없음";
+  renderRanking(entries, rankingPanelList);
+}
+
+async function submitCurrentScore(): Promise<void> {
+  if (rankingSubmitting) return;
+  const name = normalizePlayerName(rankingNameInput.value);
+  if (!name) {
+    rankingFeedback.textContent = "닉네임을 입력하세요.";
+    rankingNameInput.focus();
+    return;
+  }
+  if (state.score < 1) {
+    rankingFeedback.textContent = "등록할 점수가 없습니다.";
+    return;
+  }
+
+  savePlayerName(name);
+  rankingNameInput.value = name;
+  rankingSubmitting = true;
+  rankingSubmitButton.disabled = true;
+  rankingFeedback.textContent = "등록 중...";
+  const requestId = ++rankingRequestId;
+  const response = await submitRanking({
+    name,
+    score: state.score,
+    stage: state.stage,
+    durationMs: Math.max(0, Math.round(purePlayTimeMs)),
+  });
+  if (requestId !== rankingRequestId || state.gameStatus !== "gameOver") return;
+
+  rankingSubmitting = false;
+  rankingSubmitButton.disabled = false;
+  if (!response) {
+    rankingFeedback.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    return;
+  }
+  rankingFeedback.textContent = response.ranked
+    ? `${response.rank}위로 등록되었습니다.`
+    : (response.message ?? "상위 랭킹에 들지 못했습니다.");
+  await loadRanking();
 }
 
 function syncUi(): void {
@@ -462,6 +731,13 @@ function syncUi(): void {
   if (state.gameStatus === "gameOver") {
     resultScore.textContent = state.score.toLocaleString("ko-KR");
     resultBestScore.textContent = bestScore.toLocaleString("ko-KR");
+    resultDuration.textContent = formatPlayTime(Math.round(purePlayTimeMs));
+    if (!rankingLoaded) {
+      rankingLoaded = true;
+      rankingNameInput.value = loadPlayerName();
+      rankingFeedback.textContent = "";
+      void loadRanking();
+    }
   }
 }
 
@@ -701,7 +977,10 @@ function circleHitsRect(ball: ActiveBall, x: number, y: number, width: number, h
 
 function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
   const presence = blackHolePresence(blackHoleTime);
-  if (presence <= 0) return false;
+  if (presence <= 0) {
+    ball.blackHoleId = null;
+    return false;
+  }
 
   let nearest: { item: Item; center: Vec2; distance: number } | null = null;
   state.items.forEach((item) => {
@@ -712,7 +991,10 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
       nearest = { item, center, distance };
     }
   });
-  if (!nearest) return false;
+  if (!nearest) {
+    ball.blackHoleId = null;
+    return false;
+  }
 
   const target = nearest as { item: Item; center: Vec2; distance: number };
   if (target.distance <= BLACK_HOLE_CAPTURE_RADIUS && presence >= 0.7) {
@@ -723,6 +1005,23 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
       syncUi();
       return true;
     }
+  }
+
+  if (ball.blackHoleId !== target.item.id && target.distance > BLACK_HOLE_CAPTURE_RADIUS) {
+    const speed = Math.hypot(ball.vx, ball.vy);
+    const angle = blackHoleDeflectionAngle(
+      { x: ball.vx, y: ball.vy },
+      { x: target.center.x - ball.x, y: target.center.y - ball.y },
+    );
+    if (speed > 0 && angle !== 0) {
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const nextVx = ball.vx * cosine - ball.vy * sine;
+      const nextVy = ball.vx * sine + ball.vy * cosine;
+      ball.vx = nextVx;
+      ball.vy = nextVy;
+    }
+    ball.blackHoleId = target.item.id;
   }
 
   const acceleration = BLACK_HOLE_PULL_ACCELERATION * blackHolePullStrength(target.distance) * presence;
@@ -828,7 +1127,10 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
 }
 
 function update(delta: number): void {
-  const paused = helpOpen || optionsOpen || resetConfirmOpen;
+  const paused = helpOpen || optionsOpen || resetConfirmOpen || rankingOpen;
+  if (!paused && (state.gameStatus === "aiming" || state.gameStatus === "volley")) {
+    purePlayTimeMs += Math.min(delta, 0.032) * 1000;
+  }
   if (!paused) {
     brickHitEffects.forEach((effect, brickId) => {
       effect.elapsed += delta;
@@ -940,6 +1242,7 @@ if (["127.0.0.1", "localhost"].includes(location.hostname) && location.search ==
       vy: vx * slope,
       delay: index * 0.075,
       bounceCount: 0,
+      blackHoleId: null,
     }));
   }
   window.setTimeout(() => location.reload(), 7000);
