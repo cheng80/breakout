@@ -18,6 +18,8 @@ export const BLACK_HOLE_CAPTURE_RADIUS = 9;
 export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
 export const BLACK_HOLE_CYCLE_DURATION = 5;
 export const BLACK_HOLE_CLEAR_FADE_DURATION = 0.15;
+export const BLACK_HOLE_CAPTURE_HOLD_DURATION = 0.45;
+export const BLACK_HOLE_CAPTURE_FADE_DURATION = 0.45;
 export const MULTIBALL_SCORE = 50;
 
 export function maxBallsForStage(stage: number): number {
@@ -184,6 +186,12 @@ export function blackHolePresence(elapsed: number): number {
 export function blackHoleClearFade(elapsed: number): number {
   const progress = Math.max(0, Math.min(1, elapsed / BLACK_HOLE_CLEAR_FADE_DURATION));
   return 1 - progress ** 3;
+}
+
+export function blackHoleCaptureFade(elapsed: number): number {
+  if (elapsed <= BLACK_HOLE_CAPTURE_HOLD_DURATION) return 1;
+  const progress = Math.max(0, Math.min(1, (elapsed - BLACK_HOLE_CAPTURE_HOLD_DURATION) / BLACK_HOLE_CAPTURE_FADE_DURATION));
+  return 1 - progress ** 2;
 }
 
 export interface Brick {

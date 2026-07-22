@@ -27,6 +27,8 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   BLACK_HOLE_CAPTURE_RADIUS,
+  BLACK_HOLE_CAPTURE_FADE_DURATION,
+  BLACK_HOLE_CAPTURE_HOLD_DURATION,
   BLACK_HOLE_CLEAR_FADE_DURATION,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
@@ -43,6 +45,7 @@ import {
   SHIELD_REWIND_DURATION,
   aimFromDrag,
   blackHoleClearFade,
+  blackHoleCaptureFade,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
   blackHolePresence,
@@ -207,6 +210,7 @@ let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
 let blackHoleClearFadeTime = 0;
+const blackHoleCaptureFadeTimes = new Map<string, number>();
 let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
 let ultimateEffect: UltimateEffect | null = null;
@@ -463,6 +467,7 @@ function reset(stage = 1, ballCount = 1): void {
   blackHoleCycle = 0;
   blackHoleStage = state.stage;
   blackHoleClearFadeTime = 0;
+  blackHoleCaptureFadeTimes.clear();
   bombEffect = null;
   trapEffect = null;
   ultimateEffect = null;
@@ -1495,29 +1500,36 @@ function draw(): void {
     const logicalCenter = itemCenter(item);
     const center = { ...logicalCenter, y: logicalCenter.y + boardOffset };
     if (item.type === "blackhole") {
+      const captureElapsed = blackHoleCaptureFadeTimes.get(item.id);
+      const captured = captureElapsed !== undefined;
       const presence = (item.charges ?? 1) > 0
         ? blackHolePresence(blackHoleTime) * blackHoleClearFade(blackHoleClearFadeTime)
-        : 0;
+        : captured ? blackHoleCaptureFade(captureElapsed) : 0;
       const pulse = (Math.sin(blackHoleTime * 5) + 1) / 2;
       const label = itemLabels.get(item.id);
       if (label) label.alpha = presence;
       if (presence <= 0) return;
 
+      const glowColor = captured ? 0x8f63ff : 0xe55216;
+      const ringColor = captured ? 0xb598ff : 0xff6a19;
+      const coreColor = captured ? 0x22104b : 0xa92d08;
+      const particleColor = captured ? 0xd8c5ff : 0xff8a32;
+
       effectGlow.ellipse(center.x, center.y, 22 + pulse * 2, 7 + pulse * 0.7)
-        .stroke({ width: 12, color: 0xe55216, alpha: presence * 0.48 });
+        .stroke({ width: 12, color: glowColor, alpha: presence * 0.48 });
       effectGlow.circle(center.x, center.y, BLACK_HOLE_INFLUENCE_RADIUS)
-        .stroke({ width: 8, color: 0xd9470e, alpha: presence * 0.08 });
+        .stroke({ width: 8, color: glowColor, alpha: captured ? 0 : presence * 0.08 });
       scene.ellipse(center.x, center.y, 21 + pulse * 1.5, 6 + pulse * 0.6)
-        .stroke({ width: 2.5, color: 0xff6a19, alpha: presence * 0.92 });
-      scene.circle(center.x, center.y, 17).fill({ color: 0xa92d08, alpha: presence * 0.74 });
+        .stroke({ width: 2.5, color: ringColor, alpha: presence * 0.92 });
+      scene.circle(center.x, center.y, 17).fill({ color: coreColor, alpha: presence * 0.74 });
       scene.circle(center.x, center.y, 13).fill({ color: 0x010101, alpha: presence });
       scene.circle(center.x, center.y, 15 + pulse * 2)
-        .stroke({ width: 2, color: 0xf05a16, alpha: presence * 0.9 });
+        .stroke({ width: 2, color: ringColor, alpha: presence * 0.9 });
       for (let orbit = 0; orbit < 2; orbit += 1) {
         const angle = blackHoleTime * (2.3 + orbit * 0.45) + orbit * Math.PI;
         const radius = 20 + orbit * 4;
         scene.circle(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, 2.2 - orbit * 0.35)
-          .fill({ color: 0xff8a32, alpha: presence * (0.9 - orbit * 0.2) });
+          .fill({ color: particleColor, alpha: presence * (0.9 - orbit * 0.2) });
       }
       return;
     }
@@ -2073,6 +2085,7 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
     const remaining = captureBallByBlackHole(state, target.item.id);
     if (remaining !== null) {
       playSound("blackhole_capture");
+      if (remaining === 0) blackHoleCaptureFadeTimes.set(target.item.id, 0);
       boardSignature = "";
       syncUi();
       return true;
@@ -2301,6 +2314,16 @@ function update(delta: number): void {
   blackHoleClearFadeTime = state.bricks.some((brick) => brick.type !== "steel")
     ? 0
     : Math.min(BLACK_HOLE_CLEAR_FADE_DURATION, blackHoleClearFadeTime + delta);
+  if (!paused) {
+    blackHoleCaptureFadeTimes.forEach((elapsed, itemId) => {
+      const nextElapsed = elapsed + delta;
+      if (nextElapsed >= BLACK_HOLE_CAPTURE_HOLD_DURATION + BLACK_HOLE_CAPTURE_FADE_DURATION) {
+        blackHoleCaptureFadeTimes.delete(itemId);
+      } else {
+        blackHoleCaptureFadeTimes.set(itemId, nextElapsed);
+      }
+    });
+  }
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
