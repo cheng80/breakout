@@ -684,7 +684,6 @@ button {
 }
 
 .reward-dialog {
-  z-index: 4;
   background: rgba(4, 11, 22, 0.84);
 }
 
