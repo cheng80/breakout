@@ -100,8 +100,9 @@ describe("핵심 게임 규칙", () => {
     setBgmVolume(0.1);
   });
 
-  it("랭킹 닉네임은 공백을 정리하고 12자로 제한한다", () => {
-    expect(normalizePlayerName("  Swipe   Breakout  ")).toBe("Swipe Breako");
+  it("랭킹 닉네임은 공백을 정리하고 20자로 제한한다", () => {
+    expect(normalizePlayerName("  Swipe   Breakout  ")).toBe("Swipe Breakout");
+    expect(normalizePlayerName("123456789012345678901")).toBe("12345678901234567890");
   });
 
   it("랭킹 등록 전 점수 기준 예상 순위를 계산한다", () => {

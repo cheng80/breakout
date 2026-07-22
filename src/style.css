@@ -497,7 +497,7 @@ button {
   position: absolute;
   z-index: 11;
   inset: 50% auto auto 50%;
-  width: min(82%, 290px);
+  width: min(calc(100% - 24px), 360px);
   max-height: calc(100% - 24px);
   padding: 22px;
   overflow-y: auto;
@@ -584,7 +584,7 @@ button {
 .ranking-dialog .ranking-list li {
   min-height: 36px;
   padding: 7px 10px;
-  grid-template-columns: 30px 1fr auto;
+  grid-template-columns: 30px minmax(0, 1fr);
   gap: 8px;
   font-size: 14px;
 }
@@ -1099,11 +1099,11 @@ button {
 }
 
 .ranking-list li {
-  min-height: 24px;
+  min-height: 38px;
   padding: 4px 6px;
   display: grid;
-  grid-template-columns: 22px 1fr auto;
-  align-items: center;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
   gap: 6px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.045);
@@ -1116,6 +1116,12 @@ button {
   font-weight: 800;
 }
 
+.ranking-list .ranking-details {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
 .ranking-list .ranking-name {
   overflow: hidden;
   color: #eaf0ff;
@@ -1126,7 +1132,7 @@ button {
 .ranking-list .ranking-score {
   color: #b7c2d7;
   font-size: 9px;
-  text-align: right;
+  text-align: left;
 }
 
 .ranking-list .ranking-empty {
@@ -1141,9 +1147,9 @@ button {
 }
 
 .ranking-result .ranking-list li {
-  min-height: 38px;
+  min-height: 48px;
   padding: 7px 8px;
-  grid-template-columns: 30px 1fr auto;
+  grid-template-columns: 30px minmax(0, 1fr);
   gap: 8px;
   font-size: 13px;
 }
@@ -1780,7 +1786,7 @@ button {
 
   .result {
     --popup-scale: 0.8;
-    width: min(82%, 290px);
+    width: min(calc(100% - 24px), 360px);
     max-height: none;
     overflow: hidden;
     transform: translate(-50%, -50%) scale(var(--popup-scale));

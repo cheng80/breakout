@@ -56,7 +56,7 @@ async function request(path: string, init?: RequestInit): Promise<Record<string,
 }
 
 export function normalizePlayerName(value: string): string {
-  return value.trim().replace(/\s+/g, " ").slice(0, 12);
+  return value.trim().replace(/\s+/g, " ").slice(0, 20);
 }
 
 export function estimateRankingPosition(entries: RankingEntry[], score: number): number {
