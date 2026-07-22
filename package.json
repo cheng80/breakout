@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:ultimate-fixture": "vite --host 0.0.0.0 --mode ultimate-fixture",
     "test": "vitest",
     "build": "tsc --noEmit && vite build",
+    "build:ultimate-fixture": "tsc --noEmit && vite build --mode ultimate-fixture",
     "audio:plan": "node scripts/generate-audio.mjs",
     "audio:generate": "node scripts/generate-audio.mjs --generate"
   },
