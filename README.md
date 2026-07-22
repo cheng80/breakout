@@ -104,6 +104,19 @@ npx vite preview --host 0.0.0.0
 
 배포 후 `https://example.com/breakout/`으로 접속합니다. `src/`, `node_modules/`, `package.json`, `.DS_Store`는 서버에 올리지 않습니다.
 
+### NAS 자동 배포
+
+NAS 자동 배포는 `.env`의 배포 설정을 읽어 다음 순서로 처리합니다. 필요하면 `--env-file .env.local`로 다른 파일을 지정할 수 있습니다.
+
+```bash
+tools/deploy_breakout_web.sh
+tools/verify_breakout_web.sh
+```
+
+배포 스크립트는 `npm run build -- --base=/breakout/` 실행 후 `dist/`를 `breakout/`으로 변경하고 `breakout.zip`을 만들어 업로드합니다. NAS의 `server/deploy_breakout.php`는 압축을 `/share/Web/breakout/`에 풀고 `index.html`을 확인한 뒤 서버의 zip을 삭제합니다.
+
+배포 토큰은 `VITE_` 접두사를 붙이지 않아야 클라이언트 번들에 노출되지 않습니다. `.env`와 `.env.local`은 로컬 전용으로 사용하고 `.env.example`에는 실제 토큰을 넣지 않습니다.
+
 ### 랭킹 API 배포
 
 랭킹 서버 파일은 [server/breakoutranking/ranking.php](server/breakoutranking/ranking.php)입니다. NAS의 다음 경로에 `ranking.php`로 업로드합니다.
@@ -118,7 +131,7 @@ npx vite preview --host 0.0.0.0
 /Web/breakoutranking/ranking_data.json
 ```
 
-게임은 `/breakout/`에서 `../breakoutranking/ranking.php` 상대경로로 API를 호출합니다. 다른 호스트나 경로를 사용할 때만 `.env`에 `VITE_RANKING_URL`을 지정한 뒤 다시 빌드합니다.
+게임은 `/breakout/`에서 `../breakoutranking/ranking.php` 상대경로로 API를 호출합니다. 다른 호스트나 경로를 사용할 때만 `.env.local`에 `VITE_RANKING_URL`을 지정한 뒤 다시 빌드합니다.
 
 랭킹은 점수 내림차순, 스테이지 내림차순으로 정렬하고, 점수와 스테이지가 같으면 1스테이지부터 게임오버까지의 순수 플레이 시간이 짧은 기록을 우선합니다. 발사 조준·공 비행만 누적하며 일시정지와 발사 대기 시간은 제외합니다.
 

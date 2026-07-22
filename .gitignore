@@ -1,6 +1,11 @@
 node_modules/
 dist/
+breakout/
+breakout.zip
 .playwright-cli/
 output/playwright/
 .DS_Store
 .env
+.env.local
+.env.*.local
+.breakout_deploy.env

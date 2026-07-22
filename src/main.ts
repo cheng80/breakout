@@ -143,6 +143,7 @@ let rankingOpen = false;
 let rankingTrigger: HTMLButtonElement | null = null;
 let rankingLoaded = false;
 let rankingSubmitting = false;
+let rankingSubmitted = false;
 let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
 let rewardReplacementOpen = false;
@@ -154,6 +155,7 @@ let lastClearedStage = 0;
 let lastClearedScore = 0;
 let lastClearedDurationMs = 0;
 let challengeAbandoned = false;
+let resetConfirmAction: "reset" | "exit" | "home" | "abandon" = "reset";
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -234,6 +236,7 @@ const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
 const resultDuration = document.querySelector<HTMLElement>("#result-duration")!;
+const resultExitButton = document.querySelector<HTMLButtonElement>("#result-exit")!;
 const appRoot = document.querySelector<HTMLElement>(".app")!;
 const entryScreen = document.querySelector<HTMLElement>("#entry-screen")!;
 const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
@@ -268,6 +271,8 @@ const fpsToggleButton = document.querySelector<HTMLButtonElement>("#fps-toggle")
 const fpsMonitor = document.querySelector<HTMLOutputElement>("#fps-monitor")!;
 const fpsValue = document.querySelector<HTMLElement>("#fps-value")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
+const resetConfirmTitle = document.querySelector<HTMLElement>("#reset-confirm-title")!;
+const resetConfirmDescription = document.querySelector<HTMLElement>("#reset-confirm-description")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
 const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
 const rewardDialog = document.querySelector<HTMLElement>("#stage-reward")!;
@@ -294,11 +299,19 @@ const rewardReplacementButtons = [...document.querySelectorAll<HTMLButtonElement
 const ultimateSlotButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-ultimate-slot]")];
 const ultimateSlotCount = document.querySelector<HTMLElement>("#ultimate-slot-count")!;
 
+const ultimateImage = (fileName: string) => `${import.meta.env.BASE_URL}images/ultimates/${fileName}`;
 const ultimateDetails: Record<UltimateItemType, { name: string; symbol: string; className: string; image: string }> = {
-  antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter", image: "/images/ultimates/antimatter.png" },
-  orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital", image: "/images/ultimates/orbital-laser.png" },
-  chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning", image: "/images/ultimates/chain-lightning.png" },
+  antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter", image: ultimateImage("antimatter.png") },
+  orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital", image: ultimateImage("orbital-laser.png") },
+  chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning", image: ultimateImage("chain-lightning.png") },
 };
+
+Object.entries(ultimateDetails).forEach(([type, detail]) => {
+  document.querySelectorAll<HTMLImageElement>(`[data-ultimate-image="${type}"]`).forEach((image) => {
+    image.src = detail.image;
+    image.alt = detail.name;
+  });
+});
 
 const iconMarkup: Record<string, string> = {
   settings: settingsIcon,
@@ -381,6 +394,7 @@ function reset(): void {
   brickHitEffects.clear();
   rankingLoaded = false;
   rankingSubmitting = false;
+  rankingSubmitted = false;
   rankingRequestId += 1;
   rankingPanelRequestId += 1;
   purePlayTimeMs = 0;
@@ -481,6 +495,17 @@ app.canvas.addEventListener("pointercancel", () => {
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
 
+function exitFromGameOver(): void {
+  if (state.gameStatus !== "gameOver") return;
+  if (rankingSubmitted || state.score < 1) {
+    returnToEntryScreen();
+    return;
+  }
+  setResetConfirmOpen(true, "exit");
+}
+
+resultExitButton.addEventListener("click", exitFromGameOver);
+
 function abandonChallenge(): void {
   if (state.gameStatus === "reward" || state.gameStatus === "gameOver") return;
   ballPool.releaseAll(activeBalls);
@@ -495,7 +520,6 @@ function abandonChallenge(): void {
   syncUi();
 }
 
-challengeAbandonButton.addEventListener("click", abandonChallenge);
 showEntryScreen();
 if (["127.0.0.1", "localhost"].includes(location.hostname)) {
   window.resetBreakoutForDevelopment = resetForDevelopment;
@@ -533,9 +557,10 @@ optionsButton.addEventListener("click", () => {
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
   setOptionsOpen(false);
-  setResetConfirmOpen(true);
+  setResetConfirmOpen(true, "reset");
 });
-optionsHomeButton.addEventListener("click", returnToEntryScreen);
+optionsHomeButton.addEventListener("click", () => setResetConfirmOpen(true, "home"));
+challengeAbandonButton.addEventListener("click", () => setResetConfirmOpen(true, "abandon"));
 bgmToggleButton.addEventListener("click", () => {
   setBgmMuted(!isBgmMuted());
   syncAudioOptions();
@@ -559,7 +584,13 @@ fpsToggleButton.addEventListener("click", () => {
   syncFpsOption();
 });
 resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
-resetConfirmButton.addEventListener("click", reset);
+resetConfirmButton.addEventListener("click", () => {
+  const action = resetConfirmAction;
+  setResetConfirmOpen(false);
+  if (action === "exit" || action === "home") returnToEntryScreen();
+  else if (action === "abandon") abandonChallenge();
+  else reset();
+});
 rewardStoreButton.addEventListener("click", () => {
   if (acceptUltimateReward(state)) {
     rewardReplacementOpen = false;
@@ -646,11 +677,21 @@ function setRankingOpen(open: boolean, trigger?: HTMLButtonElement): void {
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
 
-function setResetConfirmOpen(open: boolean): void {
+function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | "abandon" = "reset"): void {
   const wasOpen = resetConfirmOpen;
+  if (open) resetConfirmAction = action;
   resetConfirmOpen = open;
   resetConfirmDialog.hidden = !open;
   if (open) {
+    const copy = {
+      reset: ["정말 다시 시작할까요?", "현재 점수와 진행 상황이 사라집니다.", "다시 시작"],
+      exit: ["랭킹을 등록하지 않고 나갈까요?", "이번 게임 기록은 저장되지 않습니다.", "나가기"],
+      home: ["처음 화면으로 돌아갈까요?", "현재 게임 진행이 사라집니다.", "처음 화면 가기"],
+      abandon: ["챌린지를 포기할까요?", "마지막 클리어 기록 기준으로 게임오버 처리됩니다.", "챌린지 포기"],
+    }[resetConfirmAction];
+    resetConfirmTitle.textContent = copy[0];
+    resetConfirmDescription.textContent = copy[1];
+    resetConfirmButton.textContent = copy[2];
     setHelpOpen(false);
     setOptionsOpen(false);
     setRankingOpen(false);
@@ -883,6 +924,7 @@ async function submitCurrentScore(): Promise<void> {
   rankingFeedback.textContent = response.ranked
     ? `${response.rank}위로 등록되었습니다.`
     : (response.message ?? "상위 랭킹에 들지 못했습니다.");
+  rankingSubmitted = true;
   await loadRanking();
 }
 
