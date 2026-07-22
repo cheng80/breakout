@@ -30,6 +30,8 @@ npm run dev
 
 기본 주소는 [http://localhost:5173](http://localhost:5173)입니다. 해당 포트가 사용 중이면 터미널에 표시되는 주소로 접속합니다.
 
+로컬 개발 중 진입 화면과 베스트 스코어를 초기화하려면 브라우저 콘솔에서 `resetBreakoutForDevelopment()`를 실행합니다. 운영 주소에서는 이 함수가 노출되지 않습니다.
+
 ## 테스트
 
 ```bash

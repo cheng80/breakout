@@ -58,10 +58,11 @@ button {
 
 .entry-kicker {
   margin: 0 0 12px;
-  color: #a5afff;
-  font-size: 13px;
+  color: #d0d6ff;
+  font-size: clamp(16px, 5vw, 20px);
   font-weight: 900;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(165, 175, 255, 0.42);
 }
 
 .entry-card h1 {
@@ -135,6 +136,40 @@ button {
   font-size: 11px;
 }
 
+.entry-ranking-button {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(145, 157, 255, 0.62);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(112, 127, 255, 0.28), rgba(86, 101, 197, 0.16));
+  box-shadow: 0 8px 22px rgba(63, 78, 190, 0.2), inset 0 1px rgba(255, 255, 255, 0.14);
+  color: #f2f4ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.entry-ranking-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.entry-ranking-button:active {
+  transform: scale(0.98);
+}
+
 .app {
   width: min(100%, 430px);
   height: min(100dvh, 900px);
@@ -167,12 +202,13 @@ button {
 
 .brand-title {
   margin: 0;
-  color: #a5afff;
-  font-size: clamp(17px, 5.2vw, 22px);
+  color: #c7ceff;
+  font-size: clamp(20px, 6vw, 26px);
   line-height: 1;
   font-weight: 900;
   letter-spacing: 0.13em;
   white-space: nowrap;
+  text-shadow: 0 0 16px rgba(165, 175, 255, 0.36);
 }
 
 .icon-button {
@@ -354,6 +390,41 @@ button {
 }
 
 .item-help[hidden] {
+  display: none;
+}
+
+.ranking-dialog {
+  position: fixed;
+  z-index: 20;
+  border-radius: 0;
+}
+
+.ranking-card {
+  width: min(100%, 360px);
+  max-height: min(82dvh, 680px);
+}
+
+.ranking-card h2 {
+  padding-right: 38px;
+}
+
+.ranking-dialog .ranking-heading {
+  margin-top: 4px;
+}
+
+.ranking-dialog .ranking-heading h3 {
+  color: #9ba8bc;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.ranking-dialog .ranking-list {
+  max-height: min(58dvh, 500px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ranking-dialog .ranking-list::-webkit-scrollbar {
   display: none;
 }
 

@@ -6,6 +6,7 @@ import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
 import volumeIcon from "lucide-static/icons/volume.svg?raw";
 import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
 import closeIcon from "lucide-static/icons/x.svg?raw";
+import trophyIcon from "lucide-static/icons/trophy.svg?raw";
 import {
   isAllMuted,
   isBgmMuted,
@@ -59,6 +60,12 @@ import {
   type Vec2,
 } from "./game";
 import type { GameStatus } from "./game";
+
+declare global {
+  interface Window {
+    resetBreakoutForDevelopment?: () => void;
+  }
+}
 
 const GRID_GAP = 4;
 const GRID_MARGIN = 12;
@@ -114,9 +121,12 @@ let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
 let resetConfirmOpen = false;
+let rankingOpen = false;
+let rankingTrigger: HTMLButtonElement | null = null;
 let rankingLoaded = false;
 let rankingSubmitting = false;
 let rankingRequestId = 0;
+let rankingPanelRequestId = 0;
 let purePlayTimeMs = 0;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
@@ -201,6 +211,12 @@ const entryScreen = document.querySelector<HTMLElement>("#entry-screen")!;
 const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
 const entryNameInput = document.querySelector<HTMLInputElement>("#entry-name")!;
 const entryFeedback = document.querySelector<HTMLElement>("#entry-feedback")!;
+const entryRankingButton = document.querySelector<HTMLButtonElement>("#entry-ranking")!;
+const rankingButton = document.querySelector<HTMLButtonElement>("#ranking-open")!;
+const rankingDialog = document.querySelector<HTMLElement>("#ranking-panel")!;
+const rankingCloseButton = document.querySelector<HTMLButtonElement>("#ranking-close")!;
+const rankingPanelStatus = document.querySelector<HTMLElement>("#ranking-panel-status")!;
+const rankingPanelList = document.querySelector<HTMLOListElement>("#ranking-panel-list")!;
 const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
 const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
 const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
@@ -229,6 +245,7 @@ const iconMarkup: Record<string, string> = {
   volume: volumeIcon,
   "rotate-ccw": restartIcon,
   x: closeIcon,
+  trophy: trophyIcon,
 };
 
 document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
@@ -273,6 +290,7 @@ function launch(direction: Vec2): void {
 
 function reset(): void {
   setResetConfirmOpen(false);
+  setRankingOpen(false);
   ballPool.releaseAll(activeBalls);
   if (bombEffect) positionedEffectPool.release(bombEffect);
   if (trapEffect) positionedEffectPool.release(trapEffect);
@@ -295,6 +313,7 @@ function reset(): void {
   rankingLoaded = false;
   rankingSubmitting = false;
   rankingRequestId += 1;
+  rankingPanelRequestId += 1;
   purePlayTimeMs = 0;
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
@@ -347,6 +366,9 @@ app.canvas.addEventListener("pointercancel", () => {
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
 entryNameInput.value = loadPlayerName();
+if (["127.0.0.1", "localhost"].includes(location.hostname)) {
+  window.resetBreakoutForDevelopment = resetForDevelopment;
+}
 entryForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = normalizePlayerName(entryNameInput.value);
@@ -363,16 +385,19 @@ entryForm.addEventListener("submit", (event) => {
   appRoot.hidden = false;
   syncUi();
 });
+entryRankingButton.addEventListener("click", () => setRankingOpen(true, entryRankingButton));
+rankingButton.addEventListener("click", () => setRankingOpen(!rankingOpen, rankingButton));
+rankingCloseButton.addEventListener("click", () => setRankingOpen(false));
 rankingForm.addEventListener("submit", (event) => {
   event.preventDefault();
   void submitCurrentScore();
 });
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !optionsOpen) setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen && !rankingOpen) setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
 optionsButton.addEventListener("click", () => {
-  if (!resetConfirmOpen) setOptionsOpen(!optionsOpen);
+  if (!resetConfirmOpen && !rankingOpen) setOptionsOpen(!optionsOpen);
 });
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
@@ -413,6 +438,32 @@ function syncAudioOptions(): void {
   allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
 }
 
+function setRankingOpen(open: boolean, trigger?: HTMLButtonElement): void {
+  const wasOpen = rankingOpen;
+  if (open && trigger) rankingTrigger = trigger;
+  rankingOpen = open;
+  rankingDialog.hidden = !open;
+  entryRankingButton.setAttribute("aria-expanded", String(open));
+  rankingButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setHelpOpen(false);
+    setOptionsOpen(false);
+    if (state.gameStatus === "aiming") {
+      aimStart = null;
+      aimCurrent = null;
+      state.gameStatus = "ready";
+      syncUi();
+    }
+    rankingCloseButton.focus();
+    void loadRankingPanel();
+  } else {
+    rankingPanelRequestId += 1;
+    if (wasOpen) (rankingTrigger ?? rankingButton).focus();
+    rankingTrigger = null;
+  }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
+}
+
 function setResetConfirmOpen(open: boolean): void {
   const wasOpen = resetConfirmOpen;
   resetConfirmOpen = open;
@@ -420,6 +471,7 @@ function setResetConfirmOpen(open: boolean): void {
   if (open) {
     setHelpOpen(false);
     setOptionsOpen(false);
+    setRankingOpen(false);
     if (state.gameStatus === "aiming") {
       aimStart = null;
       aimCurrent = null;
@@ -438,7 +490,10 @@ function setHelpOpen(open: boolean): void {
   helpOpen = open;
   helpDialog.hidden = !open;
   helpButton.setAttribute("aria-expanded", String(open));
-  if (open) setOptionsOpen(false);
+  if (open) {
+    setOptionsOpen(false);
+    setRankingOpen(false);
+  }
   if (open && state.gameStatus === "aiming") {
     aimStart = null;
     aimCurrent = null;
@@ -455,6 +510,7 @@ function setOptionsOpen(open: boolean): void {
   optionsButton.setAttribute("aria-expanded", String(open));
   if (open) {
     setHelpOpen(false);
+    setRankingOpen(false);
     syncAudioOptions();
     optionsCloseButton.focus();
   } else if (wasOpen) {
@@ -496,6 +552,17 @@ function savePlayerName(name: string): void {
   }
 }
 
+function resetForDevelopment(): void {
+  if (!["127.0.0.1", "localhost"].includes(location.hostname)) return;
+  try {
+    localStorage.removeItem(BEST_SCORE_KEY);
+    localStorage.removeItem(PLAYER_NAME_KEY);
+  } catch {
+    // 저장소를 사용할 수 없어도 페이지를 다시 불러옵니다.
+  }
+  location.reload();
+}
+
 function formatPlayTime(durationMs: number | null): string {
   if (durationMs === null || !Number.isFinite(durationMs) || durationMs < 0) return "기록 없음";
   const centiseconds = Math.floor(durationMs / 10);
@@ -504,13 +571,13 @@ function formatPlayTime(durationMs: number | null): string {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}.${String(centiseconds % 100).padStart(2, "0")}`;
 }
 
-function renderRanking(entries: RankingEntry[]): void {
-  rankingList.replaceChildren();
+function renderRanking(entries: RankingEntry[], list: HTMLOListElement): void {
+  list.replaceChildren();
   if (entries.length === 0) {
     const empty = document.createElement("li");
     empty.className = "ranking-empty";
     empty.textContent = "아직 등록된 기록이 없습니다.";
-    rankingList.append(empty);
+    list.append(empty);
     return;
   }
 
@@ -526,7 +593,7 @@ function renderRanking(entries: RankingEntry[]): void {
     name.textContent = entry.name;
     score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage} · ${formatPlayTime(entry.durationMs)}`;
     row.append(rank, name, score);
-    rankingList.append(row);
+    list.append(row);
   });
 }
 
@@ -551,7 +618,31 @@ async function loadRanking(): Promise<void> {
     return;
   }
   rankingStatus.textContent = entries.length > 0 ? `상위 ${entries.length}명` : "기록 없음";
-  renderRanking(entries);
+  renderRanking(entries, rankingList);
+}
+
+async function loadRankingPanel(): Promise<void> {
+  const requestId = ++rankingPanelRequestId;
+  rankingPanelStatus.textContent = "불러오는 중";
+  rankingPanelList.replaceChildren();
+  const loading = document.createElement("li");
+  loading.className = "ranking-empty";
+  loading.textContent = "랭킹을 불러오는 중입니다.";
+  rankingPanelList.append(loading);
+
+  const entries = await fetchTopRanking(30);
+  if (requestId !== rankingPanelRequestId || !rankingOpen) return;
+  if (entries === null) {
+    rankingPanelStatus.textContent = "연결 안 됨";
+    rankingPanelList.replaceChildren();
+    const unavailable = document.createElement("li");
+    unavailable.className = "ranking-empty";
+    unavailable.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    rankingPanelList.append(unavailable);
+    return;
+  }
+  rankingPanelStatus.textContent = entries.length > 0 ? `${entries.length}명` : "기록 없음";
+  renderRanking(entries, rankingPanelList);
 }
 
 async function submitCurrentScore(): Promise<void> {
@@ -993,7 +1084,7 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
 }
 
 function update(delta: number): void {
-  const paused = helpOpen || optionsOpen || resetConfirmOpen;
+  const paused = helpOpen || optionsOpen || resetConfirmOpen || rankingOpen;
   if (!paused && (state.gameStatus === "aiming" || state.gameStatus === "volley")) {
     purePlayTimeMs += Math.min(delta, 0.032) * 1000;
   }
