@@ -55,6 +55,7 @@ import {
   finishVolley,
   hitBrickWithBall,
   laserEffectFrame,
+  orbitalLaserStartColumn,
   prepareVolley,
   relocateBlackHoles,
   resetGame,
@@ -510,8 +511,11 @@ function ultimateHitCount(effect: UltimateEffect, progress: number): number {
 }
 
 function beginUltimateEffect(activation: UltimateActivation, target: Pick<Brick, "row" | "column">): void {
+  const effectTarget = activation.type === "orbitalLaser"
+    ? { ...target, column: orbitalLaserStartColumn(target.column) + 1 }
+    : target;
   ultimateEffect = {
-    ...itemCenter(target),
+    ...itemCenter(effectTarget),
     elapsed: 0,
     type: activation.type,
     targets: activation.targets.map(itemCenter),
@@ -1582,7 +1586,7 @@ function draw(): void {
         .stroke({ width: 3, color: 0xd9fbff, alpha: Math.max(beamAlpha, charge * 0.8) });
 
       if (beamProgress > 0) {
-        const width = CELL_WIDTH * beamOpen;
+        const width = (CELL_WIDTH * 3 + GRID_GAP * 2) * beamOpen;
         effectGlow.rect(ultimateEffect.x - width * 0.62, 0, width * 1.24, BOARD_HEIGHT)
           .fill({ color: 0x22dfff, alpha: beamAlpha * 0.62 });
         scene.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)

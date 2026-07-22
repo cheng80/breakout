@@ -34,6 +34,10 @@ export type BrickType = "normal" | "laser" | "steel";
 
 export const ULTIMATE_SLOT_COUNT = 2;
 
+export function orbitalLaserStartColumn(targetColumn: number): number {
+  return Math.max(0, Math.min(GRID_COLUMNS - 3, targetColumn - 1));
+}
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -528,6 +532,7 @@ export function useUltimateItem(
 
   const destructible = state.bricks.filter((brick) => brick.type !== "steel");
   const distance = (brick: Brick) => Math.abs(brick.row - target.row) + Math.abs(brick.column - target.column);
+  const orbitalStartColumn = orbitalLaserStartColumn(target.column);
   const fusionTargets = () => {
     const remaining = [...destructible];
     const result: Brick[] = [];
@@ -547,7 +552,7 @@ export function useUltimateItem(
   const targets = type === "antimatter"
     ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
     : type === "orbitalLaser"
-      ? destructible.filter((brick) => brick.column === target.column)
+      ? destructible.filter((brick) => brick.column >= orbitalStartColumn && brick.column < orbitalStartColumn + 3)
       : type === "chainLightning"
         ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 12)
         : type === "meteorImpact"
