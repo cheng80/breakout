@@ -370,7 +370,43 @@ button {
 }
 
 .options-card {
+  position: relative;
   width: min(100%, 320px);
+}
+
+.item-help-card .dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin: 0 !important;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  color: #c7d0e2;
+  cursor: pointer;
+  transition-property: transform, background-color;
+  transition-duration: 140ms;
+}
+
+.dialog-close:active {
+  transform: scale(0.96);
+}
+
+.dialog-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .options-section {
@@ -407,12 +443,11 @@ button {
 }
 
 .sound-setting:active,
-.options-restart:active,
-.options-close:active {
+.options-restart:active {
   transform: scale(0.96);
 }
 
-.sound-setting[aria-pressed="true"] {
+.sound-setting[aria-checked="false"] {
   background: rgba(255, 77, 109, 0.13);
 }
 
@@ -456,22 +491,44 @@ button {
   font-size: 10px;
 }
 
-.sound-setting-state {
-  min-width: 58px;
-  color: #7ee7c1;
-  font-size: 11px;
-  font-weight: 800;
-  text-align: right;
+.ios-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #45d5a1;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 12px rgba(69, 213, 161, 0.24);
+  transition-property: background-color, box-shadow;
+  transition-duration: 160ms;
 }
 
-.sound-setting[aria-pressed="true"] .sound-setting-state {
-  color: #ff8da1;
+.ios-switch span {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  transition-property: transform;
+  transition-duration: 160ms;
+}
+
+.sound-setting[aria-checked="false"] .ios-switch {
+  background: #536174;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.sound-setting[aria-checked="false"] .ios-switch span {
+  transform: translateX(-18px);
 }
 
 .options-actions {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
   gap: 8px;
 }
 
@@ -479,8 +536,7 @@ button {
   margin: 0;
 }
 
-.options-actions .options-restart,
-.options-actions .options-close {
+.options-actions .options-restart {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -496,11 +552,6 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
-}
-
-.options-actions .options-close {
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .reset-confirm-card {
@@ -651,6 +702,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   #score,
   .icon-button,
+  .dialog-close,
+  .sound-setting,
   .result button,
   .item-help-card button {
     transition-duration: 0ms;

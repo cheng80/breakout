@@ -5,6 +5,7 @@ import musicIcon from "lucide-static/icons/music-2.svg?raw";
 import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
 import volumeIcon from "lucide-static/icons/volume.svg?raw";
 import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
+import closeIcon from "lucide-static/icons/x.svg?raw";
 import {
   isAllMuted,
   isBgmMuted,
@@ -198,9 +199,6 @@ const optionsRestartButton = document.querySelector<HTMLButtonElement>("#options
 const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")!;
 const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
 const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
-const bgmState = document.querySelector<HTMLElement>("#bgm-state")!;
-const sfxState = document.querySelector<HTMLElement>("#sfx-state")!;
-const allAudioState = document.querySelector<HTMLElement>("#all-audio-state")!;
 const allAudioStatus = document.querySelector<HTMLElement>("#all-audio-status")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
@@ -212,6 +210,7 @@ const iconMarkup: Record<string, string> = {
   "audio-lines": effectIcon,
   volume: volumeIcon,
   "rotate-ccw": restartIcon,
+  x: closeIcon,
 };
 
 document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
@@ -363,13 +362,10 @@ function syncAudioOptions(): void {
   const bgmMuted = isBgmMuted();
   const sfxMuted = isSfxMuted();
   const allMuted = isAllMuted();
-  bgmState.textContent = allMuted ? "전체 음소거" : bgmMuted ? "꺼짐" : "켜짐";
-  sfxState.textContent = allMuted ? "전체 음소거" : sfxMuted ? "꺼짐" : "켜짐";
-  allAudioState.textContent = allMuted ? "꺼짐" : "켜짐";
   allAudioStatus.textContent = allMuted ? "모든 소리를 끕니다" : "개별 설정 유지";
-  bgmToggleButton.setAttribute("aria-pressed", String(allMuted || bgmMuted));
-  sfxToggleButton.setAttribute("aria-pressed", String(allMuted || sfxMuted));
-  allAudioToggleButton.setAttribute("aria-pressed", String(allMuted));
+  bgmToggleButton.setAttribute("aria-checked", String(!(allMuted || bgmMuted)));
+  sfxToggleButton.setAttribute("aria-checked", String(!(allMuted || sfxMuted)));
+  allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
 }
 
 function setResetConfirmOpen(open: boolean): void {
