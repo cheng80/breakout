@@ -143,6 +143,11 @@ export interface StageResult {
   stars: number;
 }
 
+export interface UltimateActivation {
+  type: UltimateItemType;
+  targets: Array<Pick<Brick, "row" | "column">>;
+}
+
 export interface GameState {
   stage: number;
   score: number;
@@ -497,6 +502,34 @@ export function consumeLaserTriggers(state: GameState): LaserTrigger[] {
 
 export function hitBrickWithBall(state: GameState, brickId: string): boolean {
   return damageBrick(state, brickId, state.powerTurns > 0 ? state.powerMultiplier : 1);
+}
+
+export function useUltimateItem(
+  state: GameState,
+  slot: number,
+  target: Pick<Brick, "row" | "column">,
+): UltimateActivation | null {
+  if (state.gameStatus !== "ready" || !Number.isInteger(slot) || !Number.isInteger(target.row) || !Number.isInteger(target.column)) return null;
+  if (slot < 0 || slot >= ULTIMATE_SLOT_COUNT || target.row < 0 || target.row >= DANGER_ROW || target.column < 0 || target.column >= GRID_COLUMNS) return null;
+  const type = state.ultimateInventory[slot];
+  if (!type) return null;
+
+  const destructible = state.bricks.filter((brick) => brick.type !== "steel");
+  const targets = type === "antimatter"
+    ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
+    : type === "orbitalLaser"
+      ? destructible.filter((brick) => Math.abs(brick.column - target.column) <= 1)
+      : destructible
+        .sort((a, b) => Math.abs(a.row - target.row) + Math.abs(a.column - target.column)
+          - Math.abs(b.row - target.row) - Math.abs(b.column - target.column))
+        .slice(0, 12);
+  if (targets.length === 0) return null;
+
+  const activation = { type, targets: targets.map(({ row, column }) => ({ row, column })) };
+  targets.forEach((brick) => damageBrick(state, brick.id, brick.hp));
+  state.ultimateInventory[slot] = null;
+  advanceStageIfCleared(state);
+  return activation;
 }
 
 export function collectItem(state: GameState, itemId: string): FieldItemType | null {

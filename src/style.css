@@ -403,6 +403,10 @@ button {
   touch-action: none;
 }
 
+.game-canvas.ultimate-targeting canvas {
+  cursor: crosshair;
+}
+
 .result {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -729,6 +733,10 @@ button {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 8px;
+}
+
+.reward-actions:has(.reward-skip[hidden]) {
+  grid-template-columns: 1fr;
 }
 
 .reward-actions button,
@@ -1318,29 +1326,48 @@ button {
 .ultimate-slots {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 10px;
+  margin: 0 -2px;
+  padding: 4px 2px;
 }
 
 .ultimate-slot {
   position: relative;
   min-width: 0;
-  min-height: 46px;
-  padding: 5px 7px;
+  min-height: 58px;
+  margin: 0 2px;
+  padding: 7px 8px;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   border: 0;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
   color: #78869c;
+  cursor: pointer;
   text-align: left;
+  transition-property: transform, background-color, box-shadow;
+  transition-duration: 140ms;
+}
+
+.ultimate-slot:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.ultimate-slot:disabled {
+  cursor: default;
 }
 
 .ultimate-slot.filled {
   background: rgba(108, 124, 255, 0.1);
   box-shadow: inset 0 0 0 1px rgba(158, 170, 255, 0.18), 0 5px 16px rgba(0, 0, 0, 0.12);
+}
+
+.ultimate-slot.selected {
+  background: rgba(189, 98, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(225, 184, 255, 0.52), 0 0 18px rgba(189, 98, 255, 0.25);
 }
 
 .ultimate-slot-number {
@@ -1353,13 +1380,28 @@ button {
 }
 
 .ultimate-slot-symbol {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   font-size: 15px;
+}
+
+.ultimate-slot-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  outline-offset: -1px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ultimate-slot-image[hidden],
+.ultimate-slot-symbol[hidden] {
+  display: none;
 }
 
 .ultimate-slot > span:last-child {
