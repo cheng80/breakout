@@ -1,8 +1,9 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
 import settingsIcon from "lucide-static/icons/settings.svg?raw";
-import musicIcon from "lucide-static/icons/music.svg?raw";
-import volumeIcon from "lucide-static/icons/volume-2.svg?raw";
+import musicIcon from "lucide-static/icons/music-2.svg?raw";
+import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
+import volumeIcon from "lucide-static/icons/volume.svg?raw";
 import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
 import {
   isAllMuted,
@@ -207,8 +208,9 @@ const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-con
 
 const iconMarkup: Record<string, string> = {
   settings: settingsIcon,
-  music: musicIcon,
-  "volume-2": volumeIcon,
+  "music-2": musicIcon,
+  "audio-lines": effectIcon,
+  volume: volumeIcon,
   "rotate-ccw": restartIcon,
 };
 
