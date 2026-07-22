@@ -818,6 +818,10 @@ button {
   text-wrap: pretty;
 }
 
+.reward-result:not(.no-reward) small {
+  white-space: nowrap;
+}
+
 .reward-result.no-reward .ultimate-symbol {
   background: rgba(255, 255, 255, 0.06);
   box-shadow: none;
@@ -1605,7 +1609,8 @@ button {
 }
 
 .ultimate-slot-image[hidden],
-.ultimate-slot-symbol[hidden] {
+.ultimate-slot-symbol[hidden],
+.ultimate-symbol[hidden] {
   display: none;
 }
 
