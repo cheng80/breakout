@@ -53,6 +53,21 @@ npm run build
 
 완성된 파일은 루트의 `dist/` 디렉터리에 생성됩니다.
 
+## 오디오 생성
+
+게임 실행에는 API 키가 필요하지 않습니다. 오디오를 다시 생성할 때만 `.env.example`을 복사해 `.env`에 ElevenLabs 키를 설정합니다.
+
+```bash
+npm run audio:plan
+npm run audio:generate
+```
+
+`audio:plan`은 API를 호출하지 않고 생성 대상과 예상 크레딧만 표시합니다. `audio:generate`는 기존 파일을 건너뛰고 누락된 파일만 순차 생성합니다.
+
+특정 파일을 다시 만들 때는 `node scripts/generate-audio.mjs --generate --force --only=launch`처럼 대상과 `--force`를 함께 지정합니다.
+
+BGM 재생성은 Eleven Music API를 사용하므로 ElevenLabs 유료 플랜이 필요합니다. 무료 플랜에서는 효과음 생성만 가능하며, 기존 BGM 파일 재생에는 API 키가 필요하지 않습니다.
+
 ### `/breakout/` 하위 경로 빌드
 
 `https://example.com/breakout/`처럼 하위 경로에 배포할 때는 Vite의 base 경로를 지정해 빌드합니다.
@@ -73,7 +88,7 @@ npx vite preview --host 0.0.0.0
 
 ## 배포
 
-별도 서버 런타임이나 환경 변수는 필요하지 않습니다. 빌드가 끝난 뒤 `dist/` 안의 파일을 정적 호스팅 서비스에 배포하면 됩니다.
+게임 배포에는 별도 서버 런타임이나 환경 변수가 필요하지 않습니다. 빌드가 끝난 뒤 `dist/` 안의 파일을 정적 호스팅 서비스에 배포하면 됩니다.
 
 `/breakout/` 하위 경로로 빌드했다면 `dist` 디렉터리 자체가 아니라 그 안의 파일을 서버의 `breakout` 디렉터리에 올립니다.
 
@@ -81,7 +96,8 @@ npx vite preview --host 0.0.0.0
 웹 루트/
 └── breakout/
     ├── index.html
-    └── assets/
+    ├── assets/
+    └── audio/
 ```
 
 배포 후 `https://example.com/breakout/`으로 접속합니다. `src/`, `node_modules/`, `package.json`, `.DS_Store`는 서버에 올리지 않습니다.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { canPlaySound, getBgmVolume, setBgmVolume } from "../src/audio";
 import {
   BOARD_HEIGHT,
   BLACK_HOLE_CYCLE_DURATION,
@@ -38,6 +39,20 @@ import {
 } from "../src/game";
 
 describe("핵심 게임 규칙", () => {
+  it("같은 효과음은 설정된 간격이 지나기 전에는 중복 재생하지 않는다", () => {
+    expect(canPlaySound(undefined, 1, 0.05)).toBe(true);
+    expect(canPlaySound(1, 1.04, 0.05)).toBe(false);
+    expect(canPlaySound(1, 1.05, 0.05)).toBe(true);
+  });
+
+  it("BGM 전체 볼륨은 0부터 1 사이로 적용된다", () => {
+    setBgmVolume(0.5);
+    expect(getBgmVolume()).toBe(0.5);
+    setBgmVolume(2);
+    expect(getBgmVolume()).toBe(1);
+    setBgmVolume(0.1);
+  });
+
   it("폭탄 충격파가 0.5초 동안 확대되며 사라진다", () => {
     expect(bombEffectFrame(0)).toEqual({ radius: 24, alpha: 1 });
     expect(bombEffectFrame(BOMB_EFFECT_DURATION / 2).radius).toBeGreaterThan(24);

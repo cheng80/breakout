@@ -1,5 +1,6 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
+import { isMuted, playSound, preloadAudio, setMuted, unlockAudio } from "./audio";
 import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
@@ -40,6 +41,7 @@ import {
   type Item,
   type Vec2,
 } from "./game";
+import type { GameStatus } from "./game";
 
 const GRID_GAP = 4;
 const GRID_MARGIN = 12;
@@ -173,6 +175,7 @@ const resultBestScore = document.querySelector<HTMLElement>("#result-best-score"
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
+const audioToggleButton = document.querySelector<HTMLButtonElement>("#audio-toggle")!;
 const restartButton = document.querySelector<HTMLButtonElement>("#restart")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
@@ -191,7 +194,9 @@ const itemCenter = (item: Pick<Item, "row" | "column">) => ({
 });
 
 function pullLaserEffects(): void {
-  consumeLaserTriggers(state).forEach((trigger) => {
+  const triggers = consumeLaserTriggers(state);
+  if (triggers.length > 0) playSound("laser");
+  triggers.forEach((trigger) => {
     laserEffects.push(Object.assign(positionedEffectPool.acquire(), itemCenter(trigger), { elapsed: 0 }));
   });
 }
@@ -200,6 +205,7 @@ function launch(direction: Vec2): void {
   if (state.gameStatus !== "ready") return;
   const count = prepareVolley(state);
   firstLandingX = null;
+  playSound("launch", { playbackRate: 1.08 });
   for (let index = 0; index < count; index += 1) {
     activeBalls.push(Object.assign(ballPool.acquire(), state.launchPosition, {
       vx: direction.x * BALL_SPEED,
@@ -286,6 +292,22 @@ helpButton.addEventListener("click", () => {
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
 resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
 resetConfirmButton.addEventListener("click", reset);
+document.querySelectorAll<HTMLButtonElement>("button:not(#audio-toggle)").forEach((button) => {
+  button.addEventListener("click", () => playSound("ui_click"));
+});
+audioToggleButton.addEventListener("click", () => {
+  setMuted(!isMuted());
+  syncAudioButton();
+  if (!isMuted()) playSound("ui_click");
+});
+document.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
+
+function syncAudioButton(): void {
+  const muted = isMuted();
+  audioToggleButton.textContent = muted ? "🔇" : "🔊";
+  audioToggleButton.setAttribute("aria-label", muted ? "소리 켜기" : "소리 끄기");
+  audioToggleButton.setAttribute("aria-pressed", String(muted));
+}
 
 function setResetConfirmOpen(open: boolean): void {
   const wasOpen = resetConfirmOpen;
@@ -304,9 +326,11 @@ function setResetConfirmOpen(open: boolean): void {
   } else if (wasOpen) {
     restartButton.focus();
   }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
 
 function setHelpOpen(open: boolean): void {
+  const wasOpen = helpOpen;
   helpOpen = open;
   helpDialog.hidden = !open;
   helpButton.setAttribute("aria-expanded", String(open));
@@ -316,6 +340,7 @@ function setHelpOpen(open: boolean): void {
     state.gameStatus = "ready";
     syncUi();
   }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
 
 function loadBestScore(): number {
@@ -618,6 +643,7 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
   if (target.distance <= BLACK_HOLE_CAPTURE_RADIUS && presence >= 0.7) {
     const remaining = captureBallByBlackHole(state, target.item.id);
     if (remaining !== null) {
+      playSound("blackhole_capture");
       boardSignature = "";
       syncUi();
       return true;
@@ -681,6 +707,8 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
       ball.vx = velocity.x;
       ball.vy = velocity.y;
       const destroyed = hitBrickWithBall(state, hitBrick.id);
+      if (hitBrick.type === "steel") playSound("steel_hit");
+      else playSound("brick_hit", { playbackRate: destroyed ? 1.06 : 1 });
       const hitEffect = brickHitEffects.get(hitBrick.id);
       if (hitBrick.type !== "steel" && !destroyed) {
         if (hitEffect) hitEffect.elapsed = 0;
@@ -703,11 +731,16 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
       const center = itemCenter(hitItem);
       const itemType = collectItem(state, hitItem.id);
       if (itemType === "bomb") {
+        playSound("bomb");
         if (bombEffect) positionedEffectPool.release(bombEffect);
         bombEffect = Object.assign(positionedEffectPool.acquire(), center, { elapsed: 0 });
       } else if (itemType === "trap") {
+        playSound("trap");
         if (trapEffect) positionedEffectPool.release(trapEffect);
         trapEffect = Object.assign(positionedEffectPool.acquire(), center, { elapsed: 0 });
+      } else if (itemType) {
+        const playbackRate = itemType === "multiball" ? 1.08 : itemType === "shield" ? 0.94 : 1;
+        playSound("item_collect", { playbackRate });
       }
       pullLaserEffects();
       boardSignature = "";
@@ -789,8 +822,16 @@ function update(delta: number): void {
     }
 
     if (state.gameStatus === "volley" && activeBalls.length === 0) {
+      const previousStage = state.stage;
       const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
-      if (shieldRewound) shieldRewindEffect = timedEffectPool.acquire();
+      if (shieldRewound) {
+        shieldRewindEffect = timedEffectPool.acquire();
+        playSound("shield_rewind");
+      } else if (state.stage > previousStage) {
+        playSound("stage_clear");
+      } else if ((state.gameStatus as GameStatus) === "gameOver") {
+        playSound("game_over");
+      }
       firstLandingX = null;
       boardSignature = "";
       syncUi();
@@ -800,5 +841,7 @@ function update(delta: number): void {
 }
 
 app.ticker.add((ticker) => update(ticker.deltaMS / 1000));
+syncAudioButton();
+void preloadAudio();
 syncUi();
 }
