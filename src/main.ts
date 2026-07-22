@@ -1,5 +1,9 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
+import settingsIcon from "lucide-static/icons/settings.svg?raw";
+import musicIcon from "lucide-static/icons/music.svg?raw";
+import volumeIcon from "lucide-static/icons/volume-2.svg?raw";
+import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
 import {
   isAllMuted,
   isBgmMuted,
@@ -200,6 +204,17 @@ const allAudioStatus = document.querySelector<HTMLElement>("#all-audio-status")!
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
 const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
+
+const iconMarkup: Record<string, string> = {
+  settings: settingsIcon,
+  music: musicIcon,
+  "volume-2": volumeIcon,
+  "rotate-ccw": restartIcon,
+};
+
+document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
+  icon.innerHTML = iconMarkup[icon.dataset.icon ?? ""] ?? "";
+});
 
 const brickRect = (brick: Brick) => ({
   x: GRID_MARGIN + brick.column * (CELL_WIDTH + GRID_GAP),
