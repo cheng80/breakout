@@ -138,6 +138,7 @@ interface DebugSnapshot {
   bricks: Brick[];
   score: number;
   stageScore: number;
+  stageUltimateUseCount: number;
   gameStatus: GameStatus;
   ultimateInventory: GameState["ultimateInventory"];
   pendingUltimateReward: GameState["pendingUltimateReward"];
@@ -545,6 +546,7 @@ function restoreDebugState(): void {
   state.bricks = snapshot.bricks;
   state.score = snapshot.score;
   state.stageScore = snapshot.stageScore;
+  state.stageUltimateUseCount = snapshot.stageUltimateUseCount;
   state.gameStatus = snapshot.gameStatus;
   state.ultimateInventory = [...snapshot.ultimateInventory];
   state.pendingUltimateReward = snapshot.pendingUltimateReward;
@@ -566,6 +568,7 @@ function startDebugUltimate(type: UltimateItemType): void {
     bricks: state.bricks.map((brick) => ({ ...brick })),
     score: state.score,
     stageScore: state.stageScore,
+    stageUltimateUseCount: state.stageUltimateUseCount,
     gameStatus: state.gameStatus,
     ultimateInventory: [...state.ultimateInventory],
     pendingUltimateReward: state.pendingUltimateReward,
