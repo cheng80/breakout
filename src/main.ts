@@ -38,6 +38,7 @@ import {
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   aimFromDrag,
+  blackHoleDeflectionAngle,
   blackHolePullStrength,
   blackHolePresence,
   bombEffectFrame,
@@ -82,6 +83,7 @@ interface ActiveBall extends Vec2 {
   vy: number;
   delay: number;
   bounceCount: number;
+  blackHoleId: string | null;
 }
 
 interface PositionedEffect extends Vec2 {
@@ -101,8 +103,8 @@ void startGame().catch((error: unknown) => {
 async function startGame(): Promise<void> {
 const state = createGame();
 const ballPool = new ObjectPool<ActiveBall>(
-  () => ({ x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
-  (ball) => Object.assign(ball, { x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0 }),
+  () => ({ x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0, blackHoleId: null }),
+  (ball) => Object.assign(ball, { x: 0, y: 0, vx: 0, vy: 0, delay: 0, bounceCount: 0, blackHoleId: null }),
 );
 const positionedEffectPool = new ObjectPool<PositionedEffect>(
   () => ({ x: 0, y: 0, elapsed: 0 }),
@@ -286,6 +288,7 @@ function launch(direction: Vec2): void {
       vy: direction.y * BALL_SPEED,
       delay: index * 0.075,
       bounceCount: 0,
+      blackHoleId: null,
     }));
   }
   syncUi();
@@ -974,7 +977,10 @@ function circleHitsRect(ball: ActiveBall, x: number, y: number, width: number, h
 
 function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
   const presence = blackHolePresence(blackHoleTime);
-  if (presence <= 0) return false;
+  if (presence <= 0) {
+    ball.blackHoleId = null;
+    return false;
+  }
 
   let nearest: { item: Item; center: Vec2; distance: number } | null = null;
   state.items.forEach((item) => {
@@ -985,7 +991,10 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
       nearest = { item, center, distance };
     }
   });
-  if (!nearest) return false;
+  if (!nearest) {
+    ball.blackHoleId = null;
+    return false;
+  }
 
   const target = nearest as { item: Item; center: Vec2; distance: number };
   if (target.distance <= BLACK_HOLE_CAPTURE_RADIUS && presence >= 0.7) {
@@ -996,6 +1005,23 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
       syncUi();
       return true;
     }
+  }
+
+  if (ball.blackHoleId !== target.item.id && target.distance > BLACK_HOLE_CAPTURE_RADIUS) {
+    const speed = Math.hypot(ball.vx, ball.vy);
+    const angle = blackHoleDeflectionAngle(
+      { x: ball.vx, y: ball.vy },
+      { x: target.center.x - ball.x, y: target.center.y - ball.y },
+    );
+    if (speed > 0 && angle !== 0) {
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const nextVx = ball.vx * cosine - ball.vy * sine;
+      const nextVy = ball.vx * sine + ball.vy * cosine;
+      ball.vx = nextVx;
+      ball.vy = nextVy;
+    }
+    ball.blackHoleId = target.item.id;
   }
 
   const acceleration = BLACK_HOLE_PULL_ACCELERATION * blackHolePullStrength(target.distance) * presence;
@@ -1216,6 +1242,7 @@ if (["127.0.0.1", "localhost"].includes(location.hostname) && location.search ==
       vy: vx * slope,
       delay: index * 0.075,
       bounceCount: 0,
+      blackHoleId: null,
     }));
   }
   window.setTimeout(() => location.reload(), 7000);

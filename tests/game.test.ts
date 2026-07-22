@@ -16,6 +16,7 @@ import {
   BOARD_WIDTH,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
+  BLACK_HOLE_MIN_DEFLECTION_ANGLE,
   BRICK_HIT_EFFECT_DURATION,
   DANGER_ROW,
   DANGER_Y,
@@ -26,11 +27,13 @@ import {
   GRID_TOP,
   MAX_BALLS,
   MAX_BRICK_HP,
+  MULTIBALL_SCORE,
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   advanceStageIfCleared,
   aimFromDrag,
   blackHolePresence,
+  blackHoleDeflectionAngle,
   blackHolePullStrength,
   bombEffectFrame,
   brickHitEffectFrame,
@@ -131,6 +134,11 @@ describe("핵심 게임 규칙", () => {
     state.ballCount = 1;
     expect(captureBallByBlackHole(state, "last-blackhole")).toBeNull();
     expect(state.items).toHaveLength(1);
+  });
+
+  it("블랙홀에 진입한 공은 최소 30도 방향을 튼다", () => {
+    expect(blackHoleDeflectionAngle({ x: 1, y: 0 }, { x: 0, y: 1 })).toBeCloseTo(BLACK_HOLE_MIN_DEFLECTION_ANGLE);
+    expect(blackHoleDeflectionAngle({ x: 1, y: 0 }, { x: 0, y: -1 })).toBeCloseTo(-BLACK_HOLE_MIN_DEFLECTION_ANGLE);
   });
 
   it("블랙홀은 재등장할 때 점유 칸과 위험선 주변을 피해 빈칸으로 이동한다", () => {
@@ -300,6 +308,14 @@ describe("핵심 게임 규칙", () => {
     const multiball = state.items.find((item) => item.type === "multiball")!;
     collectItem(state, multiball.id);
     expect(state.ballCount).toBe(2);
+    expect(state.score).toBe(MULTIBALL_SCORE);
+
+    state.ballCount = MAX_BALLS;
+    state.score = 0;
+    state.items.push({ id: "overflow-multiball", row: 1, column: 1, type: "multiball" });
+    collectItem(state, "overflow-multiball");
+    expect(state.ballCount).toBe(MAX_BALLS);
+    expect(state.score).toBe(MULTIBALL_SCORE);
 
     state.items.push({ id: "shield", row: 1, column: 1, type: "shield" });
     collectItem(state, "shield");

@@ -15,7 +15,9 @@ export const SHIELD_REWIND_DURATION = 0.85;
 export const BRICK_HIT_EFFECT_DURATION = 0.18;
 export const BLACK_HOLE_INFLUENCE_RADIUS = 110;
 export const BLACK_HOLE_CAPTURE_RADIUS = 9;
+export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
 export const BLACK_HOLE_CYCLE_DURATION = 5;
+export const MULTIBALL_SCORE = 50;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
 export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
@@ -91,6 +93,13 @@ export function shieldRewindFrame(elapsed: number): { offset: number; flash: num
 export function blackHolePullStrength(distance: number): number {
   const proximity = Math.min(1, Math.max(0, 1 - distance / BLACK_HOLE_INFLUENCE_RADIUS));
   return proximity ** 2;
+}
+
+export function blackHoleDeflectionAngle(velocity: Vec2, toCenter: Vec2): number {
+  const velocityAngle = Math.atan2(velocity.y, velocity.x);
+  const targetAngle = Math.atan2(toCenter.y, toCenter.x);
+  const difference = Math.atan2(Math.sin(targetAngle - velocityAngle), Math.cos(targetAngle - velocityAngle));
+  return Math.sign(difference) * Math.min(Math.abs(difference), BLACK_HOLE_MIN_DEFLECTION_ANGLE);
 }
 
 export function blackHolePresence(elapsed: number): number {
@@ -472,6 +481,7 @@ export function collectItem(state: GameState, itemId: string): ItemType | null {
 
   if (item.type === "multiball") {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
+    state.score += MULTIBALL_SCORE;
   } else if (item.type === "shield") {
     state.shield = true;
   } else if (item.type === "power" || item.type === "power3" || item.type === "power4") {

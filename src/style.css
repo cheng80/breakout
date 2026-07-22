@@ -408,24 +408,50 @@ button {
   padding-right: 38px;
 }
 
+.ranking-card > p {
+  font-size: 12px;
+}
+
 .ranking-dialog .ranking-heading {
   margin-top: 4px;
 }
 
 .ranking-dialog .ranking-heading h3 {
   color: #9ba8bc;
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.04em;
+}
+
+.ranking-dialog .ranking-heading span {
+  color: #b7c2d7;
+  font-size: 13px;
 }
 
 .ranking-dialog .ranking-list {
   max-height: min(58dvh, 500px);
   overflow-y: auto;
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .ranking-dialog .ranking-list::-webkit-scrollbar {
   display: none;
+}
+
+.ranking-dialog .ranking-list li {
+  min-height: 36px;
+  padding: 7px 10px;
+  grid-template-columns: 30px 1fr auto;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.ranking-dialog .ranking-list .ranking-score {
+  font-size: 13px;
+}
+
+.ranking-dialog .ranking-list .ranking-empty {
+  font-size: 14px;
 }
 
 .item-help-card {
