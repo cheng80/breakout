@@ -617,10 +617,14 @@ export function resolveUltimateHits(state: GameState, activation: UltimateActiva
   return applied;
 }
 
-export function collectItem(state: GameState, itemId: string): FieldItemType | null {
+export function collectItem(
+  state: GameState,
+  itemId: string,
+): { type: FieldItemType; ballCountDelta: number } | null {
   const item = state.items.find((candidate) => candidate.id === itemId);
   if (!item || item.type === "blackhole") return null;
   state.items = state.items.filter((candidate) => candidate.id !== itemId);
+  const previousBallCount = state.ballCount;
 
   if (item.type === "multiball") {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
@@ -640,7 +644,7 @@ export function collectItem(state: GameState, itemId: string): FieldItemType | n
     targets.forEach((brick) => damageBrick(state, brick.id));
   }
 
-  return item.type;
+  return { type: item.type, ballCountDelta: state.ballCount - previousBallCount };
 }
 
 export function captureBallByBlackHole(state: GameState, itemId: string): number | null {
