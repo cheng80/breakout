@@ -382,6 +382,19 @@ button {
   white-space: nowrap;
 }
 
+.hud .stat-balls > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#balls-cap {
+  color: #ffd166;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
 .hud .stat-level span {
   color: rgba(255, 255, 255, 0.86);
 }
