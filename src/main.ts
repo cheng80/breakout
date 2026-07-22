@@ -33,6 +33,7 @@ import {
   BRICK_HIT_EFFECT_DURATION,
   BRICK_HEIGHT,
   CELL_HEIGHT,
+  DANGER_ROW,
   DANGER_Y,
   FLOOR_Y,
   GRID_TOP,
@@ -61,6 +62,7 @@ import {
   shieldRewindFrame,
   stabilizeBounce,
   traceAimPath,
+  useUltimateItem,
   type Brick,
   type FieldItem,
   type UltimateItemType,
@@ -84,6 +86,7 @@ const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
 const PLAYER_NAME_KEY = "swipe-breakout-player-name";
 const FPS_VISIBLE_KEY = "swipe-breakout-fps-visible";
+const ULTIMATE_EFFECT_DURATION = 0.9;
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -98,6 +101,11 @@ interface PositionedEffect extends Vec2 {
 
 interface TimedEffect {
   elapsed: number;
+}
+
+interface UltimateEffect extends PositionedEffect {
+  type: UltimateItemType;
+  targets: Vec2[];
 }
 
 type BallExit = "landed" | "captured" | null;
@@ -137,6 +145,7 @@ let rankingSubmitting = false;
 let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
 let rewardReplacementOpen = false;
+let selectedUltimateSlot: number | null = null;
 let purePlayTimeMs = 0;
 let fpsVisible = loadFpsVisibility();
 let fpsSampleElapsedMs = 0;
@@ -145,6 +154,7 @@ let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
 let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
+let ultimateEffect: UltimateEffect | null = null;
 const laserEffects: PositionedEffect[] = [];
 let shieldRewindEffect: TimedEffect | null = null;
 const brickHitEffects = new Map<string, TimedEffect>();
@@ -276,10 +286,10 @@ const rewardReplacementButtons = [...document.querySelectorAll<HTMLButtonElement
 const ultimateSlotButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-ultimate-slot]")];
 const ultimateSlotCount = document.querySelector<HTMLElement>("#ultimate-slot-count")!;
 
-const ultimateDetails: Record<UltimateItemType, { name: string; symbol: string; className: string }> = {
-  antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter" },
-  orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital" },
-  chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning" },
+const ultimateDetails: Record<UltimateItemType, { name: string; symbol: string; className: string; image: string }> = {
+  antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter", image: "/images/ultimates/antimatter.png" },
+  orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital", image: "/images/ultimates/orbital-laser.png" },
+  chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning", image: "/images/ultimates/chain-lightning.png" },
 };
 
 const iconMarkup: Record<string, string> = {
@@ -346,6 +356,7 @@ function reset(): void {
   brickHitEffects.forEach((effect) => timedEffectPool.release(effect));
   resetGame(state);
   rewardReplacementOpen = false;
+  selectedUltimateSlot = null;
   hasNewBestScore = false;
   aimStart = null;
   aimCurrent = null;
@@ -356,6 +367,7 @@ function reset(): void {
   blackHoleStage = state.stage;
   bombEffect = null;
   trapEffect = null;
+  ultimateEffect = null;
   shieldRewindEffect = null;
   brickHitEffects.clear();
   rankingLoaded = false;
@@ -391,9 +403,38 @@ function screenPoint(event: PointerEvent): Vec2 {
   };
 }
 
+function useSelectedUltimate(point: Vec2): void {
+  if (selectedUltimateSlot === null) return;
+  const target = {
+    row: Math.max(0, Math.min(DANGER_ROW - 1, Math.floor((point.y - GRID_TOP) / CELL_HEIGHT))),
+    column: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.floor((point.x - GRID_MARGIN) / (CELL_WIDTH + GRID_GAP)))),
+  };
+  const center = itemCenter(target);
+  const activation = useUltimateItem(state, selectedUltimateSlot, target);
+  if (!activation) return;
+
+  ultimateEffect = {
+    ...center,
+    elapsed: 0,
+    type: activation.type,
+    targets: activation.targets.map(itemCenter),
+  };
+  selectedUltimateSlot = null;
+  playSound(activation.type === "antimatter" ? "bomb" : activation.type === "orbitalLaser" ? "laser" : "item_collect", {
+    playbackRate: activation.type === "chainLightning" ? 1.18 : 0.9,
+  });
+  pullLaserEffects();
+  boardSignature = "";
+  syncUi();
+}
+
 app.canvas.addEventListener("pointerdown", (event) => {
   if (helpOpen || optionsOpen || resetConfirmOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
+  if (selectedUltimateSlot !== null) {
+    useSelectedUltimate(point);
+    return;
+  }
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
   aimStart = point;
@@ -515,6 +556,13 @@ rewardBackButton.addEventListener("click", () => {
   button.addEventListener("click", () => {
     if (!discardUltimateReward(state)) return;
     rewardReplacementOpen = false;
+    syncUi();
+  });
+});
+ultimateSlotButtons.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    if (state.gameStatus !== "ready" || !state.ultimateInventory[index]) return;
+    selectedUltimateSlot = selectedUltimateSlot === index ? null : index;
     syncUi();
   });
 });
@@ -820,8 +868,11 @@ function syncUi(): void {
   shieldEl.textContent = state.shield ? "ON" : "OFF";
   shieldEl.classList.toggle("active", state.shield);
 
+  const selectedUltimate = selectedUltimateSlot === null ? null : state.ultimateInventory[selectedUltimateSlot];
   const messages = {
-    ready: state.powerTurns > 0 ? `강화볼 준비 · 공격력 ×${state.powerMultiplier}` : "공의 방향을 정하고 발사 하세요.",
+    ready: selectedUltimate
+      ? `${ultimateDetails[selectedUltimate].name} · 터뜨릴 위치를 선택하세요`
+      : state.powerTurns > 0 ? `강화볼 준비 · 공격력 ×${state.powerMultiplier}` : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
     volley: state.powerTurns > 0 ? `강화볼 발사 중 · 공격력 ×${state.powerMultiplier}` : "공이 모두 돌아올 때까지 기다리세요",
     reward: "스테이지 클리어 · 보상을 확인하세요",
@@ -846,27 +897,40 @@ function syncUi(): void {
 }
 
 function syncUltimateUi(): void {
+  if (state.gameStatus !== "ready") selectedUltimateSlot = null;
+  host.classList.toggle("ultimate-targeting", selectedUltimateSlot !== null);
   const stored = state.ultimateInventory.filter(Boolean).length;
   ultimateSlotCount.textContent = `${stored} / ${state.ultimateInventory.length}`;
   ultimateSlotButtons.forEach((button, index) => {
     const type = state.ultimateInventory[index];
     const symbol = button.querySelector<HTMLElement>(".ultimate-slot-symbol")!;
+    const image = button.querySelector<HTMLImageElement>(".ultimate-slot-image")!;
     const name = button.querySelector<HTMLElement>("strong")!;
     const hint = button.querySelector<HTMLElement>("small")!;
     symbol.className = "ultimate-slot-symbol";
+    button.classList.toggle("selected", selectedUltimateSlot === index);
+    button.setAttribute("aria-pressed", String(selectedUltimateSlot === index));
     if (!type) {
       symbol.textContent = "+";
+      symbol.hidden = false;
+      image.hidden = true;
+      image.removeAttribute("src");
       name.textContent = "비어 있음";
       hint.textContent = "클리어 보상";
       button.classList.remove("filled");
+      button.disabled = true;
       return;
     }
     const detail = ultimateDetails[type];
     symbol.textContent = detail.symbol;
     symbol.classList.add(detail.className);
+    symbol.hidden = true;
+    image.src = detail.image;
+    image.hidden = false;
     name.textContent = detail.name;
-    hint.textContent = "발동 준비";
+    hint.textContent = selectedUltimateSlot === index ? "게임판 위치 선택" : "발동 준비";
     button.classList.add("filled");
+    button.disabled = state.gameStatus !== "ready";
   });
 
   rewardDialog.hidden = state.gameStatus !== "reward";
@@ -1090,6 +1154,40 @@ function draw(): void {
     scene.moveTo(effect.x - left, effect.y).lineTo(effect.x + right, effect.y)
       .stroke({ width: 4, color: 0xffffff, alpha: frame.alpha });
   });
+
+  if (ultimateEffect) {
+    const progress = Math.min(1, ultimateEffect.elapsed / ULTIMATE_EFFECT_DURATION);
+    const alpha = 1 - progress;
+    if (ultimateEffect.type === "antimatter") {
+      const radius = 24 + 145 * (1 - (1 - progress) ** 3);
+      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
+        .stroke({ width: 34, color: 0xbd62ff, alpha: alpha * 0.9 });
+      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0x6d22aa, alpha: alpha * 0.12 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).fill({ color: 0x7020a8, alpha: alpha * 0.28 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 7, color: 0xf4dcff, alpha });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius * 0.55).stroke({ width: 3, color: 0xffffff, alpha: alpha * 0.8 });
+    } else if (ultimateEffect.type === "orbitalLaser") {
+      const width = CELL_WIDTH * 3 * Math.min(1, progress * 4);
+      effectGlow.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)
+        .fill({ color: 0x38dfff, alpha: alpha * 0.72 });
+      scene.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)
+        .fill({ color: 0x12bfe8, alpha: alpha * 0.36 });
+      scene.rect(ultimateEffect.x - Math.max(5, width * 0.14), 0, Math.max(10, width * 0.28), BOARD_HEIGHT)
+        .fill({ color: 0xffffff, alpha: alpha * 0.9 });
+    } else {
+      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
+      let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
+      ultimateEffect.targets.slice(0, visibleTargets).forEach((target) => {
+        effectGlow.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
+          .stroke({ width: 16, color: 0xc76cff, alpha: alpha * 0.75 });
+        scene.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
+          .stroke({ width: 4, color: 0xf4d8ff, alpha });
+        scene.circle(target.x, target.y, 7 + progress * 10)
+          .stroke({ width: 3, color: 0xffffff, alpha });
+        previous = target;
+      });
+    }
+  }
 
   if (shieldFrame && shieldFrame.flash > 0) {
     effectGlow.roundRect(7, 7, BOARD_WIDTH - 14, BOARD_HEIGHT - 14, 18)
@@ -1331,6 +1429,10 @@ function update(delta: number): void {
       positionedEffectPool.release(trapEffect);
       trapEffect = null;
     }
+  }
+  if (ultimateEffect) {
+    ultimateEffect.elapsed += delta;
+    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATION) ultimateEffect = null;
   }
   if (!paused) {
     for (let index = laserEffects.length - 1; index >= 0; index -= 1) {

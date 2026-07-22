@@ -55,6 +55,7 @@ import {
   stabilizeBounce,
   stageResultStars,
   traceAimPath,
+  useUltimateItem,
 } from "../src/game";
 
 function advanceThroughReward(state: ReturnType<typeof createGame>): void {
@@ -596,5 +597,33 @@ describe("핵심 게임 규칙", () => {
     expect(state.stage).toBe(2);
     expect(state.ballCount).toBe(2);
     expect(state.gameStatus).toBe("ready");
+  });
+
+  it("궁극기 3종은 선택 범위를 완전히 파괴하고 사용한 슬롯을 비운다", () => {
+    const cases = [
+      { type: "antimatter" as const, target: { row: 0, column: 0 }, expected: 9 },
+      { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 15 },
+      { type: "chainLightning" as const, target: { row: 2, column: 2 }, expected: 12 },
+    ];
+
+    cases.forEach(({ type, target, expected }) => {
+      const state = createGame();
+      state.bricks = Array.from({ length: 25 }, (_, index) => ({
+        id: `brick-${index}`,
+        row: Math.floor(index / 5),
+        column: index % 5,
+        hp: 20,
+        maxHp: 20,
+        type: "normal" as const,
+      }));
+      state.ultimateInventory = [type, null];
+
+      const activation = useUltimateItem(state, 0, target);
+
+      expect(activation?.type).toBe(type);
+      expect(activation?.targets).toHaveLength(expected);
+      expect(state.bricks).toHaveLength(25 - expected);
+      expect(state.ultimateInventory[0]).toBeNull();
+    });
   });
 });
