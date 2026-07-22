@@ -177,6 +177,7 @@ export interface GameState {
   stageTargetScore: number;
   stagePlayTimeMs: number;
   stageTargetTimeMs: number;
+  stageUltimateUseCount: number;
   gameStatus: GameStatus;
   shield: boolean;
   powerTurns: number;
@@ -312,6 +313,7 @@ export function createGame(): GameState {
     stageScore: 0,
     stagePlayTimeMs: 0,
     ...stageGoals(board.bricks, board.items),
+    stageUltimateUseCount: 0,
     gameStatus: "ready",
     shield: false,
     powerTurns: 0,
@@ -579,6 +581,7 @@ export function useUltimateItem(
     resolvedHitCount: 0,
     resolved: false,
   };
+  state.stageUltimateUseCount += 1;
   state.ultimateInventory[slot] = null;
   if (!deferResolution) resolveUltimateActivation(state, activation);
   return activation;
@@ -705,13 +708,14 @@ export function stageResultStars(
   targetScore: number,
   timeMs: number,
   targetTimeMs: number,
+  ultimateUseCount: number,
 ): number {
   let stars = 1;
   if (score >= targetScore) stars += 1;
   if (timeMs > 0 && timeMs <= targetTimeMs) stars += 1;
   if (timeMs > 0 && timeMs <= targetTimeMs * 0.8) stars += 1;
   if (timeMs > 0 && timeMs <= targetTimeMs * 0.6) stars += 1;
-  return stars;
+  return Math.max(1, stars - ultimateUseCount);
 }
 
 export function rollUltimateReward(
@@ -773,7 +777,11 @@ function finishReward(state: GameState): void {
   state.pendingLaserTriggers = [];
   state.launchPosition = { x: BOARD_WIDTH / 2, y: FLOOR_Y };
   const board = stageBoard(state.stage);
-  Object.assign(state, board, stageGoals(board.bricks, board.items), { stageScore: 0, stagePlayTimeMs: 0 });
+  Object.assign(state, board, stageGoals(board.bricks, board.items), {
+    stageScore: 0,
+    stagePlayTimeMs: 0,
+    stageUltimateUseCount: 0,
+  });
   state.gameStatus = "ready";
 }
 
@@ -783,7 +791,13 @@ function createStageResult(state: GameState): StageResult {
     targetScore: state.stageTargetScore,
     timeMs: Math.round(state.stagePlayTimeMs),
     targetTimeMs: state.stageTargetTimeMs,
-    stars: stageResultStars(state.stageScore, state.stageTargetScore, state.stagePlayTimeMs, state.stageTargetTimeMs),
+    stars: stageResultStars(
+      state.stageScore,
+      state.stageTargetScore,
+      state.stagePlayTimeMs,
+      state.stageTargetTimeMs,
+      state.stageUltimateUseCount,
+    ),
   };
 }
 

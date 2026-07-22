@@ -329,12 +329,14 @@ describe("핵심 게임 규칙", () => {
     expect(state.bricks.some((brick) => brick.type === "laser")).toBe(true);
   });
 
-  it("스테이지 목표 점수와 기준 시간으로 별과 가중치 보상을 결정한다", () => {
-    expect(stageResultStars(100, 100, 500, 1000)).toBe(5);
-    expect(stageResultStars(100, 100, 700, 1000)).toBe(4);
-    expect(stageResultStars(100, 100, 900, 1000)).toBe(3);
-    expect(stageResultStars(100, 100, 1200, 1000)).toBe(2);
-    expect(stageResultStars(90, 100, 1200, 1000)).toBe(1);
+  it("스테이지 목표 점수·시간에서 궁극기 사용 횟수만큼 별을 차감한다", () => {
+    expect(stageResultStars(100, 100, 500, 1000, 0)).toBe(5);
+    expect(stageResultStars(100, 100, 500, 1000, 1)).toBe(4);
+    expect(stageResultStars(100, 100, 500, 1000, 2)).toBe(3);
+    expect(stageResultStars(100, 100, 700, 1000, 0)).toBe(4);
+    expect(stageResultStars(100, 100, 900, 1000, 0)).toBe(3);
+    expect(stageResultStars(100, 100, 1200, 1000, 0)).toBe(2);
+    expect(stageResultStars(90, 100, 1200, 1000, 2)).toBe(1);
 
     expect(rollUltimateReward(1, () => 0.99)).toBeNull();
     expect(rollUltimateReward(2, () => 0.79)).toBeNull();
@@ -639,6 +641,7 @@ describe("핵심 게임 규칙", () => {
       expect(activation?.targets).toHaveLength(expected);
       expect(state.bricks).toHaveLength(type === "meteorImpact" ? 16 : 25 - expected);
       expect(state.ultimateInventory[0]).toBeNull();
+      expect(state.stageUltimateUseCount).toBe(1);
     });
   });
 
