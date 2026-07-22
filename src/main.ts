@@ -44,6 +44,7 @@ import {
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   aimFromDrag,
+  advanceStageIfCleared,
   blackHoleClearFade,
   blackHoleCaptureFade,
   blackHoleDeflectionAngle,
@@ -215,6 +216,7 @@ let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
 let ultimateEffect: UltimateEffect | null = null;
 let ultimateResultDelay = 0;
+let pendingUltimateClear = false;
 const laserEffects: PositionedEffect[] = [];
 let shieldRewindEffect: TimedEffect | null = null;
 const brickHitEffects = new Map<string, TimedEffect>();
@@ -472,6 +474,7 @@ function reset(stage = 1, ballCount = 1): void {
   trapEffect = null;
   ultimateEffect = null;
   ultimateResultDelay = 0;
+  pendingUltimateClear = false;
   shieldRewindEffect = null;
   brickHitEffects.clear();
   rankingLoaded = false;
@@ -577,8 +580,19 @@ function restoreDebugState(): void {
   state.pendingLaserTriggers = [...snapshot.pendingLaserTriggers];
   selectedUltimateSlot = null;
   ultimateResultDelay = 0;
+  pendingUltimateClear = false;
   boardSignature = "";
   syncUi();
+}
+
+function hasActiveBoardEffects(): boolean {
+  const stageCleared = state.bricks.every((brick) => brick.type === "steel");
+  return laserEffects.length > 0
+    || brickHitEffects.size > 0
+    || bombEffect !== null
+    || trapEffect !== null
+    || shieldRewindEffect !== null
+    || (stageCleared && blackHoleClearFadeTime < BLACK_HOLE_CLEAR_FADE_DURATION);
 }
 
 function startDebugUltimate(type: UltimateItemType): void {
@@ -2264,7 +2278,12 @@ function update(delta: number): void {
     ultimateEffect.elapsed += delta;
     const duration = ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type];
     const progress = Math.min(1, ultimateEffect.elapsed / duration);
-    const appliedHits = resolveUltimateHits(state, ultimateEffect.activation, ultimateHitCount(ultimateEffect, progress));
+    const appliedHits = resolveUltimateHits(
+      state,
+      ultimateEffect.activation,
+      ultimateHitCount(ultimateEffect, progress),
+      true,
+    );
     if (appliedHits > 0) {
       playSound(ultimateEffect.type === "orbitalLaser" || ultimateEffect.type === "crossfire" ? "laser" : "bomb", {
         playbackRate: ultimateEffect.type === "chainLightning" ? 1.18 : ultimateEffect.type === "missileBarrage" ? 0.82 : 0.9,
@@ -2276,7 +2295,7 @@ function update(delta: number): void {
     if (ultimateEffect.elapsed >= duration) {
       ultimateEffect = null;
       if (debugUltimateActive) restoreDebugState();
-      else if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;
+      else pendingUltimateClear = true;
     }
   }
   if (ultimateResultDelay > 0) {
@@ -2323,6 +2342,10 @@ function update(delta: number): void {
         blackHoleCaptureFadeTimes.set(itemId, nextElapsed);
       }
     });
+  }
+  if (pendingUltimateClear && !ultimateEffect && !hasActiveBoardEffects()) {
+    pendingUltimateClear = false;
+    if (advanceStageIfCleared(state)) ultimateResultDelay = ULTIMATE_RESULT_DELAY;
   }
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
