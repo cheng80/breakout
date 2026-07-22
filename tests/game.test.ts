@@ -51,6 +51,7 @@ import {
   laserEffectFrame,
   prepareVolley,
   relocateBlackHoles,
+  resetGame,
   resolveUltimateActivation,
   resolveUltimateHits,
   resolveCircleRectCollision,
@@ -69,6 +70,20 @@ function advanceThroughReward(state: ReturnType<typeof createGame>): void {
 }
 
 describe("핵심 게임 규칙", () => {
+  it("원하는 스테이지로 초기화할 수 있다", () => {
+    const state = createGame();
+    state.score = 1200;
+    state.ballCount = 8;
+    state.gameStatus = "volley";
+    resetGame(state, 16);
+
+    expect(state.stage).toBe(16);
+    expect(state.score).toBe(0);
+    expect(state.ballCount).toBe(1);
+    expect(state.gameStatus).toBe("ready");
+    expect(state.bricks.every((brick) => brick.id.startsWith("s16-"))).toBe(true);
+  });
+
   it("같은 효과음은 설정된 간격이 지나기 전에는 중복 재생하지 않는다", () => {
     expect(canPlaySound(undefined, 1, 0.05)).toBe(true);
     expect(canPlaySound(1, 1.04, 0.05)).toBe(false);

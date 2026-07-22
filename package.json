@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:ultimate-fixture": "vite --host 0.0.0.0 --mode ultimate-fixture",
+    "dev:stage-fixture": "vite --host 0.0.0.0 --mode stage-fixture",
     "test": "vitest",
     "build": "tsc --noEmit && vite build",
     "build:ultimate-fixture": "tsc --noEmit && vite build --mode ultimate-fixture",
+    "build:stage-fixture": "tsc --noEmit && vite build --mode stage-fixture",
     "audio:plan": "node scripts/generate-audio.mjs",
     "audio:generate": "node scripts/generate-audio.mjs --generate"
   },
