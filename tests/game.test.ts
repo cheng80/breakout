@@ -66,6 +66,7 @@ import {
   stageResultStars,
   traceAimPath,
   ultimateLevelForStage,
+  ultimateUnlockStage,
   ultimateTargetLimit,
   useUltimateItem,
   volleySpeedMultiplier,
@@ -398,6 +399,17 @@ describe("핵심 게임 규칙", () => {
     expect(rollUltimateReward(5, () => 0.1)).toBe("chainLightning");
     expect(rollUltimateReward(5, () => 0.6)).toBe("antimatter");
     expect(rollUltimateReward(5, () => 0.9)).toBe("fusionChain");
+  });
+
+  it("궁극기 보상은 해금된 스테이지의 후보에서만 선택한다", () => {
+    expect(ultimateUnlockStage("chainLightning")).toBe(1);
+    expect(ultimateUnlockStage("blackHoleCollapse")).toBe(11);
+    expect(ultimateUnlockStage("antimatter")).toBe(21);
+    expect(ultimateUnlockStage("missileBarrage")).toBe(1);
+
+    expect(rollUltimateReward(5, () => 0.99, 10)).toBe("missileBarrage");
+    expect(rollUltimateReward(5, () => 0.7, 20)).toBe("crossfire");
+    expect(rollUltimateReward(5, () => 0.99, 21)).toBe("missileBarrage");
   });
 
   it("보상을 저장·교체·건너뛴 뒤에만 다음 스테이지를 불러온다", () => {
