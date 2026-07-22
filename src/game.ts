@@ -53,6 +53,16 @@ export type UltimateItem = UltimateItemType | { type: GrowthUltimateType; level:
 export type BrickType = "normal" | "laser" | "steel";
 
 export const ULTIMATE_SLOT_COUNT = 2;
+export const ULTIMATE_MIN_STAGE: Record<UltimateItemType, number> = {
+  chainLightning: 1,
+  meteorImpact: 1,
+  blackHoleCollapse: 11,
+  crossfire: 11,
+  antimatter: 21,
+  orbitalLaser: 21,
+  fusionChain: 1,
+  missileBarrage: 1,
+};
 
 const GROWTH_ULTIMATE_TARGETS: Record<GrowthUltimateType, readonly number[]> = {
   chainLightning: [6, 8, 10, 12],
@@ -69,6 +79,10 @@ export function ultimateLevelForStage(stage: number): UltimateLevel {
   if (stage <= 20) return 2;
   if (stage <= 30) return 3;
   return 4;
+}
+
+export function ultimateUnlockStage(type: UltimateItemType): number {
+  return ULTIMATE_MIN_STAGE[type];
 }
 
 export function createUltimateItem(type: UltimateItemType, stage: number): UltimateItem {
@@ -787,7 +801,7 @@ export function advanceStageIfCleared(state: GameState): boolean {
   if (state.gameStatus === "reward" || state.bricks.some((brick) => brick.type !== "steel")) return false;
   const result = createStageResult(state);
   state.stageResult = result;
-  const rewardType = rollUltimateReward(result.stars);
+  const rewardType = rollUltimateReward(result.stars, Math.random, state.stage);
   state.pendingUltimateReward = rewardType ? createUltimateItem(rewardType, state.stage) : null;
   state.gameStatus = "reward";
   return true;
@@ -825,6 +839,7 @@ export function stageResultStars(
 export function rollUltimateReward(
   stars: number,
   random: () => number = Math.random,
+  stage = Number.POSITIVE_INFINITY,
 ): UltimateItemType | null {
   const roll = random();
   if (stars <= 1 || (stars === 2 && roll < 0.8) || (stars === 3 && roll < 0.5) || (stars === 4 && roll < 0.2)) return null;
@@ -839,12 +854,14 @@ export function rollUltimateReward(
       : stars === 4
         ? [["chainLightning", 0.18], ["meteorImpact", 0.16], ["blackHoleCollapse", 0.14], ["crossfire", 0.16], ["antimatter", 0.12], ["orbitalLaser", 0.12], ["fusionChain", 0.08], ["missileBarrage", 0.04]]
         : [["chainLightning", 0.12], ["meteorImpact", 0.14], ["blackHoleCollapse", 0.13], ["crossfire", 0.16], ["antimatter", 0.15], ["orbitalLaser", 0.12], ["fusionChain", 0.12], ["missileBarrage", 0.06]];
-  let cursor = rewardRoll;
-  for (const [item, weight] of weights) {
+  const availableWeights = weights.filter(([item]) => stage >= ultimateUnlockStage(item));
+  const totalWeight = availableWeights.reduce((total, [, weight]) => total + weight, 0);
+  let cursor = rewardRoll * totalWeight;
+  for (const [item, weight] of availableWeights) {
     if (cursor < weight) return item;
     cursor -= weight;
   }
-  return weights[weights.length - 1][0];
+  return availableWeights[availableWeights.length - 1][0];
 }
 
 export function acceptUltimateReward(
