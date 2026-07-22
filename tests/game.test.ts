@@ -610,7 +610,7 @@ describe("핵심 게임 규칙", () => {
   it("궁극기 8종은 선택 범위에 맞는 효과를 적용하고 사용한 슬롯을 비운다", () => {
     const cases = [
       { type: "antimatter" as const, target: { row: 0, column: 0 }, expected: 9 },
-      { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 15 },
+      { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 5 },
       { type: "chainLightning" as const, target: { row: 2, column: 2 }, expected: 12 },
       { type: "meteorImpact" as const, target: { row: 2, column: 2 }, expected: 25 },
       { type: "blackHoleCollapse" as const, target: { row: 2, column: 2 }, expected: 25 },

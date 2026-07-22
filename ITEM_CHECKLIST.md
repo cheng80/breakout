@@ -27,7 +27,7 @@
 보상은 선택지가 아닌 활약 별 기반 가중치 랜덤으로 1개만 지급한다. 별 1개는 지급하지 않고, 별 2/3/4/5개는 각각 20%/50%/80%/100% 확률로 지급한다. `연쇄 번개`와 `운석 충돌`은 낮은 별에서도 잘 나오는 입문형, `블랙홀 붕괴`와 `십자포화`는 중간형, `반물질 폭탄`·`궤도 레이저`는 상위형, `핵융합 연쇄`·`미사일 포화`는 높은 별에서 주로 나오는 희귀형으로 조정한다.
 
 - [x] 반물질 폭탄 (`antimatter`) — 선택 지점을 중심으로 5×5 범위의 파괴 가능한 블록을 체력과 무관하게 제거한다. 보라색 충격파와 화면 섬광, 폭탄 효과음으로 연출하며 `public/images/ultimates/antimatter.png` 아이콘을 사용한다.
-- [x] 궤도 레이저 (`orbitalLaser`) — 선택 열을 중심으로 세로 3열의 파괴 가능한 블록을 체력과 무관하게 제거한다. 전체 높이 광선과 레이저 효과음으로 연출하며 `public/images/ultimates/orbital-laser.png` 아이콘을 사용한다.
+- [x] 궤도 레이저 (`orbitalLaser`) — 선택한 1열의 파괴 가능한 블록을 체력과 무관하게 제거한다. 한 열 폭의 전체 높이 광선과 레이저 효과음으로 연출하며 `public/images/ultimates/orbital-laser.png` 아이콘을 사용한다.
 - [x] 연쇄 번개 (`chainLightning`) — 선택 지점에서 가까운 파괴 가능한 블록 최대 12개를 체력과 무관하게 제거한다. 목표 사이를 잇는 전기선과 폭탄 효과음으로 연출하며 `public/images/ultimates/chain-lightning.png` 아이콘을 사용한다.
 - [x] 운석 충돌 (`meteorImpact`) — 선택 지점 중심부의 블록을 즉시 제거하고 외곽 블록에 피해를 준다. 빛나는 원과 꼬리, 충돌 충격파, 폭탄 효과음으로 연출하며 `public/images/ultimates/meteor-impact.png` 아이콘을 사용한다.
 - [x] 블랙홀 붕괴 (`blackHoleCollapse`) — 선택 범위의 블록을 한 점으로 끌어당긴 뒤 폭발시켜 제거한다. 기존 블랙홀의 원·타원 효과와 폭탄 효과음을 재사용하며 `public/images/ultimates/black-hole-collapse.png` 아이콘을 사용한다.

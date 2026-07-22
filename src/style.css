@@ -1536,6 +1536,7 @@ button {
   outline: 1px solid rgba(255, 255, 255, 0.1);
   outline-offset: -1px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  filter: saturate(0.82) brightness(0.84);
 }
 
 .ultimate-slot-image[hidden],
@@ -1622,6 +1623,7 @@ button {
   outline: 1px solid rgba(255, 255, 255, 0.1);
   outline-offset: -1px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  filter: saturate(0.82) brightness(0.84);
 }
 
 #status-dot {

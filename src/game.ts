@@ -543,7 +543,7 @@ export function useUltimateItem(
   const targets = type === "antimatter"
     ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
     : type === "orbitalLaser"
-      ? destructible.filter((brick) => Math.abs(brick.column - target.column) <= 1)
+      ? destructible.filter((brick) => brick.column === target.column)
       : type === "chainLightning"
         ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 12)
         : type === "meteorImpact"
