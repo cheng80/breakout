@@ -38,6 +38,7 @@ import {
   blackHolePresence,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
+  createUltimateItem,
   bombEffectFrame,
   brickHitEffectFrame,
   captureBallByBlackHole,
@@ -61,6 +62,8 @@ import {
   stabilizeBounce,
   stageResultStars,
   traceAimPath,
+  ultimateLevelForStage,
+  ultimateTargetLimit,
   useUltimateItem,
   volleySpeedMultiplier,
 } from "../src/game";
@@ -690,6 +693,37 @@ describe("핵심 게임 규칙", () => {
       expect(state.ultimateInventory[0]).toBeNull();
       expect(state.stageUltimateUseCount).toBe(1);
     });
+  });
+
+  it("연쇄형 궁극기는 획득 레벨에 따라 대상 수가 늘어난다", () => {
+    expect(ultimateLevelForStage(1)).toBe(1);
+    expect(ultimateLevelForStage(11)).toBe(2);
+    expect(ultimateLevelForStage(21)).toBe(3);
+    expect(ultimateLevelForStage(31)).toBe(4);
+    expect(createUltimateItem("chainLightning", 1)).toEqual({ type: "chainLightning", level: 1 });
+    expect(ultimateTargetLimit("chainLightning", 1)).toBe(6);
+    expect(ultimateTargetLimit("fusionChain", 2)).toBe(12);
+    expect(ultimateTargetLimit("missileBarrage", 3)).toBe(16);
+    expect(ultimateTargetLimit("missileBarrage", 4)).toBe(20);
+
+    const state = createGame();
+    state.bricks = Array.from({ length: 12 }, (_, index) => ({
+      id: `brick-${index}`,
+      row: 0,
+      column: index % 8,
+      hp: 1,
+      maxHp: 1,
+      type: "normal" as const,
+    }));
+    state.ultimateInventory = [{ type: "chainLightning", level: 1 }, null];
+
+    expect(useUltimateItem(state, 0, { row: 0, column: 0 })?.targets).toHaveLength(6);
+
+    const rewardState = createGame();
+    rewardState.gameStatus = "reward";
+    rewardState.pendingUltimateReward = createUltimateItem("missileBarrage", 21);
+    expect(acceptUltimateReward(rewardState)).toBe(true);
+    expect(rewardState.ultimateInventory[0]).toEqual({ type: "missileBarrage", level: 3 });
   });
 
   it("궤도 레이저는 가장자리에서도 연속 3열을 제거한다", () => {

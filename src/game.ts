@@ -45,9 +45,46 @@ export type UltimateItemType =
   | "crossfire"
   | "fusionChain"
   | "missileBarrage";
+export type GrowthUltimateType = "chainLightning" | "fusionChain" | "missileBarrage";
+export type UltimateLevel = 1 | 2 | 3 | 4;
+export type UltimateItem = UltimateItemType | { type: GrowthUltimateType; level: UltimateLevel };
 export type BrickType = "normal" | "laser" | "steel";
 
 export const ULTIMATE_SLOT_COUNT = 2;
+
+const GROWTH_ULTIMATE_TARGETS: Record<GrowthUltimateType, readonly number[]> = {
+  chainLightning: [6, 8, 10, 12],
+  fusionChain: [9, 12, 15, 18],
+  missileBarrage: [10, 13, 16, 20],
+};
+
+export function isGrowthUltimate(type: UltimateItemType): type is GrowthUltimateType {
+  return type === "chainLightning" || type === "fusionChain" || type === "missileBarrage";
+}
+
+export function ultimateLevelForStage(stage: number): UltimateLevel {
+  if (stage <= 10) return 1;
+  if (stage <= 20) return 2;
+  if (stage <= 30) return 3;
+  return 4;
+}
+
+export function createUltimateItem(type: UltimateItemType, stage: number): UltimateItem {
+  return isGrowthUltimate(type) ? { type, level: ultimateLevelForStage(stage) } : type;
+}
+
+export function ultimateItemType(item: UltimateItem): UltimateItemType {
+  return typeof item === "string" ? item : item.type;
+}
+
+export function ultimateItemLevel(item: UltimateItem): UltimateLevel | null {
+  return typeof item === "string" ? null : item.level;
+}
+
+export function ultimateTargetLimit(type: UltimateItemType, level: UltimateLevel | null): number {
+  if (!isGrowthUltimate(type)) return Number.POSITIVE_INFINITY;
+  return GROWTH_ULTIMATE_TARGETS[type][(level ?? 4) - 1];
+}
 
 export function orbitalLaserStartColumn(targetColumn: number): number {
   return Math.max(0, Math.min(GRID_COLUMNS - 3, targetColumn - 1));
@@ -181,6 +218,7 @@ export interface StageResult {
 
 export interface UltimateActivation {
   type: UltimateItemType;
+  level: UltimateLevel | null;
   targets: Array<Pick<Brick, "row" | "column">>;
   hits: Array<{ brickId: string; damage: number }>;
   resolvedHitCount: number;
@@ -194,8 +232,8 @@ export interface GameState {
   launchPosition: Vec2;
   bricks: Brick[];
   items: FieldItem[];
-  ultimateInventory: Array<UltimateItemType | null>;
-  pendingUltimateReward: UltimateItemType | null;
+  ultimateInventory: Array<UltimateItem | null>;
+  pendingUltimateReward: UltimateItem | null;
   stageResult: StageResult | null;
   stageScore: number;
   stageTargetScore: number;
@@ -575,8 +613,11 @@ export function useUltimateItem(
 ): UltimateActivation | null {
   if (state.gameStatus !== "ready" || !Number.isInteger(slot) || !Number.isInteger(target.row) || !Number.isInteger(target.column)) return null;
   if (slot < 0 || slot >= ULTIMATE_SLOT_COUNT || target.row < 0 || target.row >= DANGER_ROW || target.column < 0 || target.column >= GRID_COLUMNS) return null;
-  const type = state.ultimateInventory[slot];
-  if (!type) return null;
+  const item = state.ultimateInventory[slot];
+  if (!item) return null;
+  const type = ultimateItemType(item);
+  const level = ultimateItemLevel(item);
+  const targetLimit = ultimateTargetLimit(type, level);
 
   const destructible = state.bricks.filter((brick) => brick.type !== "steel");
   const distance = (brick: Brick) => Math.abs(brick.row - target.row) + Math.abs(brick.column - target.column);
@@ -585,7 +626,7 @@ export function useUltimateItem(
     const remaining = [...destructible];
     const result: Brick[] = [];
     const frontier = remaining.sort((a, b) => distance(a) - distance(b)).slice(0, 1);
-    while (result.length < 18 && remaining.length > 0) {
+    while (result.length < targetLimit && remaining.length > 0) {
       const next = frontier.shift() ?? remaining[0];
       const index = remaining.indexOf(next);
       if (index < 0) continue;
@@ -602,7 +643,7 @@ export function useUltimateItem(
     : type === "orbitalLaser"
       ? destructible.filter((brick) => brick.column >= orbitalStartColumn && brick.column < orbitalStartColumn + 3)
       : type === "chainLightning"
-        ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 12)
+        ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, targetLimit)
         : type === "meteorImpact"
           ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
           : type === "blackHoleCollapse"
@@ -611,11 +652,12 @@ export function useUltimateItem(
               ? destructible.filter((brick) => Math.abs(brick.row - target.row) <= 1 || Math.abs(brick.column - target.column) <= 1)
               : type === "fusionChain"
                 ? fusionTargets()
-                : [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 20);
+                : [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, targetLimit);
   if (targets.length === 0) return null;
 
   const activation: UltimateActivation = {
     type,
+    level,
     targets: targets.map(({ row, column }) => ({ row, column })),
     hits: targets.map((brick) => {
       const distanceFromImpact = Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column));
@@ -732,7 +774,8 @@ export function advanceStageIfCleared(state: GameState): boolean {
   if (state.gameStatus === "reward" || state.bricks.some((brick) => brick.type !== "steel")) return false;
   const result = createStageResult(state);
   state.stageResult = result;
-  state.pendingUltimateReward = rollUltimateReward(result.stars);
+  const rewardType = rollUltimateReward(result.stars);
+  state.pendingUltimateReward = rewardType ? createUltimateItem(rewardType, state.stage) : null;
   state.gameStatus = "reward";
   return true;
 }

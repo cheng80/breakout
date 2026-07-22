@@ -844,6 +844,25 @@ button {
   gap: 3px;
 }
 
+.ultimate-level-badge {
+  width: fit-content;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(119, 139, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(181, 192, 255, 0.3);
+  color: #c9d2ff;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.ultimate-level-badge[data-level="4"] {
+  background: rgba(255, 186, 73, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 215, 132, 0.42);
+  color: #ffe09a;
+}
+
 .reward-result strong {
   color: #f5f8ff;
   font-size: 14px;
@@ -1655,7 +1674,8 @@ button {
 
 .ultimate-slot-image[hidden],
 .ultimate-slot-symbol[hidden],
-.ultimate-symbol[hidden] {
+.ultimate-symbol[hidden],
+.ultimate-level-badge[hidden] {
   display: none;
 }
 
@@ -1663,6 +1683,11 @@ button {
   min-width: 0;
   display: grid;
   gap: 1px;
+}
+
+.ultimate-slot .ultimate-level-badge {
+  margin-bottom: 2px;
+  font-size: 7px;
 }
 
 .ultimate-slot strong,
