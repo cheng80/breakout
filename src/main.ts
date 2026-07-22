@@ -327,11 +327,15 @@ function reset(): void {
 
 function returnToEntryScreen(): void {
   reset();
+  showEntryScreen();
+  entryNameInput.focus();
+}
+
+function showEntryScreen(): void {
   entryNameInput.value = loadPlayerName();
   entryFeedback.textContent = "";
   entryScreen.hidden = false;
   appRoot.hidden = true;
-  entryNameInput.focus();
 }
 
 function screenPoint(event: PointerEvent): Vec2 {
@@ -377,7 +381,7 @@ app.canvas.addEventListener("pointercancel", () => {
 });
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
-entryNameInput.value = loadPlayerName();
+showEntryScreen();
 if (["127.0.0.1", "localhost"].includes(location.hostname)) {
   window.resetBreakoutForDevelopment = resetForDevelopment;
 }
