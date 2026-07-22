@@ -56,7 +56,9 @@ const BGM_VOLUME_CHANGE_SECONDS = 0.2;
 let context: AudioContext | null = null;
 let masterGain: GainNode | null = null;
 let loadPromise: Promise<void> | null = null;
-let muted = readMuted();
+let allMuted = readMuted("swipe-breakout-all-muted") || readMuted("swipe-breakout-muted");
+let bgmMuted = readMuted("swipe-breakout-bgm-muted");
+let sfxMuted = readMuted("swipe-breakout-sfx-muted");
 let bgmFadeFrame: number | null = null;
 let bgmEnding = false;
 let bgmVolume = DEFAULT_BGM_VOLUME;
@@ -74,7 +76,7 @@ function restartBgm(): void {
   if (!bgmAudio) return;
   bgmAudio.currentTime = 0;
   bgmEnding = false;
-  if (!muted) {
+  if (!isBgmSilenced()) {
     fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS);
     void bgmAudio.play().catch(() => undefined);
   }
@@ -91,19 +93,39 @@ function setupBgm(): void {
 
 setupBgm();
 
-function readMuted(): boolean {
+function readMuted(key: string): boolean {
   try {
-    return localStorage.getItem("swipe-breakout-muted") === "true";
+    return localStorage.getItem(key) === "true";
   } catch {
     return false;
   }
+}
+
+function writeMuted(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
+  }
+}
+
+function isBgmSilenced(): boolean {
+  return allMuted || bgmMuted;
+}
+
+function isSfxSilenced(): boolean {
+  return allMuted || sfxMuted;
+}
+
+function syncSfxGain(): void {
+  if (masterGain) masterGain.gain.value = isSfxSilenced() ? 0 : 1;
 }
 
 function ensureContext(): AudioContext {
   if (context) return context;
   context = new AudioContext();
   masterGain = context.createGain();
-  masterGain.gain.value = muted ? 0 : 1;
+  masterGain.gain.value = isSfxSilenced() ? 0 : 1;
   masterGain.connect(context.destination);
   return context;
 }
@@ -142,7 +164,7 @@ function fadeBgm(target: number, duration: number): void {
 }
 
 function startBgm(): void {
-  if (!bgmAudio || muted || !bgmAudio.paused) return;
+  if (!bgmAudio || isBgmSilenced() || !bgmAudio.paused) return;
   bgmEnding = false;
   bgmAudio.volume = 0;
   void bgmAudio.play().then(() => fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS)).catch(() => undefined);
@@ -158,7 +180,7 @@ export async function unlockAudio(): Promise<void> {
 
 export function playSound(name: SoundName, options: { volume?: number; playbackRate?: number } = {}): void {
   void unlockAudio().then(() => {
-    if (!context || !masterGain || muted) return;
+    if (!context || !masterGain || isSfxSilenced()) return;
     const buffer = buffers.get(name);
     if (!buffer) return;
     const config = settings[name];
@@ -180,7 +202,19 @@ export function playSound(name: SoundName, options: { volume?: number; playbackR
 }
 
 export function isMuted(): boolean {
-  return muted;
+  return allMuted;
+}
+
+export function isBgmMuted(): boolean {
+  return bgmMuted;
+}
+
+export function isSfxMuted(): boolean {
+  return sfxMuted;
+}
+
+export function isAllMuted(): boolean {
+  return allMuted;
 }
 
 export function getBgmVolume(): number {
@@ -189,21 +223,43 @@ export function getBgmVolume(): number {
 
 export function setBgmVolume(value: number): void {
   bgmVolume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : DEFAULT_BGM_VOLUME));
-  if (bgmAudio && !muted && !bgmAudio.paused && !bgmEnding) {
+  if (bgmAudio && !isBgmSilenced() && !bgmAudio.paused && !bgmEnding) {
     fadeBgm(bgmVolume, BGM_VOLUME_CHANGE_SECONDS);
   }
 }
 
 export function setMuted(value: boolean): void {
-  muted = value;
-  if (masterGain) masterGain.gain.value = muted ? 0 : 1;
-  if (muted && bgmAudio) {
+  setAllMuted(value);
+}
+
+export function setBgmMuted(value: boolean): void {
+  bgmMuted = value;
+  writeMuted("swipe-breakout-bgm-muted", bgmMuted);
+  if (isBgmSilenced() && bgmAudio) {
     bgmAudio.pause();
     bgmAudio.volume = 0;
     bgmEnding = false;
+  } else if (!isBgmSilenced()) {
+    startBgm();
   }
-  try {
-    localStorage.setItem("swipe-breakout-muted", String(muted));
-  } catch {}
-  if (!muted) void unlockAudio();
+}
+
+export function setSfxMuted(value: boolean): void {
+  sfxMuted = value;
+  writeMuted("swipe-breakout-sfx-muted", sfxMuted);
+  syncSfxGain();
+}
+
+export function setAllMuted(value: boolean): void {
+  allMuted = value;
+  writeMuted("swipe-breakout-all-muted", allMuted);
+  writeMuted("swipe-breakout-muted", allMuted);
+  syncSfxGain();
+  if (isBgmSilenced() && bgmAudio) {
+    bgmAudio.pause();
+    bgmAudio.volume = 0;
+    bgmEnding = false;
+  } else if (!isBgmSilenced() && typeof AudioContext !== "undefined") {
+    void unlockAudio();
+  }
 }

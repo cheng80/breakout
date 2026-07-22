@@ -83,6 +83,18 @@ button {
   transition-duration: 140ms;
 }
 
+.icon-button svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .icon-button:active,
 .result button:active,
 .item-help-card button:active {
@@ -91,10 +103,6 @@ button {
 
 .icon-button[aria-expanded="true"] {
   background: #6c7cff;
-}
-
-#audio-toggle {
-  font-size: 17px;
 }
 
 .hud {
@@ -361,6 +369,191 @@ button {
   margin-top: 16px;
 }
 
+.options-card {
+  position: relative;
+  width: min(100%, 320px);
+}
+
+.item-help-card .dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin: 0 !important;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  color: #c7d0e2;
+  cursor: pointer;
+  transition-property: transform, background-color;
+  transition-duration: 140ms;
+}
+
+.dialog-close:active {
+  transform: scale(0.96);
+}
+
+.dialog-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.options-section {
+  display: grid;
+  gap: 8px;
+}
+
+.options-section-label {
+  margin: 0 0 2px;
+  color: #8795ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.sound-setting {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
+  color: #f5f8ff;
+  cursor: pointer;
+  text-align: left;
+  transition-property: transform, background-color;
+  transition-duration: 140ms;
+}
+
+.sound-setting:active,
+.options-restart:active {
+  transform: scale(0.96);
+}
+
+.sound-setting[aria-checked="false"] {
+  background: rgba(255, 77, 109, 0.13);
+}
+
+.sound-setting-master {
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0 0 12px 12px;
+}
+
+.sound-setting-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(108, 124, 255, 0.2);
+  color: #aeb7ff;
+}
+
+.sound-setting-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.sound-setting-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.sound-setting-copy strong {
+  font-size: 13px;
+}
+
+.sound-setting-copy small {
+  color: #9ba8bc;
+  font-size: 10px;
+}
+
+.ios-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #45d5a1;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 12px rgba(69, 213, 161, 0.24);
+  transition-property: background-color, box-shadow;
+  transition-duration: 160ms;
+}
+
+.ios-switch span {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  transition-property: transform;
+  transition-duration: 160ms;
+}
+
+.sound-setting[aria-checked="false"] .ios-switch {
+  background: #536174;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.sound-setting[aria-checked="false"] .ios-switch span {
+  transform: translateX(-18px);
+}
+
+.options-actions {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.options-actions button {
+  margin: 0;
+}
+
+.options-actions .options-restart {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.options-restart svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .reset-confirm-card {
   width: min(100%, 280px);
   overflow: visible;
@@ -509,6 +702,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   #score,
   .icon-button,
+  .dialog-close,
+  .sound-setting,
   .result button,
   .item-help-card button {
     transition-duration: 0ms;

@@ -12,9 +12,10 @@
       <header class="topbar">
         <h1 class="brand-title">SWIPE BREAKOUT</h1>
         <div class="top-actions">
-          <button id="audio-toggle" class="icon-button" type="button" aria-label="소리 끄기" aria-pressed="false">🔊</button>
           <button id="help" class="icon-button" type="button" aria-label="아이템 설명 보기" aria-controls="item-help" aria-expanded="false">?</button>
-          <button id="restart" class="icon-button" type="button" aria-label="게임 다시 시작" aria-controls="reset-confirm" aria-expanded="false">↻</button>
+          <button id="options" class="icon-button" type="button" aria-label="게임 옵션 열기" aria-controls="options-panel" aria-expanded="false">
+            <span data-icon="settings" aria-hidden="true"></span>
+          </button>
         </div>
       </header>
 
@@ -42,6 +43,39 @@
               <li><b class="legend-steel">◆</b><span><strong>강철 블록</strong>공만 반사하며 위험선 아래에서 사라집니다.</span></li>
             </ul>
             <button id="item-help-close" type="button">게임 계속하기</button>
+          </div>
+        </section>
+        <section id="options-panel" class="item-help options-panel" role="dialog" aria-modal="true" aria-labelledby="options-title" hidden>
+          <div class="item-help-card options-card">
+            <button id="options-close" class="dialog-close" type="button" aria-label="옵션 닫기">
+              <span data-icon="x" aria-hidden="true"></span>
+            </button>
+            <p>OPTIONS</p>
+            <h2 id="options-title">게임 옵션</h2>
+            <div class="options-section">
+              <p class="options-section-label">사운드</p>
+              <button id="bgm-toggle" class="sound-setting" data-audio-control type="button" role="switch" aria-checked="true">
+                <span class="sound-setting-icon" data-icon="music-2" aria-hidden="true"></span>
+                <span class="sound-setting-copy"><strong>BGM</strong><small>게임 배경 음악</small></span>
+                <span class="ios-switch" aria-hidden="true"><span></span></span>
+              </button>
+              <button id="sfx-toggle" class="sound-setting" data-audio-control type="button" role="switch" aria-checked="true">
+                <span class="sound-setting-icon" data-icon="audio-lines" aria-hidden="true"></span>
+                <span class="sound-setting-copy"><strong>효과음</strong><small>게임 효과음</small></span>
+                <span class="ios-switch" aria-hidden="true"><span></span></span>
+              </button>
+              <button id="all-audio-toggle" class="sound-setting sound-setting-master" data-audio-control type="button" role="switch" aria-checked="true">
+                <span class="sound-setting-icon" data-icon="volume" aria-hidden="true"></span>
+                <span class="sound-setting-copy"><strong>전체 사운드</strong><small id="all-audio-status">개별 설정 유지</small></span>
+                <span class="ios-switch" aria-hidden="true"><span></span></span>
+              </button>
+            </div>
+            <div class="options-actions">
+              <button id="options-restart" class="options-restart" type="button">
+                <span data-icon="rotate-ccw" aria-hidden="true"></span>
+                <span>게임 다시 시작</span>
+              </button>
+            </div>
           </div>
         </section>
         <section id="reset-confirm" class="item-help reset-confirm" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title" aria-describedby="reset-confirm-description" hidden>

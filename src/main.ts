@@ -1,6 +1,22 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import "./style.css";
-import { isMuted, playSound, preloadAudio, setMuted, unlockAudio } from "./audio";
+import settingsIcon from "lucide-static/icons/settings.svg?raw";
+import musicIcon from "lucide-static/icons/music-2.svg?raw";
+import effectIcon from "lucide-static/icons/audio-lines.svg?raw";
+import volumeIcon from "lucide-static/icons/volume.svg?raw";
+import restartIcon from "lucide-static/icons/rotate-ccw.svg?raw";
+import closeIcon from "lucide-static/icons/x.svg?raw";
+import {
+  isAllMuted,
+  isBgmMuted,
+  isSfxMuted,
+  playSound,
+  preloadAudio,
+  setAllMuted,
+  setBgmMuted,
+  setSfxMuted,
+  unlockAudio,
+} from "./audio";
 import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
@@ -94,6 +110,7 @@ let aimCurrent: Vec2 | null = null;
 let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
+let optionsOpen = false;
 let resetConfirmOpen = false;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
@@ -175,11 +192,30 @@ const resultBestScore = document.querySelector<HTMLElement>("#result-best-score"
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
-const audioToggleButton = document.querySelector<HTMLButtonElement>("#audio-toggle")!;
-const restartButton = document.querySelector<HTMLButtonElement>("#restart")!;
+const optionsButton = document.querySelector<HTMLButtonElement>("#options")!;
+const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
+const optionsCloseButton = document.querySelector<HTMLButtonElement>("#options-close")!;
+const optionsRestartButton = document.querySelector<HTMLButtonElement>("#options-restart")!;
+const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")!;
+const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
+const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
+const allAudioStatus = document.querySelector<HTMLElement>("#all-audio-status")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
 const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
+
+const iconMarkup: Record<string, string> = {
+  settings: settingsIcon,
+  "music-2": musicIcon,
+  "audio-lines": effectIcon,
+  volume: volumeIcon,
+  "rotate-ccw": restartIcon,
+  x: closeIcon,
+};
+
+document.querySelectorAll<HTMLElement>("[data-icon]").forEach((icon) => {
+  icon.innerHTML = iconMarkup[icon.dataset.icon ?? ""] ?? "";
+});
 
 const brickRect = (brick: Brick) => ({
   x: GRID_MARGIN + brick.column * (CELL_WIDTH + GRID_GAP),
@@ -239,6 +275,7 @@ function reset(): void {
   shieldRewindEffect = null;
   brickHitEffects.clear();
   setHelpOpen(false);
+  setOptionsOpen(false);
   syncUi();
 }
 
@@ -251,7 +288,7 @@ function screenPoint(event: PointerEvent): Vec2 {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (helpOpen || resetConfirmOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
+  if (helpOpen || optionsOpen || resetConfirmOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (point.y < BOARD_HEIGHT * 0.55) return;
   app.canvas.setPointerCapture(event.pointerId);
@@ -284,38 +321,60 @@ app.canvas.addEventListener("pointercancel", () => {
   syncUi();
 });
 
-restartButton.addEventListener("click", () => setResetConfirmOpen(true));
 document.querySelector("#result-restart")!.addEventListener("click", reset);
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen) setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen) setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+optionsButton.addEventListener("click", () => {
+  if (!resetConfirmOpen) setOptionsOpen(!optionsOpen);
+});
+optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
+optionsRestartButton.addEventListener("click", () => {
+  setOptionsOpen(false);
+  setResetConfirmOpen(true);
+});
+bgmToggleButton.addEventListener("click", () => {
+  setBgmMuted(!isBgmMuted());
+  syncAudioOptions();
+  playSound("ui_click");
+});
+sfxToggleButton.addEventListener("click", () => {
+  const nextMuted = !isSfxMuted();
+  setSfxMuted(nextMuted);
+  syncAudioOptions();
+  if (!nextMuted && !isAllMuted()) playSound("ui_click");
+});
+allAudioToggleButton.addEventListener("click", () => {
+  const nextMuted = !isAllMuted();
+  setAllMuted(nextMuted);
+  syncAudioOptions();
+  if (!nextMuted && !isSfxMuted()) playSound("ui_click");
+});
 resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
 resetConfirmButton.addEventListener("click", reset);
-document.querySelectorAll<HTMLButtonElement>("button:not(#audio-toggle)").forEach((button) => {
+document.querySelectorAll<HTMLButtonElement>("button:not([data-audio-control])").forEach((button) => {
   button.addEventListener("click", () => playSound("ui_click"));
-});
-audioToggleButton.addEventListener("click", () => {
-  setMuted(!isMuted());
-  syncAudioButton();
-  if (!isMuted()) playSound("ui_click");
 });
 document.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
 
-function syncAudioButton(): void {
-  const muted = isMuted();
-  audioToggleButton.textContent = muted ? "🔇" : "🔊";
-  audioToggleButton.setAttribute("aria-label", muted ? "소리 켜기" : "소리 끄기");
-  audioToggleButton.setAttribute("aria-pressed", String(muted));
+function syncAudioOptions(): void {
+  const bgmMuted = isBgmMuted();
+  const sfxMuted = isSfxMuted();
+  const allMuted = isAllMuted();
+  allAudioStatus.textContent = allMuted ? "모든 소리를 끕니다" : "개별 설정 유지";
+  bgmToggleButton.setAttribute("aria-checked", String(!(allMuted || bgmMuted)));
+  sfxToggleButton.setAttribute("aria-checked", String(!(allMuted || sfxMuted)));
+  allAudioToggleButton.setAttribute("aria-checked", String(!allMuted));
 }
 
 function setResetConfirmOpen(open: boolean): void {
   const wasOpen = resetConfirmOpen;
   resetConfirmOpen = open;
   resetConfirmDialog.hidden = !open;
-  restartButton.setAttribute("aria-expanded", String(open));
   if (open) {
     setHelpOpen(false);
+    setOptionsOpen(false);
     if (state.gameStatus === "aiming") {
       aimStart = null;
       aimCurrent = null;
@@ -324,7 +383,7 @@ function setResetConfirmOpen(open: boolean): void {
     }
     resetCancelButton.focus();
   } else if (wasOpen) {
-    restartButton.focus();
+    optionsButton.focus();
   }
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
@@ -334,11 +393,27 @@ function setHelpOpen(open: boolean): void {
   helpOpen = open;
   helpDialog.hidden = !open;
   helpButton.setAttribute("aria-expanded", String(open));
+  if (open) setOptionsOpen(false);
   if (open && state.gameStatus === "aiming") {
     aimStart = null;
     aimCurrent = null;
     state.gameStatus = "ready";
     syncUi();
+  }
+  if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
+}
+
+function setOptionsOpen(open: boolean): void {
+  const wasOpen = optionsOpen;
+  optionsOpen = open;
+  optionsDialog.hidden = !open;
+  optionsButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setHelpOpen(false);
+    syncAudioOptions();
+    optionsCloseButton.focus();
+  } else if (wasOpen) {
+    optionsButton.focus();
   }
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
@@ -753,7 +828,7 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
 }
 
 function update(delta: number): void {
-  const paused = helpOpen || resetConfirmOpen;
+  const paused = helpOpen || optionsOpen || resetConfirmOpen;
   if (!paused) {
     brickHitEffects.forEach((effect, brickId) => {
       effect.elapsed += delta;
@@ -871,7 +946,7 @@ if (["127.0.0.1", "localhost"].includes(location.hostname) && location.search ==
 }
 
 app.ticker.add((ticker) => update(ticker.deltaMS / 1000));
-syncAudioButton();
+syncAudioOptions();
 void preloadAudio();
 syncUi();
 }

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { canPlaySound, getBgmVolume, setBgmVolume } from "../src/audio";
+import {
+  canPlaySound,
+  getBgmVolume,
+  isAllMuted,
+  isBgmMuted,
+  isSfxMuted,
+  setAllMuted,
+  setBgmMuted,
+  setBgmVolume,
+  setSfxMuted,
+} from "../src/audio";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -52,6 +62,24 @@ describe("핵심 게임 규칙", () => {
     setBgmVolume(2);
     expect(getBgmVolume()).toBe(1);
     setBgmVolume(0.1);
+  });
+
+  it("BGM·효과음·전체 음소거를 각각 제어한다", () => {
+    setAllMuted(false);
+    setBgmMuted(true);
+    setSfxMuted(false);
+    expect(isBgmMuted()).toBe(true);
+    expect(isSfxMuted()).toBe(false);
+    expect(isAllMuted()).toBe(false);
+
+    setAllMuted(true);
+    expect(isBgmMuted()).toBe(true);
+    expect(isSfxMuted()).toBe(false);
+    expect(isAllMuted()).toBe(true);
+
+    setAllMuted(false);
+    setBgmMuted(false);
+    setSfxMuted(false);
   });
 
   it("폭탄 충격파가 0.5초 동안 확대되며 사라진다", () => {
