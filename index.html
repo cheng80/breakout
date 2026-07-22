@@ -65,7 +65,12 @@
       </section>
 
       <section class="game-shell">
-        <div id="game-canvas" class="game-canvas" aria-label="벽돌깨기 게임판"></div>
+        <div id="game-canvas" class="game-canvas" aria-label="벽돌깨기 게임판">
+          <output id="fps-monitor" class="fps-monitor" aria-label="초당 프레임 수" aria-live="off" hidden>
+            <span>FPS</span>
+            <strong id="fps-value">--</strong>
+          </output>
+        </div>
         <section id="item-help" class="item-help" role="dialog" aria-modal="true" aria-labelledby="item-help-title" hidden>
           <div class="item-help-card">
             <p>PAUSED</p>
@@ -105,6 +110,14 @@
               <button id="all-audio-toggle" class="sound-setting sound-setting-master" data-audio-control type="button" role="switch" aria-checked="true">
                 <span class="sound-setting-icon" data-icon="volume" aria-hidden="true"></span>
                 <span class="sound-setting-copy"><strong>전체 사운드</strong><small id="all-audio-status">개별 설정 유지</small></span>
+                <span class="ios-switch" aria-hidden="true"><span></span></span>
+              </button>
+            </div>
+            <div class="options-section options-display-section">
+              <p class="options-section-label">화면</p>
+              <button id="fps-toggle" class="sound-setting fps-setting" type="button" role="switch" aria-checked="false">
+                <span class="sound-setting-icon" data-icon="gauge" aria-hidden="true"></span>
+                <span class="sound-setting-copy"><strong>FPS 표시</strong><small>게임 성능을 실시간으로 확인합니다.</small></span>
                 <span class="ios-switch" aria-hidden="true"><span></span></span>
               </button>
             </div>
