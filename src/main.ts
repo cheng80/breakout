@@ -995,15 +995,18 @@ function renderRanking(entries: RankingEntry[], list: HTMLOListElement): void {
   entries.forEach((entry) => {
     const row = document.createElement("li");
     const rank = document.createElement("span");
+    const details = document.createElement("span");
     const name = document.createElement("strong");
     const score = document.createElement("span");
     rank.className = "ranking-rank";
+    details.className = "ranking-details";
     name.className = "ranking-name";
     score.className = "ranking-score";
     rank.textContent = String(entry.rank).padStart(2, "0");
     name.textContent = entry.name;
     score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage} · ${formatPlayTime(entry.durationMs)}`;
-    row.append(rank, name, score);
+    details.append(name, score);
+    row.append(rank, details);
     list.append(row);
   });
 }
