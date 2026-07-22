@@ -87,6 +87,7 @@ const BEST_SCORE_KEY = "swipe-breakout-best-score";
 const PLAYER_NAME_KEY = "swipe-breakout-player-name";
 const FPS_VISIBLE_KEY = "swipe-breakout-fps-visible";
 const ULTIMATE_EFFECT_DURATION = 0.9;
+const ULTIMATE_RESULT_DELAY = 0.35;
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -149,12 +150,17 @@ let selectedUltimateSlot: number | null = null;
 let purePlayTimeMs = 0;
 let fpsVisible = loadFpsVisibility();
 let fpsSampleElapsedMs = 0;
+let lastClearedStage = 0;
+let lastClearedScore = 0;
+let lastClearedDurationMs = 0;
+let challengeAbandoned = false;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
 let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
 let ultimateEffect: UltimateEffect | null = null;
+let ultimateResultDelay = 0;
 const laserEffects: PositionedEffect[] = [];
 let shieldRewindEffect: TimedEffect | null = null;
 const brickHitEffects = new Map<string, TimedEffect>();
@@ -253,6 +259,7 @@ const optionsDialog = document.querySelector<HTMLElement>("#options-panel")!;
 const optionsCloseButton = document.querySelector<HTMLButtonElement>("#options-close")!;
 const optionsRestartButton = document.querySelector<HTMLButtonElement>("#options-restart")!;
 const optionsHomeButton = document.querySelector<HTMLButtonElement>("#options-home")!;
+const challengeAbandonButton = document.querySelector<HTMLButtonElement>("#challenge-abandon")!;
 const bgmToggleButton = document.querySelector<HTMLButtonElement>("#bgm-toggle")!;
 const sfxToggleButton = document.querySelector<HTMLButtonElement>("#sfx-toggle")!;
 const allAudioToggleButton = document.querySelector<HTMLButtonElement>("#all-audio-toggle")!;
@@ -273,6 +280,7 @@ const rewardScore = document.querySelector<HTMLElement>("#reward-score")!;
 const rewardTargetScore = document.querySelector<HTMLElement>("#reward-target-score")!;
 const rewardResult = document.querySelector<HTMLElement>("#reward-result")!;
 const rewardResultSymbol = document.querySelector<HTMLElement>("#reward-result-symbol")!;
+const rewardResultImage = document.querySelector<HTMLImageElement>("#reward-result-image")!;
 const rewardResultName = document.querySelector<HTMLElement>("#reward-result-name")!;
 const rewardResultCopy = document.querySelector<HTMLElement>("#reward-result-copy")!;
 const rewardActions = document.querySelector<HTMLElement>("#reward-actions")!;
@@ -368,6 +376,7 @@ function reset(): void {
   bombEffect = null;
   trapEffect = null;
   ultimateEffect = null;
+  ultimateResultDelay = 0;
   shieldRewindEffect = null;
   brickHitEffects.clear();
   rankingLoaded = false;
@@ -375,6 +384,10 @@ function reset(): void {
   rankingRequestId += 1;
   rankingPanelRequestId += 1;
   purePlayTimeMs = 0;
+  lastClearedStage = 0;
+  lastClearedScore = 0;
+  lastClearedDurationMs = 0;
+  challengeAbandoned = false;
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
   setHelpOpen(false);
@@ -420,7 +433,7 @@ function useSelectedUltimate(point: Vec2): void {
     targets: activation.targets.map(itemCenter),
   };
   selectedUltimateSlot = null;
-  playSound(activation.type === "antimatter" ? "bomb" : activation.type === "orbitalLaser" ? "laser" : "item_collect", {
+  playSound(activation.type === "orbitalLaser" ? "laser" : "bomb", {
     playbackRate: activation.type === "chainLightning" ? 1.18 : 0.9,
   });
   pullLaserEffects();
@@ -467,6 +480,22 @@ app.canvas.addEventListener("pointercancel", () => {
 });
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+
+function abandonChallenge(): void {
+  if (state.gameStatus === "reward" || state.gameStatus === "gameOver") return;
+  ballPool.releaseAll(activeBalls);
+  aimStart = null;
+  aimCurrent = null;
+  challengeAbandoned = true;
+  state.gameStatus = "gameOver";
+  state.stage = Math.max(1, lastClearedStage);
+  state.score = lastClearedScore;
+  purePlayTimeMs = lastClearedDurationMs;
+  setOptionsOpen(false);
+  syncUi();
+}
+
+challengeAbandonButton.addEventListener("click", abandonChallenge);
 showEntryScreen();
 if (["127.0.0.1", "localhost"].includes(location.hostname)) {
   window.resetBreakoutForDevelopment = resetForDevelopment;
@@ -823,7 +852,10 @@ async function submitCurrentScore(): Promise<void> {
     rankingNameInput.focus();
     return;
   }
-  if (state.score < 1) {
+  const score = challengeAbandoned ? lastClearedScore : state.score;
+  const stage = challengeAbandoned ? Math.max(1, lastClearedStage) : state.stage;
+  const durationMs = challengeAbandoned ? lastClearedDurationMs : Math.max(0, Math.round(purePlayTimeMs));
+  if (score < 1) {
     rankingFeedback.textContent = "등록할 점수가 없습니다.";
     return;
   }
@@ -836,9 +868,9 @@ async function submitCurrentScore(): Promise<void> {
   const requestId = ++rankingRequestId;
   const response = await submitRanking({
     name,
-    score: state.score,
-    stage: state.stage,
-    durationMs: Math.max(0, Math.round(purePlayTimeMs)),
+    score,
+    stage,
+    durationMs,
   });
   if (requestId !== rankingRequestId || state.gameStatus !== "gameOver") return;
 
@@ -855,6 +887,11 @@ async function submitCurrentScore(): Promise<void> {
 }
 
 function syncUi(): void {
+  if (state.stageResult) {
+    lastClearedStage = state.stage;
+    lastClearedScore = state.score;
+    lastClearedDurationMs = Math.max(0, Math.round(purePlayTimeMs));
+  }
   if (state.score > bestScore) {
     bestScore = state.score;
     hasNewBestScore = true;
@@ -933,7 +970,7 @@ function syncUltimateUi(): void {
     button.disabled = state.gameStatus !== "ready";
   });
 
-  rewardDialog.hidden = state.gameStatus !== "reward";
+  rewardDialog.hidden = state.gameStatus !== "reward" || ultimateEffect !== null || ultimateResultDelay > 0;
   if (state.gameStatus !== "reward") return;
   rewardActions.hidden = rewardReplacementOpen;
   rewardReplacement.hidden = !rewardReplacementOpen;
@@ -948,17 +985,22 @@ function syncUltimateUi(): void {
   rewardScore.textContent = stageResult.score.toLocaleString("ko-KR");
   rewardTargetScore.textContent = `/ ${stageResult.targetScore.toLocaleString("ko-KR")}`;
   rewardResultSymbol.className = "ultimate-symbol";
+  rewardResultImage.hidden = true;
+  rewardResultImage.removeAttribute("src");
   rewardResult.classList.toggle("no-reward", !state.pendingUltimateReward);
   if (state.pendingUltimateReward) {
     const detail = ultimateDetails[state.pendingUltimateReward];
-    rewardResultSymbol.textContent = detail.symbol;
-    rewardResultSymbol.classList.add(detail.className);
+    rewardResultSymbol.hidden = true;
+    rewardResultImage.src = detail.image;
+    rewardResultImage.alt = detail.name;
+    rewardResultImage.hidden = false;
     rewardResultName.textContent = detail.name;
     rewardResultCopy.textContent = "궁극기 보상을 획득했습니다.";
     rewardReplacementName.textContent = detail.name;
     rewardStoreButton.textContent = "슬롯에 저장";
     rewardSkipButton.hidden = false;
   } else {
+    rewardResultSymbol.hidden = false;
     rewardResultSymbol.textContent = "—";
     rewardResultName.textContent = "보상 없음";
     rewardResultCopy.textContent = "다음 스테이지에서 더 좋은 활약을 노려보세요.";
@@ -1432,7 +1474,17 @@ function update(delta: number): void {
   }
   if (ultimateEffect) {
     ultimateEffect.elapsed += delta;
-    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATION) ultimateEffect = null;
+    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATION) {
+      ultimateEffect = null;
+      if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;
+    }
+  }
+  if (ultimateResultDelay > 0) {
+    ultimateResultDelay = Math.max(0, ultimateResultDelay - delta);
+    if (ultimateResultDelay === 0 && state.gameStatus === "reward") {
+      playSound("stage_clear");
+      syncUi();
+    }
   }
   if (!paused) {
     for (let index = laserEffects.length - 1; index >= 0; index -= 1) {
