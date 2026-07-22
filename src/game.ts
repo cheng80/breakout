@@ -19,9 +19,12 @@ export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
 export const BLACK_HOLE_CYCLE_DURATION = 5;
 export const MULTIBALL_SCORE = 50;
 
-export type GameStatus = "ready" | "aiming" | "volley" | "gameOver";
-export type ItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
+export type GameStatus = "ready" | "aiming" | "volley" | "reward" | "gameOver";
+export type FieldItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
+export type UltimateItemType = "antimatter" | "orbitalLaser" | "chainLightning";
 export type BrickType = "normal" | "laser" | "steel";
+
+export const ULTIMATE_SLOT_COUNT = 2;
 
 export interface Vec2 {
   x: number;
@@ -124,12 +127,20 @@ export interface LaserTrigger {
   column: number;
 }
 
-export interface Item {
+export interface FieldItem {
   id: string;
   row: number;
   column: number;
-  type: ItemType;
+  type: FieldItemType;
   charges?: number;
+}
+
+export interface StageResult {
+  score: number;
+  targetScore: number;
+  timeMs: number;
+  targetTimeMs: number;
+  stars: number;
 }
 
 export interface GameState {
@@ -138,7 +149,14 @@ export interface GameState {
   ballCount: number;
   launchPosition: Vec2;
   bricks: Brick[];
-  items: Item[];
+  items: FieldItem[];
+  ultimateInventory: Array<UltimateItemType | null>;
+  pendingUltimateReward: UltimateItemType | null;
+  stageResult: StageResult | null;
+  stageScore: number;
+  stageTargetScore: number;
+  stagePlayTimeMs: number;
+  stageTargetTimeMs: number;
   gameStatus: GameStatus;
   shield: boolean;
   powerTurns: number;
@@ -155,7 +173,7 @@ const layouts = [
   ["55555555", "5.5..5.5", ".555555.", "5.BMS..5", ".55..55.", "555..555"],
 ] as const;
 
-const itemTypes: Record<string, ItemType> = {
+const itemTypes: Record<string, FieldItemType> = {
   B: "bomb",
   M: "multiball",
   S: "shield",
@@ -213,7 +231,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   })).filter((cell) => !occupied.has(`${cell.row}:${cell.column}`));
   openCells.sort(() => random() - 0.5);
   const hasBlackHole = stage >= 10 && (stage - 10) % 3 === 0;
-  let itemOrder: ItemType[];
+  let itemOrder: FieldItemType[];
   if (stage >= 31) {
     itemOrder = ["multiball", "power3", "power4", "bomb", "bomb"];
     if (stage % 3 === 0) itemOrder.push("shield");
@@ -231,7 +249,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   if (hasBlackHole) itemOrder.splice(Math.min(4, itemOrder.length), 0, "blackhole");
   const itemLimit = (stage >= 31 ? 7 : stage >= 16 ? 5 : 4) + Number(hasBlackHole);
   const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => {
-    const item: Item = { id: `s${stage}-i${index}`, ...openCells[index], type };
+    const item: FieldItem = { id: `s${stage}-i${index}`, ...openCells[index], type };
     if (type === "blackhole") item.charges = stage >= 31 ? 2 : 1;
     return item;
   });
@@ -242,7 +260,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
 function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   if (stage > layouts.length) return proceduralBoard(stage);
   const bricks: Brick[] = [];
-  const items: Item[] = [];
+  const items: FieldItem[] = [];
   const layout = layouts[stage - 1];
 
   layout.forEach((line, row) => {
@@ -261,12 +279,19 @@ function stageBoard(stage: number): Pick<GameState, "bricks" | "items"> {
 }
 
 export function createGame(): GameState {
+  const board = stageBoard(1);
   return {
     stage: 1,
     score: 0,
     ballCount: 1,
     launchPosition: { x: BOARD_WIDTH / 2, y: FLOOR_Y },
-    ...stageBoard(1),
+    ...board,
+    ultimateInventory: Array.from({ length: ULTIMATE_SLOT_COUNT }, () => null),
+    pendingUltimateReward: null,
+    stageResult: null,
+    stageScore: 0,
+    stagePlayTimeMs: 0,
+    ...stageGoals(board.bricks, board.items),
     gameStatus: "ready",
     shield: false,
     powerTurns: 0,
@@ -449,17 +474,17 @@ export function damageBrick(state: GameState, brickId: string, damage = 1): bool
 
   const applied = Math.min(brick.hp, Math.max(0, damage));
   brick.hp -= applied;
-  state.score += applied * 10;
+  addScore(state, applied * 10);
 
   if (brick.hp <= 0) {
     const cleared = brick.type === "laser"
       ? state.bricks.filter((candidate) => candidate.row === brick.row && candidate.type !== "steel")
       : [brick];
     state.bricks = state.bricks.filter((candidate) => !cleared.includes(candidate));
-    state.score += cleared
+    addScore(state, cleared
       .filter((candidate) => candidate !== brick)
-      .reduce((score, candidate) => score + candidate.hp * 10 + 40, 0);
-    state.score += 40;
+      .reduce((score, candidate) => score + candidate.hp * 10 + 40, 0));
+    addScore(state, 40);
     if (brick.type === "laser") state.pendingLaserTriggers.push({ row: brick.row, column: brick.column });
     return true;
   }
@@ -474,14 +499,14 @@ export function hitBrickWithBall(state: GameState, brickId: string): boolean {
   return damageBrick(state, brickId, state.powerTurns > 0 ? state.powerMultiplier : 1);
 }
 
-export function collectItem(state: GameState, itemId: string): ItemType | null {
+export function collectItem(state: GameState, itemId: string): FieldItemType | null {
   const item = state.items.find((candidate) => candidate.id === itemId);
   if (!item || item.type === "blackhole") return null;
   state.items = state.items.filter((candidate) => candidate.id !== itemId);
 
   if (item.type === "multiball") {
     state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
-    state.score += MULTIBALL_SCORE;
+    addScore(state, MULTIBALL_SCORE);
   } else if (item.type === "shield") {
     state.shield = true;
   } else if (item.type === "power" || item.type === "power3" || item.type === "power4") {
@@ -548,16 +573,110 @@ export function relocateBlackHoles(state: GameState, cycle: number): boolean {
 }
 
 export function advanceStageIfCleared(state: GameState): boolean {
-  if (state.bricks.some((brick) => brick.type !== "steel")) return false;
+  if (state.gameStatus === "reward" || state.bricks.some((brick) => brick.type !== "steel")) return false;
+  const result = createStageResult(state);
+  state.stageResult = result;
+  state.pendingUltimateReward = rollUltimateReward(result.stars);
+  state.gameStatus = "reward";
+  return true;
+}
+
+export function stageGoals(
+  bricks: Brick[],
+  items: FieldItem[],
+): Pick<GameState, "stageTargetScore" | "stageTargetTimeMs"> {
+  const destructible = bricks.filter((brick) => brick.type !== "steel");
+  const totalHp = destructible.reduce((total, brick) => total + brick.maxHp, 0);
+  const stageTargetScore = destructible.reduce((total, brick) => total + brick.maxHp * 10 + 40, 0)
+    + items.filter((item) => item.type === "multiball").length * MULTIBALL_SCORE;
+  // ponytail: 초기 휴리스틱, 실플레이 데이터가 쌓이면 스테이지별 파 타임으로 교체합니다.
+  const targetSeconds = 12 + destructible.length * 0.5 + Math.sqrt(totalHp) * 3
+    + bricks.filter((brick) => brick.type === "steel").length * 4;
+  return { stageTargetScore, stageTargetTimeMs: Math.round(targetSeconds * 1000) };
+}
+
+export function stageResultStars(
+  score: number,
+  targetScore: number,
+  timeMs: number,
+  targetTimeMs: number,
+): number {
+  let stars = 1;
+  if (score >= targetScore) stars += 1;
+  if (timeMs > 0 && timeMs <= targetTimeMs) stars += 1;
+  if (timeMs > 0 && timeMs <= targetTimeMs * 0.8) stars += 1;
+  if (timeMs > 0 && timeMs <= targetTimeMs * 0.6) stars += 1;
+  return stars;
+}
+
+export function rollUltimateReward(
+  stars: number,
+  random: () => number = Math.random,
+): UltimateItemType | null {
+  const roll = random();
+  if (stars <= 1 || (stars === 2 && roll < 0.8) || (stars === 3 && roll < 0.5) || (stars === 4 && roll < 0.2)) return null;
+  const rewardRoll = stars === 2 ? (roll - 0.8) / 0.2
+    : stars === 3 ? (roll - 0.5) / 0.5
+      : stars === 4 ? (roll - 0.2) / 0.8
+        : roll;
+  const antimatterWeight = stars >= 5 ? 0.45 : stars === 4 ? 0.3 : stars === 3 ? 0.15 : 0.05;
+  const orbitalWeight = stars >= 5 ? 0.35 : stars === 4 ? 0.4 : stars === 3 ? 0.35 : 0.25;
+  if (rewardRoll < antimatterWeight) return "antimatter";
+  if (rewardRoll < antimatterWeight + orbitalWeight) return "orbitalLaser";
+  return "chainLightning";
+}
+
+export function acceptUltimateReward(
+  state: GameState,
+  replacementSlot?: number,
+): boolean {
+  if (state.gameStatus !== "reward") return false;
+  if (!state.pendingUltimateReward) {
+    finishReward(state);
+    return true;
+  }
+  const emptySlot = state.ultimateInventory.indexOf(null);
+  const slot = emptySlot >= 0 ? emptySlot : replacementSlot;
+  if (slot === undefined || !Number.isInteger(slot) || slot < 0 || slot >= ULTIMATE_SLOT_COUNT) return false;
+
+  state.ultimateInventory[slot] = state.pendingUltimateReward;
+  finishReward(state);
+  return true;
+}
+
+export function discardUltimateReward(state: GameState): boolean {
+  if (state.gameStatus !== "reward") return false;
+  finishReward(state);
+  return true;
+}
+
+function finishReward(state: GameState): void {
+  state.pendingUltimateReward = null;
+  state.stageResult = null;
   state.stage += 1;
   state.shield = false;
   state.powerTurns = 0;
   state.powerMultiplier = 1;
   state.pendingLaserTriggers = [];
   state.launchPosition = { x: BOARD_WIDTH / 2, y: FLOOR_Y };
-  Object.assign(state, stageBoard(state.stage));
+  const board = stageBoard(state.stage);
+  Object.assign(state, board, stageGoals(board.bricks, board.items), { stageScore: 0, stagePlayTimeMs: 0 });
   state.gameStatus = "ready";
-  return true;
+}
+
+function createStageResult(state: GameState): StageResult {
+  return {
+    score: state.stageScore,
+    targetScore: state.stageTargetScore,
+    timeMs: Math.round(state.stagePlayTimeMs),
+    targetTimeMs: state.stageTargetTimeMs,
+    stars: stageResultStars(state.stageScore, state.stageTargetScore, state.stagePlayTimeMs, state.stageTargetTimeMs),
+  };
+}
+
+function addScore(state: GameState, score: number): void {
+  state.score += score;
+  state.stageScore += score;
 }
 
 function addTurnMultiball(state: GameState): void {

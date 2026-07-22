@@ -182,6 +182,7 @@ button {
 }
 
 .topbar {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -190,6 +191,7 @@ button {
 
 .top-actions {
   display: flex;
+  flex: 0 0 auto;
   gap: 7px;
 }
 
@@ -201,12 +203,15 @@ button {
 }
 
 .brand-title {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   color: #c7ceff;
-  font-size: clamp(20px, 6vw, 26px);
+  font-size: clamp(15px, 4.5vw, 21px);
   line-height: 1;
   font-weight: 900;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow: 0 0 16px rgba(165, 175, 255, 0.36);
 }
@@ -528,6 +533,17 @@ button {
   font-size: 22px;
 }
 
+.item-help-card h3 {
+  margin: 14px 0 8px;
+  color: #aeb7ff;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.item-help-card h2 + h3 {
+  margin-top: 0;
+}
+
 .item-help-list {
   margin: 0;
   padding: 0;
@@ -564,6 +580,263 @@ button {
   display: block;
   color: #f5f8ff;
   font-size: 12px;
+}
+
+.reward-dialog {
+  z-index: 4;
+  background: rgba(4, 11, 22, 0.84);
+}
+
+.reward-card {
+  width: min(100%, 320px);
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.reward-card h2 {
+  margin-bottom: 6px;
+  text-wrap: balance;
+}
+
+.reward-card .reward-description {
+  margin-bottom: 8px;
+  color: #a9b4c8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.reward-card.replacing .reward-description,
+.reward-card.replacing .reward-stars,
+.reward-card.replacing .reward-scorecard,
+.reward-card.replacing .reward-result {
+  display: none;
+}
+
+.reward-stars {
+  margin-bottom: 10px;
+  color: #ffd65a;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-shadow: 0 0 18px rgba(255, 214, 90, 0.42);
+}
+
+.reward-scorecard {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reward-scorecard p {
+  min-width: 0;
+  margin: 0;
+  padding: 9px;
+  display: grid;
+  gap: 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.reward-scorecard span {
+  color: #8f9db2;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.reward-scorecard strong {
+  overflow: hidden;
+  color: #f5f8ff;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reward-scorecard small {
+  overflow: hidden;
+  color: #6f7d92;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reward-actions[hidden],
+.reward-replacement[hidden] {
+  display: none;
+}
+
+.reward-result {
+  min-height: 72px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.reward-replacement button:active {
+  transform: scale(0.96);
+}
+
+.ultimate-symbol {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.reward-result > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.reward-result strong {
+  color: #f5f8ff;
+  font-size: 14px;
+}
+
+.reward-result small {
+  color: #9ba8bc;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.reward-result.no-reward .ultimate-symbol {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  color: #758297;
+}
+
+.reward-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 8px;
+}
+
+.reward-actions button,
+.reward-replacement .reward-skip {
+  min-height: 44px;
+  margin: 0;
+}
+
+.reward-card .reward-skip {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  color: #b9c4d6;
+  font-size: 11px;
+}
+
+.ultimate-antimatter {
+  background: radial-gradient(circle, #ffffff 0 8%, #b68cff 10% 28%, #6729bd 48%, #171029 72%);
+  box-shadow: 0 0 18px rgba(182, 140, 255, 0.5);
+}
+
+.ultimate-orbital {
+  background: linear-gradient(145deg, #36d8ff, #1460c9);
+  box-shadow: 0 0 18px rgba(54, 216, 255, 0.42);
+}
+
+.ultimate-lightning {
+  background: linear-gradient(145deg, #fff39a, #d68b0c);
+  box-shadow: 0 0 18px rgba(255, 216, 74, 0.42);
+  color: #2b2100;
+}
+
+.reward-replacement > p {
+  margin: 4px 0 12px;
+  color: #a9b4c8;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.reward-replacement > p strong {
+  color: #f5f8ff;
+}
+
+.reward-replacement-slots {
+  display: grid;
+  gap: 8px;
+}
+
+.reward-replacement-slots button {
+  min-height: 48px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09);
+  font-size: 12px;
+}
+
+.reward-replacement .reward-back {
+  min-height: 40px;
+  margin-top: 10px;
+  background: transparent;
+  box-shadow: none;
+  color: #aeb7ff;
+  font-size: 11px;
+}
+
+.reward-dialog:not([hidden]) .reward-card > p,
+.reward-dialog:not([hidden]) .reward-card > h2,
+.reward-dialog:not([hidden]) .reward-stars,
+.reward-dialog:not([hidden]) .reward-scorecard,
+.reward-dialog:not([hidden]) .reward-result,
+.reward-dialog:not([hidden]) .reward-actions {
+  opacity: 0;
+  transform: translateY(10px);
+  filter: blur(4px);
+  animation: reward-enter 320ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.reward-dialog:not([hidden]) .reward-card > h2 {
+  animation-delay: 70ms;
+}
+
+.reward-dialog:not([hidden]) .reward-card > .reward-description {
+  animation-delay: 140ms;
+}
+
+.reward-dialog:not([hidden]) .reward-stars {
+  animation-delay: 210ms;
+}
+
+.reward-dialog:not([hidden]) .reward-scorecard {
+  animation-delay: 280ms;
+}
+
+.reward-dialog:not([hidden]) .reward-result {
+  animation-delay: 350ms;
+}
+
+.reward-dialog:not([hidden]) .reward-actions {
+  animation-delay: 420ms;
+}
+
+@keyframes reward-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
 }
 
 .result > p:first-child {
@@ -1009,9 +1282,107 @@ button {
 .control-panel {
   min-height: 40px;
   padding: 7px 9px;
+  display: grid;
+  gap: 7px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.055);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16), inset 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.ultimate-tray {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 7px;
+}
+
+.ultimate-tray-heading {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.ultimate-tray-heading span {
+  color: #aeb7ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.ultimate-tray-heading small {
+  color: #78869c;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ultimate-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ultimate-slot {
+  position: relative;
+  min-width: 0;
+  min-height: 46px;
+  padding: 5px 7px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: #78869c;
+  text-align: left;
+}
+
+.ultimate-slot.filled {
+  background: rgba(108, 124, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(158, 170, 255, 0.18), 0 5px 16px rgba(0, 0, 0, 0.12);
+}
+
+.ultimate-slot-number {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  color: #69768b;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.ultimate-slot-symbol {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 15px;
+}
+
+.ultimate-slot > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.ultimate-slot strong,
+.ultimate-slot small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ultimate-slot strong {
+  color: #c8d1e2;
+  font-size: 9px;
+}
+
+.ultimate-slot small {
+  color: #77859a;
+  font-size: 8px;
 }
 
 .control-status {
@@ -1062,6 +1433,20 @@ button {
   background: linear-gradient(145deg, #7d8ca3, #465267);
 }
 
+.legend-antimatter {
+  background: radial-gradient(circle, #fff 0 8%, #b68cff 10% 28%, #6729bd 48%, #171029 72%);
+  box-shadow: 0 0 12px rgba(182, 140, 255, 0.45);
+}
+
+.legend-orbital {
+  background: linear-gradient(145deg, #36d8ff, #1460c9);
+}
+
+.legend-lightning {
+  background: linear-gradient(145deg, #fff39a, #d68b0c);
+  color: #2b2100 !important;
+}
+
 #status-dot {
   width: 7px;
   height: 7px;
@@ -1073,6 +1458,11 @@ button {
 #status-dot[data-state="volley"] {
   background: #ffc145;
   box-shadow: 0 0 12px rgba(255, 193, 69, 0.65);
+}
+
+#status-dot[data-state="reward"] {
+  background: #b68cff;
+  box-shadow: 0 0 12px rgba(182, 140, 255, 0.7);
 }
 
 #status-dot[data-state="gameOver"] {
@@ -1092,6 +1482,27 @@ button {
   }
 
   .hud div {
+    padding-block: 5px;
+  }
+
+  .ultimate-tray {
+    grid-template-columns: 54px 1fr;
+    gap: 5px;
+  }
+
+  .ultimate-slot {
+    min-height: 40px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .ultimate-slot-symbol {
+    width: 24px;
+    height: 24px;
+  }
+
+  .control-panel {
+    gap: 4px;
     padding-block: 5px;
   }
 }
@@ -1119,5 +1530,18 @@ button {
   .result button,
   .item-help-card button {
     transition-duration: 0ms;
+  }
+
+
+  .reward-dialog:not([hidden]) .reward-card > p,
+  .reward-dialog:not([hidden]) .reward-card > h2,
+  .reward-dialog:not([hidden]) .reward-stars,
+  .reward-dialog:not([hidden]) .reward-scorecard,
+  .reward-dialog:not([hidden]) .reward-result,
+  .reward-dialog:not([hidden]) .reward-actions {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    animation: none;
   }
 }

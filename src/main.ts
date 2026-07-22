@@ -46,9 +46,11 @@ import {
   bombEffectFrame,
   brickHitEffectFrame,
   captureBallByBlackHole,
+  acceptUltimateReward,
   collectItem,
   consumeLaserTriggers,
   createGame,
+  discardUltimateReward,
   finishVolley,
   hitBrickWithBall,
   laserEffectFrame,
@@ -60,7 +62,8 @@ import {
   stabilizeBounce,
   traceAimPath,
   type Brick,
-  type Item,
+  type FieldItem,
+  type UltimateItemType,
   type Vec2,
 } from "./game";
 import type { GameStatus } from "./game";
@@ -133,6 +136,7 @@ let rankingLoaded = false;
 let rankingSubmitting = false;
 let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
+let rewardReplacementOpen = false;
 let purePlayTimeMs = 0;
 let fpsVisible = loadFpsVisibility();
 let fpsSampleElapsedMs = 0;
@@ -249,6 +253,34 @@ const fpsValue = document.querySelector<HTMLElement>("#fps-value")!;
 const resetConfirmDialog = document.querySelector<HTMLElement>("#reset-confirm")!;
 const resetCancelButton = document.querySelector<HTMLButtonElement>("#reset-cancel")!;
 const resetConfirmButton = document.querySelector<HTMLButtonElement>("#reset-confirm-button")!;
+const rewardDialog = document.querySelector<HTMLElement>("#stage-reward")!;
+const rewardCard = rewardDialog.querySelector<HTMLElement>(".reward-card")!;
+const rewardStage = document.querySelector<HTMLElement>("#reward-stage")!;
+const rewardStars = document.querySelector<HTMLElement>("#reward-stars")!;
+const rewardTime = document.querySelector<HTMLElement>("#reward-time")!;
+const rewardTargetTime = document.querySelector<HTMLElement>("#reward-target-time")!;
+const rewardScore = document.querySelector<HTMLElement>("#reward-score")!;
+const rewardTargetScore = document.querySelector<HTMLElement>("#reward-target-score")!;
+const rewardResult = document.querySelector<HTMLElement>("#reward-result")!;
+const rewardResultSymbol = document.querySelector<HTMLElement>("#reward-result-symbol")!;
+const rewardResultName = document.querySelector<HTMLElement>("#reward-result-name")!;
+const rewardResultCopy = document.querySelector<HTMLElement>("#reward-result-copy")!;
+const rewardActions = document.querySelector<HTMLElement>("#reward-actions")!;
+const rewardStoreButton = document.querySelector<HTMLButtonElement>("#reward-store")!;
+const rewardSkipButton = document.querySelector<HTMLButtonElement>("#reward-skip")!;
+const rewardReplaceSkipButton = document.querySelector<HTMLButtonElement>("#reward-replace-skip")!;
+const rewardReplacement = document.querySelector<HTMLElement>("#reward-replacement")!;
+const rewardReplacementName = document.querySelector<HTMLElement>("#reward-replacement-name")!;
+const rewardBackButton = document.querySelector<HTMLButtonElement>("#reward-back")!;
+const rewardReplacementButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-replace-slot]")];
+const ultimateSlotButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-ultimate-slot]")];
+const ultimateSlotCount = document.querySelector<HTMLElement>("#ultimate-slot-count")!;
+
+const ultimateDetails: Record<UltimateItemType, { name: string; symbol: string; className: string }> = {
+  antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter" },
+  orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital" },
+  chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning" },
+};
 
 const iconMarkup: Record<string, string> = {
   settings: settingsIcon,
@@ -273,7 +305,7 @@ const brickRect = (brick: Brick) => ({
   height: BRICK_HEIGHT,
 });
 
-const itemCenter = (item: Pick<Item, "row" | "column">) => ({
+const itemCenter = (item: Pick<FieldItem, "row" | "column">) => ({
   x: GRID_MARGIN + item.column * (CELL_WIDTH + GRID_GAP) + CELL_WIDTH / 2,
   y: GRID_TOP + item.row * CELL_HEIGHT + BRICK_HEIGHT / 2,
 });
@@ -313,6 +345,7 @@ function reset(): void {
   if (shieldRewindEffect) timedEffectPool.release(shieldRewindEffect);
   brickHitEffects.forEach((effect) => timedEffectPool.release(effect));
   resetGame(state);
+  rewardReplacementOpen = false;
   hasNewBestScore = false;
   aimStart = null;
   aimCurrent = null;
@@ -421,11 +454,11 @@ rankingForm.addEventListener("submit", (event) => {
   void submitCurrentScore();
 });
 helpButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !optionsOpen && !rankingOpen) setHelpOpen(!helpOpen);
+  if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
 helpCloseButton.addEventListener("click", () => setHelpOpen(false));
 optionsButton.addEventListener("click", () => {
-  if (!resetConfirmOpen && !rankingOpen) setOptionsOpen(!optionsOpen);
+  if (!resetConfirmOpen && !rankingOpen && state.gameStatus !== "reward") setOptionsOpen(!optionsOpen);
 });
 optionsCloseButton.addEventListener("click", () => setOptionsOpen(false));
 optionsRestartButton.addEventListener("click", () => {
@@ -457,6 +490,34 @@ fpsToggleButton.addEventListener("click", () => {
 });
 resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
 resetConfirmButton.addEventListener("click", reset);
+rewardStoreButton.addEventListener("click", () => {
+  if (acceptUltimateReward(state)) {
+    rewardReplacementOpen = false;
+    syncUi();
+    return;
+  }
+  rewardReplacementOpen = true;
+  syncUi();
+});
+rewardReplacementButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const slot = Number(button.dataset.replaceSlot);
+    if (!acceptUltimateReward(state, slot)) return;
+    rewardReplacementOpen = false;
+    syncUi();
+  });
+});
+rewardBackButton.addEventListener("click", () => {
+  rewardReplacementOpen = false;
+  syncUi();
+});
+[rewardSkipButton, rewardReplaceSkipButton].forEach((button) => {
+  button.addEventListener("click", () => {
+    if (!discardUltimateReward(state)) return;
+    rewardReplacementOpen = false;
+    syncUi();
+  });
+});
 document.querySelectorAll<HTMLButtonElement>("button:not([data-audio-control])").forEach((button) => {
   button.addEventListener("click", () => playSound("ui_click"));
 });
@@ -763,12 +824,14 @@ function syncUi(): void {
     ready: state.powerTurns > 0 ? `강화볼 준비 · 공격력 ×${state.powerMultiplier}` : "공의 방향을 정하고 발사 하세요.",
     aiming: "손을 떼면 발사합니다",
     volley: state.powerTurns > 0 ? `강화볼 발사 중 · 공격력 ×${state.powerMultiplier}` : "공이 모두 돌아올 때까지 기다리세요",
+    reward: "스테이지 클리어 · 보상을 확인하세요",
     gameOver: "벽돌이 위험선에 닿았습니다",
   } as const;
   statusEl.textContent = shieldRewindEffect ? "보호막 발동 · 한 칸 되돌리는 중" : messages[state.gameStatus];
   statusDot.dataset.state = state.gameStatus;
 
   result.hidden = state.gameStatus !== "gameOver";
+  syncUltimateUi();
   if (state.gameStatus === "gameOver") {
     resultScore.textContent = state.score.toLocaleString("ko-KR");
     resultBestScore.textContent = bestScore.toLocaleString("ko-KR");
@@ -780,6 +843,70 @@ function syncUi(): void {
       void loadRanking();
     }
   }
+}
+
+function syncUltimateUi(): void {
+  const stored = state.ultimateInventory.filter(Boolean).length;
+  ultimateSlotCount.textContent = `${stored} / ${state.ultimateInventory.length}`;
+  ultimateSlotButtons.forEach((button, index) => {
+    const type = state.ultimateInventory[index];
+    const symbol = button.querySelector<HTMLElement>(".ultimate-slot-symbol")!;
+    const name = button.querySelector<HTMLElement>("strong")!;
+    const hint = button.querySelector<HTMLElement>("small")!;
+    symbol.className = "ultimate-slot-symbol";
+    if (!type) {
+      symbol.textContent = "+";
+      name.textContent = "비어 있음";
+      hint.textContent = "클리어 보상";
+      button.classList.remove("filled");
+      return;
+    }
+    const detail = ultimateDetails[type];
+    symbol.textContent = detail.symbol;
+    symbol.classList.add(detail.className);
+    name.textContent = detail.name;
+    hint.textContent = "발동 준비";
+    button.classList.add("filled");
+  });
+
+  rewardDialog.hidden = state.gameStatus !== "reward";
+  if (state.gameStatus !== "reward") return;
+  rewardActions.hidden = rewardReplacementOpen;
+  rewardReplacement.hidden = !rewardReplacementOpen;
+  rewardCard.classList.toggle("replacing", rewardReplacementOpen);
+  const stageResult = state.stageResult;
+  if (!stageResult) return;
+  rewardStage.textContent = String(state.stage).padStart(2, "0");
+  rewardStars.textContent = `${"★".repeat(stageResult.stars)}${"☆".repeat(5 - stageResult.stars)}`;
+  rewardStars.setAttribute("aria-label", `별 ${stageResult.stars}개`);
+  rewardTime.textContent = formatPlayTime(stageResult.timeMs);
+  rewardTargetTime.textContent = `/ ${formatPlayTime(stageResult.targetTimeMs)}`;
+  rewardScore.textContent = stageResult.score.toLocaleString("ko-KR");
+  rewardTargetScore.textContent = `/ ${stageResult.targetScore.toLocaleString("ko-KR")}`;
+  rewardResultSymbol.className = "ultimate-symbol";
+  rewardResult.classList.toggle("no-reward", !state.pendingUltimateReward);
+  if (state.pendingUltimateReward) {
+    const detail = ultimateDetails[state.pendingUltimateReward];
+    rewardResultSymbol.textContent = detail.symbol;
+    rewardResultSymbol.classList.add(detail.className);
+    rewardResultName.textContent = detail.name;
+    rewardResultCopy.textContent = "궁극기 보상을 획득했습니다.";
+    rewardReplacementName.textContent = detail.name;
+    rewardStoreButton.textContent = "슬롯에 저장";
+    rewardSkipButton.hidden = false;
+  } else {
+    rewardResultSymbol.textContent = "—";
+    rewardResultName.textContent = "보상 없음";
+    rewardResultCopy.textContent = "다음 스테이지에서 더 좋은 활약을 노려보세요.";
+    rewardStoreButton.textContent = "다음 스테이지";
+    rewardSkipButton.hidden = true;
+  }
+  rewardReplacementButtons.forEach((button, index) => {
+    const storedType = state.ultimateInventory[index];
+    button.textContent = storedType
+      ? `${index + 1}번 · ${ultimateDetails[storedType].name} 교체`
+      : `${index + 1}번 · 빈 슬롯`;
+  });
 }
 
 function rebuildLabels(): void {
@@ -1023,7 +1150,7 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
     return false;
   }
 
-  let nearest: { item: Item; center: Vec2; distance: number } | null = null;
+  let nearest: { item: FieldItem; center: Vec2; distance: number } | null = null;
   state.items.forEach((item) => {
     if (item.type !== "blackhole") return;
     const center = itemCenter(item);
@@ -1037,7 +1164,7 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
     return false;
   }
 
-  const target = nearest as { item: Item; center: Vec2; distance: number };
+  const target = nearest as { item: FieldItem; center: Vec2; distance: number };
   if (target.distance <= BLACK_HOLE_CAPTURE_RADIUS && presence >= 0.7) {
     const remaining = captureBallByBlackHole(state, target.item.id);
     if (remaining !== null) {
@@ -1168,9 +1295,11 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
 }
 
 function update(delta: number): void {
-  const paused = helpOpen || optionsOpen || resetConfirmOpen || rankingOpen;
+  const paused = helpOpen || optionsOpen || resetConfirmOpen || rankingOpen || state.gameStatus === "reward";
   if (!paused && (state.gameStatus === "aiming" || state.gameStatus === "volley")) {
-    purePlayTimeMs += Math.min(delta, 0.032) * 1000;
+    const activeTimeMs = Math.min(delta, 0.032) * 1000;
+    purePlayTimeMs += activeTimeMs;
+    state.stagePlayTimeMs += activeTimeMs;
   }
   if (!paused) {
     brickHitEffects.forEach((effect, brickId) => {
@@ -1241,12 +1370,11 @@ function update(delta: number): void {
     }
 
     if (state.gameStatus === "volley" && activeBalls.length === 0) {
-      const previousStage = state.stage;
       const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
       if (shieldRewound) {
         shieldRewindEffect = timedEffectPool.acquire();
         playSound("shield_rewind");
-      } else if (state.stage > previousStage) {
+      } else if ((state.gameStatus as GameStatus) === "reward") {
         playSound("stage_clear");
       } else if ((state.gameStatus as GameStatus) === "gameOver") {
         playSound("game_over");

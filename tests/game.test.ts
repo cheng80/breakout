@@ -30,6 +30,7 @@ import {
   MULTIBALL_SCORE,
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
+  acceptUltimateReward,
   advanceStageIfCleared,
   aimFromDrag,
   blackHolePresence,
@@ -42,16 +43,25 @@ import {
   consumeLaserTriggers,
   createGame,
   damageBrick,
+  discardUltimateReward,
   finishVolley,
   hitBrickWithBall,
   laserEffectFrame,
   prepareVolley,
   relocateBlackHoles,
   resolveCircleRectCollision,
+  rollUltimateReward,
   shieldRewindFrame,
   stabilizeBounce,
+  stageResultStars,
   traceAimPath,
 } from "../src/game";
+
+function advanceThroughReward(state: ReturnType<typeof createGame>): void {
+  expect(advanceStageIfCleared(state)).toBe(true);
+  expect(state.gameStatus).toBe("reward");
+  expect(discardUltimateReward(state)).toBe(true);
+}
 
 describe("핵심 게임 규칙", () => {
   it("같은 효과음은 설정된 간격이 지나기 전에는 중복 재생하지 않는다", () => {
@@ -187,9 +197,9 @@ describe("핵심 게임 규칙", () => {
     expect(state.bricks.some((brick) => brick.id === "edge-steel")).toBe(false);
 
     state.bricks = state.bricks.filter((brick) => brick.type === "steel");
-    expect(advanceStageIfCleared(state)).toBe(true);
+    advanceThroughReward(state);
     state.bricks = [];
-    expect(advanceStageIfCleared(state)).toBe(true);
+    advanceThroughReward(state);
     expect(state.bricks.some((brick) => brick.type === "steel")).toBe(true);
   });
 
@@ -281,13 +291,15 @@ describe("핵심 게임 규칙", () => {
     expect(state.ballCount).toBe(1);
     expect(state.bricks).toHaveLength(8);
     expect(state.bricks.every((brick) => brick.row <= 1 && brick.hp === 1)).toBe(true);
+    expect(state.stageTargetScore).toBe(450);
+    expect(state.stageTargetTimeMs).toBeGreaterThan(0);
     state.ballCount = 99;
     expect(MAX_BALLS).toBe(30);
     expect(prepareVolley(state)).toBe(MAX_BALLS);
     expect(state.gameStatus).toBe("volley");
   });
 
-  it("벽돌 피해와 제거 점수를 적용하고 모든 벽돌 제거 시 다음 스테이지로 간다", () => {
+  it("벽돌을 모두 제거하면 보상 확인 후 다음 스테이지로 간다", () => {
     const state = createGame();
     const target = state.bricks[0];
     damageBrick(state, target.id, target.hp);
@@ -297,10 +309,77 @@ describe("핵심 게임 규칙", () => {
     state.bricks = [];
     state.ballCount = 3;
     expect(advanceStageIfCleared(state)).toBe(true);
+    expect(state.stage).toBe(1);
+    expect(state.gameStatus).toBe("reward");
+    expect(discardUltimateReward(state)).toBe(true);
     expect(state.stage).toBe(2);
     expect(state.ballCount).toBe(3);
     expect(state.items.some((item) => item.type === "power")).toBe(true);
     expect(state.bricks.some((brick) => brick.type === "laser")).toBe(true);
+  });
+
+  it("스테이지 목표 점수와 기준 시간으로 별과 가중치 보상을 결정한다", () => {
+    expect(stageResultStars(100, 100, 500, 1000)).toBe(5);
+    expect(stageResultStars(100, 100, 700, 1000)).toBe(4);
+    expect(stageResultStars(100, 100, 900, 1000)).toBe(3);
+    expect(stageResultStars(100, 100, 1200, 1000)).toBe(2);
+    expect(stageResultStars(90, 100, 1200, 1000)).toBe(1);
+
+    expect(rollUltimateReward(1, () => 0.99)).toBeNull();
+    expect(rollUltimateReward(2, () => 0.79)).toBeNull();
+    expect(rollUltimateReward(2, () => 0.805)).toBe("antimatter");
+    expect(rollUltimateReward(2, () => 0.99)).toBe("chainLightning");
+    expect(rollUltimateReward(3, () => 0.49)).toBeNull();
+    expect(rollUltimateReward(3, () => 0.7)).toBe("orbitalLaser");
+    expect(rollUltimateReward(4, () => 0.1)).toBeNull();
+    expect(rollUltimateReward(5, () => 0.1)).toBe("antimatter");
+    expect(rollUltimateReward(5, () => 0.6)).toBe("orbitalLaser");
+    expect(rollUltimateReward(5, () => 0.9)).toBe("chainLightning");
+  });
+
+  it("보상을 저장·교체·건너뛴 뒤에만 다음 스테이지를 불러온다", () => {
+    const state = createGame();
+    state.bricks = [];
+    state.stageScore = state.stageTargetScore;
+    state.stagePlayTimeMs = state.stageTargetTimeMs * 0.5;
+    expect(advanceStageIfCleared(state)).toBe(true);
+    expect(state.stage).toBe(1);
+    expect(state.stageResult?.stars).toBe(5);
+    expect(state.pendingUltimateReward).not.toBeNull();
+    const firstReward = state.pendingUltimateReward;
+    expect(acceptUltimateReward(state)).toBe(true);
+    expect(state.stage).toBe(2);
+    expect(state.ultimateInventory[0]).toBe(firstReward);
+
+    state.ultimateInventory = ["antimatter", "orbitalLaser"];
+    state.bricks = [];
+    state.stageScore = state.stageTargetScore;
+    state.stagePlayTimeMs = state.stageTargetTimeMs * 0.5;
+    advanceStageIfCleared(state);
+    const replacement = state.pendingUltimateReward;
+    expect(acceptUltimateReward(state)).toBe(false);
+    expect(state.stage).toBe(2);
+    expect(acceptUltimateReward(state, 1)).toBe(true);
+    expect(state.ultimateInventory).toEqual(["antimatter", replacement]);
+    expect(state.stage).toBe(3);
+
+    const inventory = [...state.ultimateInventory];
+    state.bricks = [];
+    state.stageScore = state.stageTargetScore;
+    state.stagePlayTimeMs = state.stageTargetTimeMs * 0.5;
+    advanceStageIfCleared(state);
+    expect(discardUltimateReward(state)).toBe(true);
+    expect(state.ultimateInventory).toEqual(inventory);
+    expect(state.stage).toBe(4);
+
+    state.bricks = [];
+    state.stageScore = 0;
+    state.stagePlayTimeMs = state.stageTargetTimeMs * 2;
+    advanceStageIfCleared(state);
+    expect(state.stageResult?.stars).toBe(1);
+    expect(state.pendingUltimateReward).toBeNull();
+    expect(acceptUltimateReward(state)).toBe(true);
+    expect(state.stage).toBe(5);
   });
 
   it("멀티볼, 쉴드, 폭탄, 강화볼, 공 감소 함정을 규칙대로 적용한다", () => {
@@ -403,7 +482,7 @@ describe("핵심 게임 규칙", () => {
     const first = createGame();
     first.stage = 5;
     first.bricks = [];
-    expect(advanceStageIfCleared(first)).toBe(true);
+    advanceThroughReward(first);
     expect(first.stage).toBe(6);
     expect(first.gameStatus).toBe("ready");
     expect(first.bricks.length).toBeGreaterThan(0);
@@ -414,14 +493,14 @@ describe("핵심 게임 규칙", () => {
     const second = createGame();
     second.stage = 5;
     second.bricks = [];
-    advanceStageIfCleared(second);
+    advanceThroughReward(second);
     expect(second.bricks).toEqual(first.bricks);
     expect(second.items).toEqual(first.items);
 
     const far = createGame();
     far.stage = 99;
     far.bricks = [];
-    advanceStageIfCleared(far);
+    advanceThroughReward(far);
     expect(far.stage).toBe(100);
     expect(far.bricks.length).toBeGreaterThan(0);
     const farHp = far.bricks.filter((brick) => brick.type !== "steel").map((brick) => brick.hp);
@@ -433,7 +512,7 @@ describe("핵심 게임 규칙", () => {
       const state = createGame();
       state.stage = 5 + index;
       state.bricks = [];
-      advanceStageIfCleared(state);
+      advanceThroughReward(state);
       return state;
     });
     const signatures = generated.map((state) => state.bricks
@@ -453,7 +532,7 @@ describe("핵심 게임 규칙", () => {
     const late = createGame();
     late.stage = 18;
     late.bricks = [];
-    advanceStageIfCleared(late);
+    advanceThroughReward(late);
     expect(late.bricks.length).toBeGreaterThan(first.bricks.length);
     expect(late.bricks.filter((brick) => brick.type === "laser")).toHaveLength(2);
     expect(late.items.filter((item) => item.type === "power" || item.type === "power3")).toHaveLength(2);
@@ -464,7 +543,7 @@ describe("핵심 게임 규칙", () => {
     const sevenRows = createGame();
     sevenRows.stage = 30;
     sevenRows.bricks = [];
-    advanceStageIfCleared(sevenRows);
+    advanceThroughReward(sevenRows);
     expect(sevenRows.stage).toBe(31);
     expect(new Set(sevenRows.bricks.map((brick) => brick.row)).size).toBe(7);
     expect(sevenRows.bricks.filter((brick) => brick.type === "laser")).toHaveLength(3);
@@ -476,7 +555,7 @@ describe("핵심 게임 규칙", () => {
     const maxDensity = createGame();
     maxDensity.stage = 38;
     maxDensity.bricks = [];
-    advanceStageIfCleared(maxDensity);
+    advanceThroughReward(maxDensity);
     expect(maxDensity.stage).toBe(39);
     expect(maxDensity.bricks).toHaveLength(52);
     expect(maxDensity.items).toHaveLength(4);
@@ -485,25 +564,25 @@ describe("핵심 게임 규칙", () => {
     const firstBlackHole = createGame();
     firstBlackHole.stage = 9;
     firstBlackHole.bricks = [];
-    advanceStageIfCleared(firstBlackHole);
+    advanceThroughReward(firstBlackHole);
     expect(firstBlackHole.stage).toBe(10);
     expect(firstBlackHole.items.find((item) => item.type === "blackhole")?.charges).toBe(1);
 
     const firstTrap = createGame();
     firstTrap.stage = 10;
     firstTrap.bricks = [];
-    advanceStageIfCleared(firstTrap);
+    advanceThroughReward(firstTrap);
     expect(firstTrap.items.filter((item) => item.type === "trap")).toHaveLength(1);
     expect(firstTrap.items.some((item) => item.type === "blackhole")).toBe(false);
 
     const doubleTrap = createGame();
     doubleTrap.stage = 30;
     doubleTrap.bricks = [];
-    advanceStageIfCleared(doubleTrap);
+    advanceThroughReward(doubleTrap);
     expect(doubleTrap.items.filter((item) => item.type === "trap")).toHaveLength(2);
   });
 
-  it("마지막 벽돌 제거 후 volley 회수가 끝날 때 다음 스테이지로 이동한다", () => {
+  it("마지막 벽돌 제거 후 보상 처리를 마쳐야 다음 스테이지로 이동한다", () => {
     const state = createGame();
     state.ballCount = 2;
     state.bricks = [];
@@ -511,6 +590,9 @@ describe("핵심 게임 규칙", () => {
 
     expect(state.stage).toBe(1);
     finishVolley(state, 120);
+    expect(state.stage).toBe(1);
+    expect(state.gameStatus).toBe("reward");
+    discardUltimateReward(state);
     expect(state.stage).toBe(2);
     expect(state.ballCount).toBe(2);
     expect(state.gameStatus).toBe("ready");
