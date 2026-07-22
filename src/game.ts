@@ -17,6 +17,7 @@ export const BLACK_HOLE_INFLUENCE_RADIUS = 110;
 export const BLACK_HOLE_CAPTURE_RADIUS = 9;
 export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
 export const BLACK_HOLE_CYCLE_DURATION = 5;
+export const BLACK_HOLE_CLEAR_FADE_DURATION = 0.15;
 export const MULTIBALL_SCORE = 50;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "reward" | "gameOver";
@@ -36,6 +37,10 @@ export const ULTIMATE_SLOT_COUNT = 2;
 
 export function orbitalLaserStartColumn(targetColumn: number): number {
   return Math.max(0, Math.min(GRID_COLUMNS - 3, targetColumn - 1));
+}
+
+function blackHoleChargesForStage(stage: number): number {
+  return stage >= 31 ? 2 : 1;
 }
 
 export interface Vec2 {
@@ -123,6 +128,11 @@ export function blackHolePresence(elapsed: number): number {
   if (phase < 4.3) return 1;
   if (phase < 4.65) return 1 - ((phase - 4.3) / 0.35) ** 3;
   return 0;
+}
+
+export function blackHoleClearFade(elapsed: number): number {
+  const progress = Math.max(0, Math.min(1, elapsed / BLACK_HOLE_CLEAR_FADE_DURATION));
+  return 1 - progress ** 3;
 }
 
 export interface Brick {
@@ -271,7 +281,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const itemLimit = (stage >= 31 ? 7 : stage >= 16 ? 5 : 4) + Number(hasBlackHole);
   const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => {
     const item: FieldItem = { id: `s${stage}-i${index}`, ...openCells[index], type };
-    if (type === "blackhole") item.charges = stage >= 31 ? 2 : 1;
+    if (type === "blackhole") item.charges = blackHoleChargesForStage(stage);
     return item;
   });
 
@@ -635,12 +645,12 @@ export function collectItem(state: GameState, itemId: string): FieldItemType | n
 
 export function captureBallByBlackHole(state: GameState, itemId: string): number | null {
   const item = state.items.find((candidate) => candidate.id === itemId && candidate.type === "blackhole");
-  if (!item || state.ballCount <= 1) return null;
+  const charges = item?.charges ?? 1;
+  if (!item || charges <= 0 || state.ballCount <= 1) return null;
 
   state.ballCount = Math.max(1, state.ballCount - 1);
-  const remainingCharges = Math.max(0, (item.charges ?? 1) - 1);
-  if (remainingCharges === 0) state.items = state.items.filter((candidate) => candidate !== item);
-  else item.charges = remainingCharges;
+  const remainingCharges = charges - 1;
+  item.charges = remainingCharges;
   return remainingCharges;
 }
 
@@ -655,6 +665,11 @@ export function relocateBlackHoles(state: GameState, cycle: number): boolean {
   let relocated = false;
 
   blackHoles.forEach((item, itemIndex) => {
+    const nextCharges = blackHoleChargesForStage(state.stage);
+    if (item.charges !== nextCharges) {
+      item.charges = nextCharges;
+      relocated = true;
+    }
     const currentCell = `${item.row}:${item.column}`;
     const openCells = Array.from({ length: (DANGER_ROW - 1) * GRID_COLUMNS }, (_, index) => ({
       row: Math.floor(index / GRID_COLUMNS),

@@ -14,6 +14,7 @@ import { estimateRankingPosition, normalizePlayerName } from "../src/ranking";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  BLACK_HOLE_CLEAR_FADE_DURATION,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BLACK_HOLE_MIN_DEFLECTION_ANGLE,
@@ -33,6 +34,7 @@ import {
   acceptUltimateReward,
   advanceStageIfCleared,
   aimFromDrag,
+  blackHoleClearFade,
   blackHolePresence,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
@@ -131,7 +133,7 @@ describe("핵심 게임 규칙", () => {
     expect(shieldRewindFrame(SHIELD_REWIND_DURATION)).toEqual({ offset: 0, flash: 0 });
   });
 
-  it("블랙홀은 가까울수록 강하게 끌고 후반 흡수 횟수만큼 공을 제거한다", () => {
+  it("블랙홀은 흡수 횟수를 소진해도 다음 주기에 위치와 횟수를 갱신해 재등장한다", () => {
     expect(blackHolePullStrength(BLACK_HOLE_INFLUENCE_RADIUS)).toBe(0);
     expect(blackHolePullStrength(20)).toBeGreaterThan(blackHolePullStrength(50));
     expect(blackHolePullStrength(BLACK_HOLE_INFLUENCE_RADIUS / 2)).toBe(0.25);
@@ -140,8 +142,11 @@ describe("핵심 게임 규칙", () => {
     expect(blackHolePresence(0.3)).toBe(1);
     expect(blackHolePresence(4.8)).toBe(0);
     expect(blackHolePresence(BLACK_HOLE_CYCLE_DURATION)).toBe(0);
+    expect(blackHoleClearFade(0)).toBe(1);
+    expect(blackHoleClearFade(BLACK_HOLE_CLEAR_FADE_DURATION)).toBe(0);
 
     const state = createGame();
+    state.stage = 31;
     state.ballCount = 5;
     state.items = [{ id: "blackhole", row: 2, column: 3, type: "blackhole", charges: 2 }];
     expect(captureBallByBlackHole(state, "blackhole")).toBe(1);
@@ -149,7 +154,11 @@ describe("핵심 게임 규칙", () => {
     expect(state.items[0].charges).toBe(1);
     expect(captureBallByBlackHole(state, "blackhole")).toBe(0);
     expect(state.ballCount).toBe(3);
-    expect(state.items).toHaveLength(0);
+    expect(state.items[0].charges).toBe(0);
+    expect(captureBallByBlackHole(state, "blackhole")).toBeNull();
+    expect(state.ballCount).toBe(3);
+    expect(relocateBlackHoles(state, 1)).toBe(true);
+    expect(state.items[0].charges).toBe(2);
 
     state.items = [{ id: "last-blackhole", row: 2, column: 3, type: "blackhole", charges: 1 }];
     state.ballCount = 1;
@@ -167,12 +176,13 @@ describe("핵심 게임 규칙", () => {
     state.stage = 16;
     state.bricks = [{ id: "occupied-brick", row: 0, column: 0, hp: 1, maxHp: 1, type: "normal" }];
     state.items = [
-      { id: "blackhole", row: 2, column: 3, type: "blackhole", charges: 1 },
+      { id: "blackhole", row: 2, column: 3, type: "blackhole", charges: 0 },
       { id: "occupied-item", row: 1, column: 1, type: "bomb" },
     ];
 
     expect(relocateBlackHoles(state, 1)).toBe(true);
     const blackHole = state.items.find((item) => item.type === "blackhole")!;
+    expect(blackHole.charges).toBe(1);
     expect(`${blackHole.row}:${blackHole.column}`).not.toBe("2:3");
     expect(`${blackHole.row}:${blackHole.column}`).not.toBe("0:0");
     expect(`${blackHole.row}:${blackHole.column}`).not.toBe("1:1");

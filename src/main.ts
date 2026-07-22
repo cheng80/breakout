@@ -27,6 +27,7 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   BLACK_HOLE_CAPTURE_RADIUS,
+  BLACK_HOLE_CLEAR_FADE_DURATION,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BOMB_EFFECT_DURATION,
@@ -41,6 +42,7 @@ import {
   LASER_EFFECT_DURATION,
   SHIELD_REWIND_DURATION,
   aimFromDrag,
+  blackHoleClearFade,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
   blackHolePresence,
@@ -198,6 +200,7 @@ let resetConfirmAction: "reset" | "exit" | "home" | "abandon" = "reset";
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
+let blackHoleClearFadeTime = 0;
 let bombEffect: PositionedEffect | null = null;
 let trapEffect: PositionedEffect | null = null;
 let ultimateEffect: UltimateEffect | null = null;
@@ -445,6 +448,7 @@ function reset(): void {
   blackHoleTime = 0;
   blackHoleCycle = 0;
   blackHoleStage = state.stage;
+  blackHoleClearFadeTime = 0;
   bombEffect = null;
   trapEffect = null;
   ultimateEffect = null;
@@ -1434,7 +1438,9 @@ function draw(): void {
     const logicalCenter = itemCenter(item);
     const center = { ...logicalCenter, y: logicalCenter.y + boardOffset };
     if (item.type === "blackhole") {
-      const presence = blackHolePresence(blackHoleTime);
+      const presence = (item.charges ?? 1) > 0
+        ? blackHolePresence(blackHoleTime) * blackHoleClearFade(blackHoleClearFadeTime)
+        : 0;
       const pulse = (Math.sin(blackHoleTime * 5) + 1) / 2;
       const label = itemLabels.get(item.id);
       if (label) label.alpha = presence;
@@ -1985,7 +1991,7 @@ function circleHitsRect(ball: ActiveBall, x: number, y: number, width: number, h
 }
 
 function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
-  const presence = blackHolePresence(blackHoleTime);
+  const presence = blackHolePresence(blackHoleTime) * blackHoleClearFade(blackHoleClearFadeTime);
   if (presence <= 0) {
     ball.blackHoleId = null;
     return false;
@@ -1993,7 +1999,7 @@ function applyBlackHolePull(ball: ActiveBall, delta: number): boolean {
 
   let nearest: { item: FieldItem; center: Vec2; distance: number } | null = null;
   state.items.forEach((item) => {
-    if (item.type !== "blackhole") return;
+    if (item.type !== "blackhole" || (item.charges ?? 1) <= 0) return;
     const center = itemCenter(item);
     const distance = Math.hypot(center.x - ball.x, center.y - ball.y);
     if (distance <= BLACK_HOLE_INFLUENCE_RADIUS && (!nearest || distance < nearest.distance)) {
@@ -2214,6 +2220,7 @@ function update(delta: number): void {
       blackHoleStage = state.stage;
       blackHoleTime = 0;
       blackHoleCycle = 0;
+      blackHoleClearFadeTime = 0;
     } else {
       blackHoleTime += delta;
       const nextCycle = Math.floor(blackHoleTime / BLACK_HOLE_CYCLE_DURATION);
@@ -2223,6 +2230,9 @@ function update(delta: number): void {
       }
     }
   }
+  blackHoleClearFadeTime = state.bricks.some((brick) => brick.type !== "steel")
+    ? 0
+    : Math.min(BLACK_HOLE_CLEAR_FADE_DURATION, blackHoleClearFadeTime + delta);
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
