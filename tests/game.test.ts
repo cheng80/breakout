@@ -336,14 +336,14 @@ describe("핵심 게임 규칙", () => {
 
     expect(rollUltimateReward(1, () => 0.99)).toBeNull();
     expect(rollUltimateReward(2, () => 0.79)).toBeNull();
-    expect(rollUltimateReward(2, () => 0.805)).toBe("antimatter");
-    expect(rollUltimateReward(2, () => 0.99)).toBe("chainLightning");
+    expect(rollUltimateReward(2, () => 0.805)).toBe("chainLightning");
+    expect(rollUltimateReward(2, () => 0.99)).toBe("crossfire");
     expect(rollUltimateReward(3, () => 0.49)).toBeNull();
-    expect(rollUltimateReward(3, () => 0.7)).toBe("orbitalLaser");
+    expect(rollUltimateReward(3, () => 0.7)).toBe("meteorImpact");
     expect(rollUltimateReward(4, () => 0.1)).toBeNull();
-    expect(rollUltimateReward(5, () => 0.1)).toBe("antimatter");
-    expect(rollUltimateReward(5, () => 0.6)).toBe("orbitalLaser");
-    expect(rollUltimateReward(5, () => 0.9)).toBe("chainLightning");
+    expect(rollUltimateReward(5, () => 0.1)).toBe("chainLightning");
+    expect(rollUltimateReward(5, () => 0.6)).toBe("antimatter");
+    expect(rollUltimateReward(5, () => 0.9)).toBe("fusionChain");
   });
 
   it("보상을 저장·교체·건너뛴 뒤에만 다음 스테이지를 불러온다", () => {
@@ -607,11 +607,16 @@ describe("핵심 게임 규칙", () => {
     expect(state.gameStatus).toBe("ready");
   });
 
-  it("궁극기 3종은 선택 범위를 완전히 파괴하고 사용한 슬롯을 비운다", () => {
+  it("궁극기 8종은 선택 범위에 맞는 효과를 적용하고 사용한 슬롯을 비운다", () => {
     const cases = [
       { type: "antimatter" as const, target: { row: 0, column: 0 }, expected: 9 },
       { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 15 },
       { type: "chainLightning" as const, target: { row: 2, column: 2 }, expected: 12 },
+      { type: "meteorImpact" as const, target: { row: 2, column: 2 }, expected: 25 },
+      { type: "blackHoleCollapse" as const, target: { row: 2, column: 2 }, expected: 25 },
+      { type: "crossfire" as const, target: { row: 2, column: 2 }, expected: 21 },
+      { type: "fusionChain" as const, target: { row: 2, column: 2 }, expected: 18 },
+      { type: "missileBarrage" as const, target: { row: 2, column: 2 }, expected: 20 },
     ];
 
     cases.forEach(({ type, target, expected }) => {
@@ -630,7 +635,7 @@ describe("핵심 게임 규칙", () => {
 
       expect(activation?.type).toBe(type);
       expect(activation?.targets).toHaveLength(expected);
-      expect(state.bricks).toHaveLength(25 - expected);
+      expect(state.bricks).toHaveLength(type === "meteorImpact" ? 16 : 25 - expected);
       expect(state.ultimateInventory[0]).toBeNull();
     });
   });

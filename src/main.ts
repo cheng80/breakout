@@ -303,15 +303,23 @@ const ultimateSlotButtons = [...document.querySelectorAll<HTMLButtonElement>("[d
 const ultimateSlotCount = document.querySelector<HTMLElement>("#ultimate-slot-count")!;
 
 const ultimateImage = (fileName: string) => `${import.meta.env.BASE_URL}images/ultimates/${fileName}`;
-const ultimateDetails: Record<UltimateItemType, { name: string; symbol: string; className: string; image: string }> = {
+type UltimateDetail = { name: string; symbol: string; className: string; image: string | null };
+const ultimateDetails: Record<UltimateItemType, UltimateDetail> = {
   antimatter: { name: "반물질 폭탄", symbol: "◎", className: "ultimate-antimatter", image: ultimateImage("antimatter.png") },
   orbitalLaser: { name: "궤도 레이저", symbol: "▥", className: "ultimate-orbital", image: ultimateImage("orbital-laser.png") },
   chainLightning: { name: "연쇄 번개", symbol: "ϟ", className: "ultimate-lightning", image: ultimateImage("chain-lightning.png") },
+  meteorImpact: { name: "운석 충돌", symbol: "☄", className: "ultimate-meteor", image: ultimateImage("meteor-impact.png") },
+  blackHoleCollapse: { name: "블랙홀 붕괴", symbol: "●", className: "ultimate-blackhole", image: ultimateImage("black-hole-collapse.png") },
+  crossfire: { name: "십자포화", symbol: "✚", className: "ultimate-crossfire", image: ultimateImage("crossfire.png") },
+  fusionChain: { name: "핵융합 연쇄", symbol: "✹", className: "ultimate-fusion", image: ultimateImage("fusion-chain.png") },
+  missileBarrage: { name: "미사일 포화", symbol: "➤", className: "ultimate-missile", image: ultimateImage("missile-barrage.png") },
 };
 
 Object.entries(ultimateDetails).forEach(([type, detail]) => {
+  const imageSource = detail.image;
+  if (!imageSource) return;
   document.querySelectorAll<HTMLImageElement>(`[data-ultimate-image="${type}"]`).forEach((image) => {
-    image.src = detail.image;
+    image.src = imageSource;
     image.alt = detail.name;
   });
 });
@@ -451,8 +459,8 @@ function useSelectedUltimate(point: Vec2): void {
     targets: activation.targets.map(itemCenter),
   };
   selectedUltimateSlot = null;
-  playSound(activation.type === "orbitalLaser" ? "laser" : "bomb", {
-    playbackRate: activation.type === "chainLightning" ? 1.18 : 0.9,
+  playSound(activation.type === "orbitalLaser" || activation.type === "crossfire" ? "laser" : "bomb", {
+    playbackRate: activation.type === "chainLightning" ? 1.18 : activation.type === "missileBarrage" ? 0.82 : 0.9,
   });
   pullLaserEffects();
   boardSignature = "";
@@ -1025,9 +1033,15 @@ function syncUltimateUi(): void {
     const detail = ultimateDetails[type];
     symbol.textContent = detail.symbol;
     symbol.classList.add(detail.className);
-    symbol.hidden = true;
-    image.src = detail.image;
-    image.hidden = false;
+    if (detail.image) {
+      symbol.hidden = true;
+      image.src = detail.image;
+      image.hidden = false;
+    } else {
+      symbol.hidden = false;
+      image.hidden = true;
+      image.removeAttribute("src");
+    }
     name.textContent = detail.name;
     hint.textContent = selectedUltimateSlot === index ? "게임판 위치 선택" : "발동 준비";
     button.classList.add("filled");
@@ -1054,10 +1068,17 @@ function syncUltimateUi(): void {
   rewardResult.classList.toggle("no-reward", !state.pendingUltimateReward);
   if (state.pendingUltimateReward) {
     const detail = ultimateDetails[state.pendingUltimateReward];
-    rewardResultSymbol.hidden = true;
-    rewardResultImage.src = detail.image;
-    rewardResultImage.alt = detail.name;
-    rewardResultImage.hidden = false;
+    rewardResultSymbol.textContent = detail.symbol;
+    rewardResultSymbol.classList.add(detail.className);
+    if (detail.image) {
+      rewardResultSymbol.hidden = true;
+      rewardResultImage.src = detail.image;
+      rewardResultImage.alt = detail.name;
+      rewardResultImage.hidden = false;
+    } else {
+      rewardResultSymbol.hidden = false;
+      rewardResultImage.hidden = true;
+    }
     rewardResultName.textContent = detail.name;
     rewardResultCopy.textContent = "궁극기 보상을 획득했습니다.";
     rewardReplacementName.textContent = detail.name;
@@ -1280,7 +1301,7 @@ function draw(): void {
         .fill({ color: 0x12bfe8, alpha: alpha * 0.36 });
       scene.rect(ultimateEffect.x - Math.max(5, width * 0.14), 0, Math.max(10, width * 0.28), BOARD_HEIGHT)
         .fill({ color: 0xffffff, alpha: alpha * 0.9 });
-    } else {
+    } else if (ultimateEffect.type === "chainLightning") {
       const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
       let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
       ultimateEffect.targets.slice(0, visibleTargets).forEach((target) => {
@@ -1291,6 +1312,86 @@ function draw(): void {
         scene.circle(target.x, target.y, 7 + progress * 10)
           .stroke({ width: 3, color: 0xffffff, alpha });
         previous = target;
+      });
+    } else if (ultimateEffect.type === "meteorImpact") {
+      const radius = 18 + 154 * (1 - (1 - progress) ** 3);
+      const tail = { x: ultimateEffect.x - 150 - progress * 30, y: ultimateEffect.y - 180 - progress * 22 };
+      effectGlow.moveTo(tail.x, tail.y).lineTo(ultimateEffect.x, ultimateEffect.y)
+        .stroke({ width: 24, color: 0xff7133, alpha: alpha * 0.72 });
+      scene.moveTo(tail.x, tail.y).lineTo(ultimateEffect.x, ultimateEffect.y)
+        .stroke({ width: 10, color: 0xffbd55, alpha });
+      scene.circle(tail.x, tail.y, 13 + progress * 7).fill({ color: 0xffe9b0, alpha });
+      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
+        .stroke({ width: 30, color: 0xff7133, alpha: alpha * 0.8 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).fill({ color: 0xf06a28, alpha: alpha * 0.25 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 6, color: 0xffd978, alpha });
+    } else if (ultimateEffect.type === "blackHoleCollapse") {
+      const pull = Math.min(1, progress * 1.4);
+      const radius = 26 + 112 * progress;
+      effectGlow.ellipse(ultimateEffect.x, ultimateEffect.y, 28 + progress * 8, 10 + progress * 3)
+        .stroke({ width: 18, color: 0xe55216, alpha: alpha * 0.7 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 18 + progress * 7).fill({ color: 0x010101, alpha: alpha * 0.9 });
+      scene.ellipse(ultimateEffect.x, ultimateEffect.y, 28 + progress * 8, 10 + progress * 3)
+        .stroke({ width: 3, color: 0xff6a19, alpha });
+      const centerX = ultimateEffect.x;
+      const centerY = ultimateEffect.y;
+      ultimateEffect.targets.forEach((target, index) => {
+        const wobble = Math.sin(progress * 12 + index) * (1 - pull) * 7;
+        const x = target.x + (centerX - target.x) * pull + wobble;
+        const y = target.y + (centerY - target.y) * pull - wobble;
+        scene.moveTo(target.x, target.y).lineTo(x, y).stroke({ width: 2, color: 0xf99a48, alpha: alpha * 0.35 });
+        scene.circle(x, y, 4 + (1 - pull) * 4).fill({ color: 0xffa247, alpha: alpha * 0.75 });
+      });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 5, color: 0xffb15b, alpha: alpha * 0.65 });
+    } else if (ultimateEffect.type === "crossfire") {
+      const reach = 40 + 220 * Math.min(1, progress * 1.8);
+      const width = 8 + progress * 14;
+      for (let offset = -1; offset <= 1; offset += 1) {
+        const y = ultimateEffect.y + offset * CELL_HEIGHT;
+        const x = ultimateEffect.x + offset * (CELL_WIDTH + GRID_GAP);
+        effectGlow.moveTo(ultimateEffect.x - reach, y).lineTo(ultimateEffect.x + reach, y)
+          .stroke({ width: width * 2.4, color: 0x26dfff, alpha: alpha * 0.6 });
+        effectGlow.moveTo(x, Math.max(0, ultimateEffect.y - reach)).lineTo(x, Math.min(BOARD_HEIGHT, ultimateEffect.y + reach))
+          .stroke({ width: width * 2.4, color: 0x26dfff, alpha: alpha * 0.6 });
+        scene.moveTo(ultimateEffect.x - reach, y).lineTo(ultimateEffect.x + reach, y)
+          .stroke({ width, color: 0x9af7ff, alpha });
+        scene.moveTo(x, Math.max(0, ultimateEffect.y - reach)).lineTo(x, Math.min(BOARD_HEIGHT, ultimateEffect.y + reach))
+          .stroke({ width, color: 0xffffff, alpha });
+      }
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 18 + progress * 22).fill({ color: 0x48dfff, alpha: alpha * 0.45 });
+    } else if (ultimateEffect.type === "fusionChain") {
+      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 1.7)));
+      let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
+      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
+        effectGlow.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
+          .stroke({ width: 18, color: 0xff7c35, alpha: alpha * 0.68 });
+        scene.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
+          .stroke({ width: 4, color: index % 2 === 0 ? 0xfff3a6 : 0xff8e49, alpha });
+        scene.circle(target.x, target.y, 8 + progress * 11)
+          .fill({ color: 0xffbd55, alpha: alpha * 0.35 })
+          .stroke({ width: 3, color: 0xffffdc, alpha });
+        previous = target;
+      });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 22 + progress * 86)
+        .stroke({ width: 7, color: 0xff9d42, alpha: alpha * 0.8 });
+    } else {
+      const count = ultimateEffect.targets.length;
+      const visibleTargets = Math.max(1, Math.ceil(count * Math.min(1, progress * 2.2)));
+      const centerX = ultimateEffect.x;
+      const centerY = ultimateEffect.y;
+      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
+        const angle = (index / Math.max(1, count)) * Math.PI * 2 + progress * 1.5;
+        const origin = { x: centerX + Math.cos(angle) * 270, y: centerY + Math.sin(angle) * 270 };
+        const dx = target.x - origin.x;
+        const dy = target.y - origin.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const tip = { x: target.x - (dx / length) * 12, y: target.y - (dy / length) * 12 };
+        effectGlow.moveTo(origin.x, origin.y).lineTo(target.x, target.y)
+          .stroke({ width: 12, color: 0xff456f, alpha: alpha * 0.65 });
+        scene.moveTo(origin.x, origin.y).lineTo(tip.x, tip.y)
+          .stroke({ width: 3, color: 0xffc5d5, alpha });
+        scene.moveTo(tip.x, tip.y).lineTo(target.x, target.y).lineTo(tip.x - (dx / length) * 8, tip.y - (dy / length) * 8)
+          .stroke({ width: 4, color: 0xff5b78, alpha });
       });
     }
   }
