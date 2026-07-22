@@ -50,6 +50,7 @@ import {
   prepareVolley,
   relocateBlackHoles,
   resolveUltimateActivation,
+  resolveUltimateHits,
   resolveCircleRectCollision,
   rollUltimateReward,
   shieldRewindFrame,
@@ -611,7 +612,7 @@ describe("핵심 게임 규칙", () => {
   it("궁극기 8종은 선택 범위에 맞는 효과를 적용하고 사용한 슬롯을 비운다", () => {
     const cases = [
       { type: "antimatter" as const, target: { row: 0, column: 0 }, expected: 9 },
-      { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 5 },
+      { type: "orbitalLaser" as const, target: { row: 2, column: 2 }, expected: 15 },
       { type: "chainLightning" as const, target: { row: 2, column: 2 }, expected: 12 },
       { type: "meteorImpact" as const, target: { row: 2, column: 2 }, expected: 25 },
       { type: "blackHoleCollapse" as const, target: { row: 2, column: 2 }, expected: 25 },
@@ -639,6 +640,24 @@ describe("핵심 게임 규칙", () => {
       expect(state.bricks).toHaveLength(type === "meteorImpact" ? 16 : 25 - expected);
       expect(state.ultimateInventory[0]).toBeNull();
     });
+  });
+
+  it("궤도 레이저는 가장자리에서도 연속 3열을 제거한다", () => {
+    const state = createGame();
+    state.bricks = Array.from({ length: 8 }, (_, column) => ({
+      id: `brick-${column}`,
+      row: 0,
+      column,
+      hp: 1,
+      maxHp: 1,
+      type: "normal" as const,
+    }));
+    state.ultimateInventory = ["orbitalLaser", null];
+
+    const activation = useUltimateItem(state, 0, { row: 0, column: 7 });
+
+    expect(activation?.targets.map(({ column }) => column)).toEqual([5, 6, 7]);
+    expect(state.bricks.map(({ column }) => column)).toEqual([0, 1, 2, 3, 4]);
   });
 
   it("운석 충돌 피해는 연출의 충돌 시점까지 지연할 수 있다", () => {
@@ -670,5 +689,32 @@ describe("핵심 게임 규칙", () => {
 
     expect(state.score).toBe(scoreAfterImpact);
     expect(state.bricks.find((brick) => brick.id === "brick-0")?.hp).toBe(19);
+  });
+
+  it("지연된 궁극기 피해는 연출 순서에 맞춰 대상별로 적용할 수 있다", () => {
+    const state = createGame();
+    state.bricks = Array.from({ length: 4 }, (_, index) => ({
+      id: `brick-${index}`,
+      row: 0,
+      column: index,
+      hp: 1,
+      maxHp: 1,
+      type: "normal" as const,
+    }));
+    state.ultimateInventory = ["chainLightning", null];
+
+    const activation = useUltimateItem(state, 0, { row: 0, column: 0 }, true)!;
+
+    expect(resolveUltimateHits(state, activation, 1)).toBe(1);
+    expect(state.bricks).toHaveLength(3);
+    expect(activation.resolved).toBe(false);
+    expect(resolveUltimateHits(state, activation, 1)).toBe(0);
+    expect(resolveUltimateHits(state, activation, 3)).toBe(2);
+    expect(state.bricks).toHaveLength(1);
+
+    expect(resolveUltimateHits(state, activation, 4)).toBe(1);
+    expect(activation.resolved).toBe(true);
+    expect(state.bricks).toHaveLength(0);
+    expect(state.gameStatus).toBe("reward");
   });
 });

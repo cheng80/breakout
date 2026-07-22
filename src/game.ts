@@ -34,6 +34,10 @@ export type BrickType = "normal" | "laser" | "steel";
 
 export const ULTIMATE_SLOT_COUNT = 2;
 
+export function orbitalLaserStartColumn(targetColumn: number): number {
+  return Math.max(0, Math.min(GRID_COLUMNS - 3, targetColumn - 1));
+}
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -155,6 +159,7 @@ export interface UltimateActivation {
   type: UltimateItemType;
   targets: Array<Pick<Brick, "row" | "column">>;
   hits: Array<{ brickId: string; damage: number }>;
+  resolvedHitCount: number;
   resolved: boolean;
 }
 
@@ -527,6 +532,7 @@ export function useUltimateItem(
 
   const destructible = state.bricks.filter((brick) => brick.type !== "steel");
   const distance = (brick: Brick) => Math.abs(brick.row - target.row) + Math.abs(brick.column - target.column);
+  const orbitalStartColumn = orbitalLaserStartColumn(target.column);
   const fusionTargets = () => {
     const remaining = [...destructible];
     const result: Brick[] = [];
@@ -546,7 +552,7 @@ export function useUltimateItem(
   const targets = type === "antimatter"
     ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
     : type === "orbitalLaser"
-      ? destructible.filter((brick) => brick.column === target.column)
+      ? destructible.filter((brick) => brick.column >= orbitalStartColumn && brick.column < orbitalStartColumn + 3)
       : type === "chainLightning"
         ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 12)
         : type === "meteorImpact"
@@ -570,6 +576,7 @@ export function useUltimateItem(
         damage: type === "meteorImpact" && distanceFromImpact === 2 ? 1 : brick.hp,
       };
     }),
+    resolvedHitCount: 0,
     resolved: false,
   };
   state.ultimateInventory[slot] = null;
@@ -578,10 +585,23 @@ export function useUltimateItem(
 }
 
 export function resolveUltimateActivation(state: GameState, activation: UltimateActivation): void {
-  if (activation.resolved) return;
-  activation.resolved = true;
-  activation.hits.forEach(({ brickId, damage }) => damageBrick(state, brickId, damage));
-  advanceStageIfCleared(state);
+  resolveUltimateHits(state, activation, activation.hits.length);
+}
+
+export function resolveUltimateHits(state: GameState, activation: UltimateActivation, hitCount: number): number {
+  const targetCount = Math.max(0, Math.min(activation.hits.length, Math.floor(hitCount)));
+  let applied = 0;
+  while (activation.resolvedHitCount < targetCount) {
+    const { brickId, damage } = activation.hits[activation.resolvedHitCount];
+    activation.resolvedHitCount += 1;
+    damageBrick(state, brickId, damage);
+    applied += 1;
+  }
+  if (!activation.resolved && activation.resolvedHitCount === activation.hits.length) {
+    activation.resolved = true;
+    advanceStageIfCleared(state);
+  }
+  return applied;
 }
 
 export function collectItem(state: GameState, itemId: string): FieldItemType | null {
