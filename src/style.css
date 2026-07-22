@@ -1038,6 +1038,23 @@ button {
   transition-duration: 140ms;
 }
 
+.result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.result-actions button {
+  margin-top: 0;
+}
+
+.result-actions .result-exit {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+  color: #b9c4d6;
+}
+
 .item-help-card button {
   margin-top: 16px;
 }
@@ -1500,18 +1517,14 @@ button {
   background: linear-gradient(145deg, #7d8ca3, #465267);
 }
 
-.legend-antimatter {
-  background: radial-gradient(circle, #fff 0 8%, #b68cff 10% 28%, #6729bd 48%, #171029 72%);
-  box-shadow: 0 0 12px rgba(182, 140, 255, 0.45);
-}
-
-.legend-orbital {
-  background: linear-gradient(145deg, #36d8ff, #1460c9);
-}
-
-.legend-lightning {
-  background: linear-gradient(145deg, #fff39a, #d68b0c);
-  color: #2b2100 !important;
+.item-help-list .legend-ultimate-image {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  outline-offset: -1px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 #status-dot {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breakout NAS Web Build"
+  short_description: "Build Breakout for /breakout/, upload it to NAS, and verify hashes."
+  default_prompt: "나스웹빌드 해줘"
