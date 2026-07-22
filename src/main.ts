@@ -35,7 +35,7 @@ import {
   resetGame,
   resolveCircleRectCollision,
   shieldRewindFrame,
-  stabilizeShallowBounce,
+  stabilizeBounce,
   traceAimPath,
   type Brick,
   type Item,
@@ -688,7 +688,7 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
     }
     if (bounced) {
       ball.bounceCount += 1;
-      const velocity = stabilizeShallowBounce({ x: ball.vx, y: ball.vy }, ball.bounceCount);
+      const velocity = stabilizeBounce({ x: ball.vx, y: ball.vy }, ball.bounceCount);
       ball.vx = velocity.x;
       ball.vy = velocity.y;
     }
@@ -702,8 +702,8 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
       const collision = resolveCircleRectCollision(ball, { x: ball.vx, y: ball.vy }, rect, BALL_RADIUS)!;
       ball.x = collision.position.x;
       ball.y = collision.position.y;
-      ball.bounceCount += 1;
-      const velocity = stabilizeShallowBounce(collision.velocity, ball.bounceCount);
+      ball.bounceCount = hitBrick.type === "steel" ? ball.bounceCount + 1 : 0;
+      const velocity = stabilizeBounce(collision.velocity, ball.bounceCount);
       ball.vx = velocity.x;
       ball.vy = velocity.y;
       const destroyed = hitBrickWithBall(state, hitBrick.id);
@@ -730,6 +730,7 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
     if (hitItem) {
       const center = itemCenter(hitItem);
       const itemType = collectItem(state, hitItem.id);
+      if (itemType) ball.bounceCount = 0;
       if (itemType === "bomb") {
         playSound("bomb");
         if (bombEffect) positionedEffectPool.release(bombEffect);
@@ -838,6 +839,35 @@ function update(delta: number): void {
     }
   }
   draw();
+}
+
+if (["127.0.0.1", "localhost"].includes(location.hostname) && location.search === "?bounce-repro") {
+  Object.assign(state, {
+    stage: 7,
+    score: 12250,
+    ballCount: 30,
+    bricks: [
+      { id: "repro-normal", row: 4, column: 0, hp: 5, maxHp: 8, type: "normal" },
+      { id: "repro-steel", row: 3, column: 5, hp: 0, maxHp: 0, type: "steel" },
+    ],
+    items: [],
+    gameStatus: "volley",
+    powerTurns: 2,
+    powerMultiplier: 2,
+  });
+  const slope = (GRID_TOP + 3 * CELL_HEIGHT - BALL_RADIUS * 2) / (BOARD_WIDTH - BALL_RADIUS * 2);
+  const vx = BALL_SPEED / Math.hypot(1, slope);
+  for (let index = 0; index < state.ballCount; index += 1) {
+    activeBalls.push(Object.assign(ballPool.acquire(), {
+      x: 121,
+      y: BALL_RADIUS + 0.01,
+      vx,
+      vy: vx * slope,
+      delay: index * 0.075,
+      bounceCount: 0,
+    }));
+  }
+  window.setTimeout(() => location.reload(), 7000);
 }
 
 app.ticker.add((ticker) => update(ticker.deltaMS / 1000));

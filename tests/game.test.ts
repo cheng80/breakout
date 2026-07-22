@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { canPlaySound, getBgmVolume, setBgmVolume } from "../src/audio";
 import {
   BOARD_HEIGHT,
+  BOARD_WIDTH,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BRICK_HIT_EFFECT_DURATION,
@@ -34,7 +35,7 @@ import {
   relocateBlackHoles,
   resolveCircleRectCollision,
   shieldRewindFrame,
-  stabilizeShallowBounce,
+  stabilizeBounce,
   traceAimPath,
 } from "../src/game";
 
@@ -192,13 +193,42 @@ describe("핵심 게임 규칙", () => {
 
   it("거의 수평인 반사는 속도를 유지하면서 반복 횟수에 따라 다른 탈출 각도로 보정한다", () => {
     const shallow = { x: 600, y: 10 };
-    const first = stabilizeShallowBounce(shallow, 0);
-    const second = stabilizeShallowBounce(shallow, 1);
+    const first = stabilizeBounce(shallow, 0);
+    const second = stabilizeBounce(shallow, 1);
 
     expect(Math.hypot(first.x, first.y)).toBeCloseTo(Math.hypot(shallow.x, shallow.y));
     expect(Math.abs(first.y)).toBeGreaterThan(100);
     expect(Math.abs(second.y)).toBeGreaterThan(Math.abs(first.y));
-    expect(stabilizeShallowBounce({ x: 500, y: 300 }, 0)).toEqual({ x: 500, y: 300 });
+    expect(stabilizeBounce({ x: 500, y: 300 }, 0)).toEqual({ x: 500, y: 300 });
+  });
+
+  it("영상의 강철 블록 반복 궤도에서 공 30개를 탈출 각도로 보정한다", () => {
+    const radius = 5;
+    const steel = { x: 224.5, y: 168, width: 38.5, height: BRICK_HEIGHT };
+    const slope = (steel.y - radius * 2) / (BOARD_WIDTH - radius * 2);
+    const vx = 600 / Math.hypot(1, slope);
+    const balls = Array.from({ length: MAX_BALLS }, () => ({ x: vx, y: vx * slope }));
+    const trappedRightWallY = radius + (BOARD_WIDTH - radius - 121) * slope;
+    const steelHitX = BOARD_WIDTH - radius - (steel.y - radius - trappedRightWallY) / slope;
+    expect(steelHitX).toBeGreaterThan(steel.x - radius);
+    expect(steelHitX).toBeLessThan(steel.x + steel.width + radius);
+
+    for (let bounceCount = 1; bounceCount <= 8; bounceCount += 1) {
+      balls.forEach((ball) => {
+        if (bounceCount % 2 === 1) ball.x *= -1;
+        else ball.y *= -1;
+        Object.assign(ball, stabilizeBounce(ball, bounceCount));
+      });
+    }
+
+    expect(balls).toHaveLength(MAX_BALLS);
+    balls.forEach((ball) => {
+      const escapedSlope = Math.abs(ball.y / ball.x);
+      const rightWallY = radius + (BOARD_WIDTH - radius - 121) * escapedSlope;
+      const nextSteelX = BOARD_WIDTH - radius - (steel.y - radius - rightWallY) / escapedSlope;
+      expect(nextSteelX).toBeGreaterThan(steel.x + steel.width + radius);
+      expect(Math.hypot(ball.x, ball.y)).toBeCloseTo(600);
+    });
   });
 
   it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~30개로 제한한다", () => {
