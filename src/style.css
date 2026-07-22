@@ -16,6 +16,7 @@ body {
   height: 100%;
   margin: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: start center;
   overflow: hidden;
   background:
@@ -170,10 +171,25 @@ button {
   transform: scale(0.98);
 }
 
+.entry-card .entry-audio-toggle {
+  min-height: 46px;
+  margin-top: 8px;
+  padding-block: 5px;
+  text-align: left;
+}
+
+.entry-audio-toggle:active {
+  transform: scale(0.98);
+}
+
 .app {
+  position: relative;
   width: min(100%, 430px);
-  height: min(100dvh, 900px);
-  min-height: 520px;
+  height: auto;
+  min-width: 360px;
+  min-height: calc(360px * 900 / 430);
+  aspect-ratio: 430 / 900;
+  overflow: hidden;
   margin: 0;
   padding: max(12px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
   display: grid;
@@ -339,10 +355,20 @@ button {
   place-items: center;
 }
 
+.app:has(.game-shell > .item-help:not([hidden]), .game-shell > .result:not([hidden]))::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(1, 6, 16, 0.68);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
 .game-canvas {
   position: relative;
-  width: min(100%, calc((100dvh - 200px) * 360 / 602));
-  height: auto;
+  width: auto;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   aspect-ratio: 360 / 602;
@@ -409,11 +435,13 @@ button {
 
 .result {
   position: absolute;
+  z-index: 11;
   inset: 50% auto auto 50%;
   width: min(82%, 290px);
   max-height: calc(100% - 24px);
   padding: 22px;
   overflow-y: auto;
+  border: 1px solid rgba(164, 177, 255, 0.22);
   transform: translate(-50%, -50%);
   border-radius: 18px;
   background: rgba(9, 21, 36, 0.94);
@@ -421,6 +449,7 @@ button {
   text-align: center;
   backdrop-filter: blur(16px);
   scrollbar-width: none;
+  word-break: keep-all;
 }
 
 .result::-webkit-scrollbar {
@@ -434,7 +463,7 @@ button {
 .item-help {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 20;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -515,9 +544,11 @@ button {
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  border: 1px solid rgba(164, 177, 255, 0.22);
   border-radius: 18px;
   background: rgba(18, 32, 52, 0.97);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.11);
+  word-break: keep-all;
 }
 
 .item-help-card::-webkit-scrollbar {
@@ -888,11 +919,48 @@ button {
 
 .ranking-result {
   margin: 14px 0;
-  padding: 11px;
+  padding: 13px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.055);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
   text-align: left;
+}
+
+.ranking-result .ranking-heading {
+  margin-bottom: 9px;
+}
+
+.ranking-result .ranking-heading h3 {
+  font-size: 13px;
+}
+
+.ranking-result .ranking-heading span {
+  font-size: 11px;
+}
+
+.ranking-prediction {
+  margin-bottom: 9px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 9px;
+  background: rgba(108, 124, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(135, 149, 255, 0.14);
+}
+
+.ranking-prediction span {
+  color: #c0c9db;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ranking-prediction strong {
+  color: #ffd166;
+  font-size: 21px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .ranking-heading {
@@ -957,6 +1025,35 @@ button {
   display: block;
   color: #8e9bb0;
   text-align: center;
+}
+
+.ranking-result .ranking-list {
+  margin-top: 0;
+  gap: 6px;
+}
+
+.ranking-result .ranking-list li {
+  min-height: 38px;
+  padding: 7px 8px;
+  grid-template-columns: 30px 1fr auto;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.ranking-result .ranking-list .ranking-rank {
+  font-size: 13px;
+}
+
+.ranking-result .ranking-list .ranking-name {
+  font-size: 13px;
+}
+
+.ranking-result .ranking-list .ranking-score {
+  font-size: 12px;
+}
+
+.ranking-result .ranking-list .ranking-empty {
+  font-size: 12px;
 }
 
 .ranking-form {
@@ -1551,6 +1648,33 @@ button {
 }
 
 @media (max-height: 650px) {
+  .item-help {
+    --popup-scale: 0.8;
+    padding: 8px;
+  }
+
+  .item-help-card,
+  .options-card,
+  .reward-card,
+  .ranking-card {
+    width: min(100%, 320px);
+    max-height: none;
+    overflow: hidden;
+    transform: scale(var(--popup-scale));
+  }
+
+  .ranking-card {
+    width: min(100%, 360px);
+  }
+
+  .result {
+    --popup-scale: 0.8;
+    width: min(82%, 290px);
+    max-height: none;
+    overflow: hidden;
+    transform: translate(-50%, -50%) scale(var(--popup-scale));
+  }
+
   .app {
     gap: 6px;
     padding-top: 8px;
@@ -1584,6 +1708,20 @@ button {
   .control-panel {
     gap: 4px;
     padding-block: 5px;
+  }
+}
+
+@media (max-height: 520px) {
+  .item-help,
+  .result {
+    --popup-scale: 0.72;
+  }
+}
+
+@media (max-height: 420px) {
+  .item-help,
+  .result {
+    --popup-scale: 0.62;
   }
 }
 
