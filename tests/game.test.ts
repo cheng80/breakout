@@ -50,6 +50,7 @@ import {
   prepareVolley,
   relocateBlackHoles,
   resolveUltimateActivation,
+  resolveUltimateHits,
   resolveCircleRectCollision,
   rollUltimateReward,
   shieldRewindFrame,
@@ -670,5 +671,32 @@ describe("핵심 게임 규칙", () => {
 
     expect(state.score).toBe(scoreAfterImpact);
     expect(state.bricks.find((brick) => brick.id === "brick-0")?.hp).toBe(19);
+  });
+
+  it("지연된 궁극기 피해는 연출 순서에 맞춰 대상별로 적용할 수 있다", () => {
+    const state = createGame();
+    state.bricks = Array.from({ length: 4 }, (_, index) => ({
+      id: `brick-${index}`,
+      row: 0,
+      column: index,
+      hp: 1,
+      maxHp: 1,
+      type: "normal" as const,
+    }));
+    state.ultimateInventory = ["chainLightning", null];
+
+    const activation = useUltimateItem(state, 0, { row: 0, column: 0 }, true)!;
+
+    expect(resolveUltimateHits(state, activation, 1)).toBe(1);
+    expect(state.bricks).toHaveLength(3);
+    expect(activation.resolved).toBe(false);
+    expect(resolveUltimateHits(state, activation, 1)).toBe(0);
+    expect(resolveUltimateHits(state, activation, 3)).toBe(2);
+    expect(state.bricks).toHaveLength(1);
+
+    expect(resolveUltimateHits(state, activation, 4)).toBe(1);
+    expect(activation.resolved).toBe(true);
+    expect(state.bricks).toHaveLength(0);
+    expect(state.gameStatus).toBe("reward");
   });
 });

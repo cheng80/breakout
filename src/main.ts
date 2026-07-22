@@ -58,7 +58,7 @@ import {
   prepareVolley,
   relocateBlackHoles,
   resetGame,
-  resolveUltimateActivation,
+  resolveUltimateHits,
   resolveCircleRectCollision,
   shieldRewindFrame,
   stabilizeBounce,
@@ -99,7 +99,17 @@ const ULTIMATE_EFFECT_DURATIONS: Record<UltimateItemType, number> = {
   fusionChain: 1.25,
   missileBarrage: 1.3,
 };
+const ANTIMATTER_IMPACT_PROGRESS = 0.4;
+const ORBITAL_LASER_IMPACT_PROGRESS = 0.34;
+const CHAIN_LIGHTNING_REVEAL_RATE = 2.4;
 const METEOR_IMPACT_PROGRESS = 0.38;
+const BLACK_HOLE_IMPACT_PROGRESS = 0.72;
+const CROSSFIRE_IMPACT_PROGRESS = 0.4;
+const FUSION_IGNITION_SPAN = 0.62;
+const FUSION_IMPACT_OFFSET = 0.06;
+const MISSILE_LAUNCH_SPAN = 0.32;
+const MISSILE_LOCAL_DURATION = 0.62;
+const MISSILE_IMPACT_LOCAL_PROGRESS = 0.76;
 const ULTIMATE_RESULT_DELAY = 0.35;
 interface ActiveBall extends Vec2 {
   vx: number;
@@ -230,10 +240,14 @@ const labelPool = new ObjectPool<Text>(
   (label) => {
     label.text = "";
     label.alpha = 1;
+    label.visible = true;
+    label.rotation = 0;
+    label.scale.set(1);
     label.position.set(0, 0);
   },
 );
 const activeLabels: Text[] = [];
+const brickLabels = new Map<string, Text>();
 const itemLabels = new Map<string, Text>();
 const ballCounter = new Text({
   text: "×1",
@@ -474,6 +488,27 @@ function screenPoint(event: PointerEvent): Vec2 {
   };
 }
 
+function ultimateHitCount(effect: UltimateEffect, progress: number): number {
+  const total = effect.targets.length;
+  if (effect.type === "chainLightning") {
+    return Math.max(1, Math.ceil(total * Math.min(1, progress * CHAIN_LIGHTNING_REVEAL_RATE)));
+  }
+  if (effect.type === "fusionChain") {
+    return effect.targets.reduce((count, _, index) => count
+      + Number(progress >= index / total * FUSION_IGNITION_SPAN + FUSION_IMPACT_OFFSET), 0);
+  }
+  if (effect.type === "missileBarrage") {
+    return effect.targets.reduce((count, _, index) => count
+      + Number(progress >= index / total * MISSILE_LAUNCH_SPAN + MISSILE_LOCAL_DURATION * MISSILE_IMPACT_LOCAL_PROGRESS), 0);
+  }
+  const impactProgress = effect.type === "antimatter" ? ANTIMATTER_IMPACT_PROGRESS
+    : effect.type === "orbitalLaser" ? ORBITAL_LASER_IMPACT_PROGRESS
+      : effect.type === "meteorImpact" ? METEOR_IMPACT_PROGRESS
+        : effect.type === "blackHoleCollapse" ? BLACK_HOLE_IMPACT_PROGRESS
+          : CROSSFIRE_IMPACT_PROGRESS;
+  return progress >= impactProgress ? total : 0;
+}
+
 function beginUltimateEffect(activation: UltimateActivation, target: Pick<Brick, "row" | "column">): void {
   ultimateEffect = {
     ...itemCenter(target),
@@ -483,15 +518,6 @@ function beginUltimateEffect(activation: UltimateActivation, target: Pick<Brick,
     activation,
   };
   selectedUltimateSlot = null;
-  if (activation.type !== "meteorImpact") {
-    playSound(activation.type === "orbitalLaser" || activation.type === "crossfire" ? "laser" : "bomb", {
-      playbackRate: activation.type === "chainLightning" ? 1.18 : activation.type === "missileBarrage" ? 0.82 : 0.9,
-    });
-  }
-  if (activation.resolved) {
-    pullLaserEffects();
-    boardSignature = "";
-  }
   syncUi();
 }
 
@@ -501,12 +527,7 @@ function useSelectedUltimate(point: Vec2): void {
     row: Math.max(0, Math.min(DANGER_ROW - 1, Math.floor((point.y - GRID_TOP) / CELL_HEIGHT))),
     column: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.floor((point.x - GRID_MARGIN) / (CELL_WIDTH + GRID_GAP)))),
   };
-  const activation = useUltimateItem(
-    state,
-    selectedUltimateSlot,
-    target,
-    state.ultimateInventory[selectedUltimateSlot] === "meteorImpact",
-  );
+  const activation = useUltimateItem(state, selectedUltimateSlot, target, true);
   if (!activation) return;
   beginUltimateEffect(activation, target);
 }
@@ -550,7 +571,7 @@ function startDebugUltimate(type: UltimateItemType): void {
   debugUltimateActive = true;
   state.ultimateInventory[0] = type;
   const target = { row: targetBrick.row, column: targetBrick.column };
-  const activation = useUltimateItem(state, 0, target, type === "meteorImpact");
+  const activation = useUltimateItem(state, 0, target, true);
   if (!activation) {
     restoreDebugState();
     return;
@@ -1213,6 +1234,7 @@ function rebuildLabels(): void {
   boardSignature = signature;
   labels.removeChildren();
   labelPool.releaseAll(activeLabels);
+  brickLabels.clear();
   itemLabels.clear();
 
   state.bricks.forEach((brick) => {
@@ -1224,6 +1246,7 @@ function rebuildLabels(): void {
     label.position.set(rect.x + rect.width / 2, rect.y + rect.height / 2);
     labels.addChild(label);
     activeLabels.push(label);
+    brickLabels.set(brick.id, label);
   });
 
   const itemLabel = { bomb: "B", multiball: "+1", shield: "S", power: "×2", power3: "×3", power4: "×4", trap: "−1" } as const;
@@ -1371,8 +1394,23 @@ function draw(): void {
   }
   scene.stroke({ width: 1.5, color: 0xff4d6d, alpha: 0.7 });
 
+  const blackHoleTargetIds = ultimateEffect?.type === "blackHoleCollapse" && !ultimateEffect.activation.resolved
+    ? new Set(ultimateEffect.activation.hits.map(({ brickId }) => brickId))
+    : null;
   state.bricks.forEach((brick) => {
     const logicalRect = brickRect(brick);
+    const label = brickLabels.get(brick.id);
+    if (label) {
+      label.visible = true;
+      label.alpha = 1;
+      label.rotation = 0;
+      label.scale.set(1);
+      label.position.set(logicalRect.x + logicalRect.width / 2, logicalRect.y + logicalRect.height / 2);
+    }
+    if (blackHoleTargetIds?.has(brick.id)) {
+      if (label) label.visible = false;
+      return;
+    }
     const rect = { ...logicalRect, y: logicalRect.y + boardOffset };
     scene.roundRect(rect.x, rect.y, rect.width, rect.height, 8).fill(brickColor(brick));
     if (brick.type === "laser") {
@@ -1471,7 +1509,7 @@ function draw(): void {
     const progress = Math.min(1, ultimateEffect.elapsed / ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type]);
     const alpha = 1 - progress;
     if (ultimateEffect.type === "antimatter") {
-      const collapse = Math.min(1, progress / 0.4);
+      const collapse = Math.min(1, progress / ANTIMATTER_IMPACT_PROGRESS);
       const collapseAlpha = Math.max(0, 1 - Math.max(0, progress - 0.34) / 0.22);
       const centerX = ultimateEffect.x;
       const centerY = ultimateEffect.y;
@@ -1497,7 +1535,7 @@ function draw(): void {
         .fill({ color: 0x010107, alpha: collapseAlpha * 0.98 })
         .stroke({ width: 3, color: 0xf6d7ff, alpha: collapseAlpha });
 
-      const burstProgress = Math.max(0, (progress - 0.4) / 0.6);
+      const burstProgress = Math.max(0, (progress - ANTIMATTER_IMPACT_PROGRESS) / (1 - ANTIMATTER_IMPACT_PROGRESS));
       if (burstProgress > 0) {
         const burst = 1 - (1 - burstProgress) ** 3;
         const burstAlpha = 1 - burstProgress;
@@ -1513,12 +1551,20 @@ function draw(): void {
         scene.circle(ultimateEffect.x, ultimateEffect.y, 28 * (1 - burst) + 4)
           .fill({ color: 0xffffff, alpha: burstAlpha });
         for (let index = 0; index < 14; index += 1) {
-          const angle = index / 14 * Math.PI * 2;
-          const inner = 18 + burst * 25;
-          const outer = 28 + burst * (78 + index % 3 * 12);
-          scene.moveTo(ultimateEffect.x + Math.cos(angle) * inner, ultimateEffect.y + Math.sin(angle) * inner)
-            .lineTo(ultimateEffect.x + Math.cos(angle) * outer, ultimateEffect.y + Math.sin(angle) * outer)
-            .stroke({ width: index % 2 === 0 ? 3 : 2, color: index % 2 === 0 ? 0xffffff : 0xdc83ff, alpha: burstAlpha * 0.86 });
+          const angle = index / 14 * Math.PI * 2 + Math.sin(index * 4.17) * 0.16;
+          const inner = 16 + burst * (19 + index % 2 * 8);
+          const outer = 25 + burst * (64 + index % 4 * 14);
+          const start = {
+            x: ultimateEffect.x + Math.cos(angle) * inner,
+            y: ultimateEffect.y + Math.sin(angle) * inner,
+          };
+          const end = {
+            x: ultimateEffect.x + Math.cos(angle + Math.sin(index * 2.7) * 0.09) * outer,
+            y: ultimateEffect.y + Math.sin(angle + Math.sin(index * 2.7) * 0.09) * outer,
+          };
+          const ray = lightningPath(start, end, index + 31, progress, 3, 5 + index % 3 * 2);
+          strokeLightning(effectGlow, ray, 11, 0xc15cff, burstAlpha * 0.5);
+          strokeLightning(scene, ray, index % 2 === 0 ? 3 : 2, index % 2 === 0 ? 0xffffff : 0xdc83ff, burstAlpha * 0.86);
         }
       }
     } else if (ultimateEffect.type === "orbitalLaser") {
@@ -1556,7 +1602,7 @@ function draw(): void {
           .stroke({ width: 4, color: 0xffffff, alpha: beamAlpha * 0.82 });
       }
     } else if (ultimateEffect.type === "chainLightning") {
-      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
+      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * CHAIN_LIGHTNING_REVEAL_RATE)));
       const lightningAlpha = alpha * (0.72 + Math.abs(Math.sin(progress * 52)) * 0.28);
       scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
         .fill({ color: 0x2b9cff, alpha: lightningAlpha * 0.035 });
@@ -1662,26 +1708,56 @@ function draw(): void {
         }
       }
     } else if (ultimateEffect.type === "blackHoleCollapse") {
-      const pullProgress = Math.min(1, progress / 0.62);
-      const pull = pullProgress ** 2;
-      const collapseProgress = Math.max(0, Math.min(1, (progress - 0.58) / 0.16));
-      const suctionAlpha = Math.max(0, 1 - Math.max(0, progress - 0.58) / 0.18);
+      const blackHoleEffect = ultimateEffect;
+      const pullProgress = Math.min(1, progress / BLACK_HOLE_IMPACT_PROGRESS);
+      const pull = pullProgress * pullProgress * (3 - 2 * pullProgress);
+      const collapseProgress = Math.max(0, Math.min(1, (progress - 0.6) / (BLACK_HOLE_IMPACT_PROGRESS - 0.6)));
+      const suctionAlpha = Math.max(0, 1 - Math.max(0, progress - 0.6) / 0.25);
       const centerX = ultimateEffect.x;
       const centerY = ultimateEffect.y;
       scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0x09001c, alpha: suctionAlpha * 0.16 });
-      ultimateEffect.targets.forEach((target, index) => {
-        const dx = centerX - target.x;
-        const dy = centerY - target.y;
-        const distance = Math.hypot(dx, dy) || 1;
-        const normal = { x: -dy / distance, y: dx / distance };
-        const swirl = Math.sin(pullProgress * Math.PI) * Math.min(34, distance * 0.28) * (index % 2 === 0 ? 1 : -1);
-        const x = target.x + dx * pull + normal.x * swirl;
-        const y = target.y + dy * pull + normal.y * swirl;
-        const scale = Math.max(0.08, 1 - pull);
-        scene.moveTo(target.x, target.y).lineTo(x, y)
-          .stroke({ width: 2, color: 0x7d7cff, alpha: suctionAlpha * 0.32 });
-        scene.roundRect(x - CELL_WIDTH * 0.28 * scale, y - BRICK_HEIGHT * 0.28 * scale, CELL_WIDTH * 0.56 * scale, BRICK_HEIGHT * 0.56 * scale, 3)
-          .fill({ color: index % 2 === 0 ? 0x695cff : 0xb06cff, alpha: suctionAlpha * 0.76 });
+      blackHoleEffect.activation.hits.forEach(({ brickId }, index) => {
+        const target = blackHoleEffect.targets[index];
+        const brick = state.bricks.find((candidate) => candidate.id === brickId);
+        if (!target || !brick) return;
+        const origin = { x: target.x - centerX, y: target.y - centerY };
+        const spinDirection = index % 2 === 0 ? 1 : -1;
+        const positionAt = (value: number) => {
+          const eased = value * value * (3 - 2 * value);
+          const spin = spinDirection * value * Math.PI * (1.15 + index % 3 * 0.18);
+          const radius = 1 - eased;
+          return {
+            x: centerX + (origin.x * Math.cos(spin) - origin.y * Math.sin(spin)) * radius,
+            y: centerY + (origin.x * Math.sin(spin) + origin.y * Math.cos(spin)) * radius,
+          };
+        };
+        const trail = Array.from({ length: 4 }, (_, trailIndex) => positionAt(Math.max(0, pullProgress - (3 - trailIndex) * 0.045)));
+        effectGlow.moveTo(trail[0].x, trail[0].y);
+        scene.moveTo(trail[0].x, trail[0].y);
+        trail.slice(1).forEach((point) => {
+          effectGlow.lineTo(point.x, point.y);
+          scene.lineTo(point.x, point.y);
+        });
+        effectGlow.stroke({ width: 9, color: 0x6d5cff, alpha: suctionAlpha * 0.3 });
+        scene.stroke({ width: 2, color: 0xa59cff, alpha: suctionAlpha * 0.48 });
+
+        const position = positionAt(pullProgress);
+        const scale = Math.max(0.05, (1 - pull) ** 0.78);
+        const rect = brickRect(brick);
+        const width = rect.width * scale;
+        const height = rect.height * scale;
+        effectGlow.roundRect(position.x - width / 2, position.y - height / 2, width, height, Math.min(8, height / 3))
+          .stroke({ width: 9, color: 0x775cff, alpha: suctionAlpha * 0.34 });
+        scene.roundRect(position.x - width / 2, position.y - height / 2, width, height, Math.min(8, height / 3))
+          .fill({ color: brickColor(brick), alpha: suctionAlpha * 0.94 })
+          .stroke({ width: 1.5, color: 0xd7d2ff, alpha: suctionAlpha * 0.7 });
+        const label = brickLabels.get(brickId);
+        if (label) {
+          label.visible = true;
+          label.alpha = suctionAlpha;
+          label.position.set(position.x, position.y);
+          label.scale.set(scale);
+        }
       });
       const diskRadius = (34 + pullProgress * 11) * (1 - collapseProgress * 0.85);
       effectGlow.ellipse(ultimateEffect.x, ultimateEffect.y, diskRadius, diskRadius * 0.34)
@@ -1701,7 +1777,7 @@ function draw(): void {
         .fill(0x000005)
         .stroke({ width: 3, color: 0xd8ceff, alpha: suctionAlpha });
 
-      const burstProgress = Math.max(0, (progress - 0.72) / 0.28);
+      const burstProgress = Math.max(0, (progress - BLACK_HOLE_IMPACT_PROGRESS) / (1 - BLACK_HOLE_IMPACT_PROGRESS));
       if (burstProgress > 0) {
         const burst = 1 - (1 - burstProgress) ** 3;
         const burstAlpha = 1 - burstProgress;
@@ -1772,7 +1848,7 @@ function draw(): void {
       scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
         .fill({ color: 0xff6328, alpha: Math.max(0, 0.045 - progress * 0.03) });
       ultimateEffect.targets.forEach((target, index) => {
-        const ignition = index / count * 0.62;
+        const ignition = index / count * FUSION_IGNITION_SPAN;
         const localProgress = Math.max(0, Math.min(1, (progress - ignition) / 0.32));
         if (localProgress <= 0) return;
         const expansion = 1 - (1 - localProgress) ** 3;
@@ -1801,10 +1877,10 @@ function draw(): void {
     } else {
       const count = Math.max(1, ultimateEffect.targets.length);
       ultimateEffect.targets.forEach((target, index) => {
-        const launchDelay = index / count * 0.32;
-        const localProgress = Math.max(0, Math.min(1, (progress - launchDelay) / 0.62));
+        const launchDelay = index / count * MISSILE_LAUNCH_SPAN;
+        const localProgress = Math.max(0, Math.min(1, (progress - launchDelay) / MISSILE_LOCAL_DURATION));
         if (localProgress <= 0) return;
-        const flightProgress = Math.min(1, localProgress / 0.76);
+        const flightProgress = Math.min(1, localProgress / MISSILE_IMPACT_LOCAL_PROGRESS);
         const side = index % 3;
         const origin = side === 0
           ? { x: target.x - 90 + index % 5 * 38, y: -30 }
@@ -1833,7 +1909,7 @@ function draw(): void {
           };
           drawMissile(effectGlow, scene, position, velocity, Math.min(1, localProgress * 8));
         } else {
-          const explosionProgress = (localProgress - 0.76) / 0.24;
+          const explosionProgress = (localProgress - MISSILE_IMPACT_LOCAL_PROGRESS) / (1 - MISSILE_IMPACT_LOCAL_PROGRESS);
           const explosion = 1 - (1 - explosionProgress) ** 3;
           const explosionAlpha = 1 - explosionProgress;
           const radius = 4 + explosion * 24;
@@ -2093,9 +2169,12 @@ function update(delta: number): void {
   if (ultimateEffect) {
     ultimateEffect.elapsed += delta;
     const duration = ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type];
-    if (ultimateEffect.type === "meteorImpact" && !ultimateEffect.activation.resolved && ultimateEffect.elapsed >= duration * METEOR_IMPACT_PROGRESS) {
-      resolveUltimateActivation(state, ultimateEffect.activation);
-      playSound("bomb", { playbackRate: 0.9 });
+    const progress = Math.min(1, ultimateEffect.elapsed / duration);
+    const appliedHits = resolveUltimateHits(state, ultimateEffect.activation, ultimateHitCount(ultimateEffect, progress));
+    if (appliedHits > 0) {
+      playSound(ultimateEffect.type === "orbitalLaser" || ultimateEffect.type === "crossfire" ? "laser" : "bomb", {
+        playbackRate: ultimateEffect.type === "chainLightning" ? 1.18 : ultimateEffect.type === "missileBarrage" ? 0.82 : 0.9,
+      });
       pullLaserEffects();
       boardSignature = "";
       syncUi();

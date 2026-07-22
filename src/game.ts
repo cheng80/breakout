@@ -155,6 +155,7 @@ export interface UltimateActivation {
   type: UltimateItemType;
   targets: Array<Pick<Brick, "row" | "column">>;
   hits: Array<{ brickId: string; damage: number }>;
+  resolvedHitCount: number;
   resolved: boolean;
 }
 
@@ -570,6 +571,7 @@ export function useUltimateItem(
         damage: type === "meteorImpact" && distanceFromImpact === 2 ? 1 : brick.hp,
       };
     }),
+    resolvedHitCount: 0,
     resolved: false,
   };
   state.ultimateInventory[slot] = null;
@@ -578,10 +580,23 @@ export function useUltimateItem(
 }
 
 export function resolveUltimateActivation(state: GameState, activation: UltimateActivation): void {
-  if (activation.resolved) return;
-  activation.resolved = true;
-  activation.hits.forEach(({ brickId, damage }) => damageBrick(state, brickId, damage));
-  advanceStageIfCleared(state);
+  resolveUltimateHits(state, activation, activation.hits.length);
+}
+
+export function resolveUltimateHits(state: GameState, activation: UltimateActivation, hitCount: number): number {
+  const targetCount = Math.max(0, Math.min(activation.hits.length, Math.floor(hitCount)));
+  let applied = 0;
+  while (activation.resolvedHitCount < targetCount) {
+    const { brickId, damage } = activation.hits[activation.resolvedHitCount];
+    activation.resolvedHitCount += 1;
+    damageBrick(state, brickId, damage);
+    applied += 1;
+  }
+  if (!activation.resolved && activation.resolvedHitCount === activation.hits.length) {
+    activation.resolved = true;
+    advanceStageIfCleared(state);
+  }
+  return applied;
 }
 
 export function collectItem(state: GameState, itemId: string): FieldItemType | null {
