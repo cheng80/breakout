@@ -10,6 +10,7 @@ import {
   setBgmVolume,
   setSfxMuted,
 } from "../src/audio";
+import { normalizePlayerName } from "../src/ranking";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -62,6 +63,10 @@ describe("핵심 게임 규칙", () => {
     setBgmVolume(2);
     expect(getBgmVolume()).toBe(1);
     setBgmVolume(0.1);
+  });
+
+  it("랭킹 닉네임은 공백을 정리하고 12자로 제한한다", () => {
+    expect(normalizePlayerName("  Swipe   Breakout  ")).toBe("Swipe Breako");
   });
 
   it("BGM·효과음·전체 음소거를 각각 제어한다", () => {

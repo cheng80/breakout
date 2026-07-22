@@ -17,6 +17,7 @@ import {
   setSfxMuted,
   unlockAudio,
 } from "./audio";
+import { fetchTopRanking, normalizePlayerName, submitRanking, type RankingEntry } from "./ranking";
 import { ObjectPool } from "./object-pool";
 import {
   BOARD_HEIGHT,
@@ -67,6 +68,7 @@ const BALL_SPEED = 600;
 const BLACK_HOLE_PULL_ACCELERATION = 4000;
 const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
+const PLAYER_NAME_KEY = "swipe-breakout-player-name";
 interface ActiveBall extends Vec2 {
   vx: number;
   vy: number;
@@ -112,6 +114,9 @@ let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
 let resetConfirmOpen = false;
+let rankingLoaded = false;
+let rankingSubmitting = false;
+let rankingRequestId = 0;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -189,6 +194,12 @@ const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
+const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
+const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
+const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
+const rankingNameInput = document.querySelector<HTMLInputElement>("#ranking-name")!;
+const rankingSubmitButton = document.querySelector<HTMLButtonElement>("#ranking-submit")!;
+const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")!;
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
@@ -274,6 +285,11 @@ function reset(): void {
   trapEffect = null;
   shieldRewindEffect = null;
   brickHitEffects.clear();
+  rankingLoaded = false;
+  rankingSubmitting = false;
+  rankingRequestId += 1;
+  rankingSubmitButton.disabled = false;
+  rankingFeedback.textContent = "";
   setHelpOpen(false);
   setOptionsOpen(false);
   syncUi();
@@ -322,6 +338,10 @@ app.canvas.addEventListener("pointercancel", () => {
 });
 
 document.querySelector("#result-restart")!.addEventListener("click", reset);
+rankingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void submitCurrentScore();
+});
 helpButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !optionsOpen) setHelpOpen(!helpOpen);
 });
@@ -435,6 +455,106 @@ function saveBestScore(): void {
   }
 }
 
+function loadPlayerName(): string {
+  try {
+    return normalizePlayerName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function savePlayerName(name: string): void {
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 게임은 계속 진행합니다.
+  }
+}
+
+function renderRanking(entries: RankingEntry[]): void {
+  rankingList.replaceChildren();
+  if (entries.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "ranking-empty";
+    empty.textContent = "아직 등록된 기록이 없습니다.";
+    rankingList.append(empty);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const row = document.createElement("li");
+    const rank = document.createElement("span");
+    const name = document.createElement("strong");
+    const score = document.createElement("span");
+    rank.className = "ranking-rank";
+    name.className = "ranking-name";
+    score.className = "ranking-score";
+    rank.textContent = String(entry.rank).padStart(2, "0");
+    name.textContent = entry.name;
+    score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage}`;
+    row.append(rank, name, score);
+    rankingList.append(row);
+  });
+}
+
+async function loadRanking(): Promise<void> {
+  const requestId = ++rankingRequestId;
+  rankingStatus.textContent = "불러오는 중";
+  rankingList.replaceChildren();
+  const loading = document.createElement("li");
+  loading.className = "ranking-empty";
+  loading.textContent = "랭킹을 불러오는 중입니다.";
+  rankingList.append(loading);
+
+  const entries = await fetchTopRanking(10);
+  if (requestId !== rankingRequestId) return;
+  if (entries === null) {
+    rankingStatus.textContent = "연결 안 됨";
+    rankingList.replaceChildren();
+    const unavailable = document.createElement("li");
+    unavailable.className = "ranking-empty";
+    unavailable.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    rankingList.append(unavailable);
+    return;
+  }
+  rankingStatus.textContent = entries.length > 0 ? `상위 ${entries.length}명` : "기록 없음";
+  renderRanking(entries);
+}
+
+async function submitCurrentScore(): Promise<void> {
+  if (rankingSubmitting) return;
+  const name = normalizePlayerName(rankingNameInput.value);
+  if (!name) {
+    rankingFeedback.textContent = "닉네임을 입력하세요.";
+    rankingNameInput.focus();
+    return;
+  }
+  if (state.score < 1) {
+    rankingFeedback.textContent = "등록할 점수가 없습니다.";
+    return;
+  }
+
+  savePlayerName(name);
+  rankingNameInput.value = name;
+  rankingSubmitting = true;
+  rankingSubmitButton.disabled = true;
+  rankingFeedback.textContent = "등록 중...";
+  const requestId = ++rankingRequestId;
+  const response = await submitRanking({ name, score: state.score, stage: state.stage });
+  if (requestId !== rankingRequestId || state.gameStatus !== "gameOver") return;
+
+  rankingSubmitting = false;
+  rankingSubmitButton.disabled = false;
+  if (!response) {
+    rankingFeedback.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    return;
+  }
+  rankingFeedback.textContent = response.ranked
+    ? `${response.rank}위로 등록되었습니다.`
+    : (response.message ?? "상위 랭킹에 들지 못했습니다.");
+  await loadRanking();
+}
+
 function syncUi(): void {
   if (state.score > bestScore) {
     bestScore = state.score;
@@ -462,6 +582,12 @@ function syncUi(): void {
   if (state.gameStatus === "gameOver") {
     resultScore.textContent = state.score.toLocaleString("ko-KR");
     resultBestScore.textContent = bestScore.toLocaleString("ko-KR");
+    if (!rankingLoaded) {
+      rankingLoaded = true;
+      rankingNameInput.value = loadPlayerName();
+      rankingFeedback.textContent = "";
+      void loadRanking();
+    }
   }
 }
 
