@@ -360,7 +360,7 @@ describe("핵심 게임 규칙", () => {
     const firstReward = state.pendingUltimateReward;
     expect(acceptUltimateReward(state)).toBe(true);
     expect(state.stage).toBe(2);
-    expect(state.ultimateInventory[0]).toBe(firstReward);
+    expect(state.ultimateInventory).toEqual([firstReward, null]);
 
     state.ultimateInventory = ["antimatter", "orbitalLaser"];
     state.bricks = [];
