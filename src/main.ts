@@ -1239,6 +1239,58 @@ function drawAimSegment(start: Vec2, end: Vec2, reflection: number): void {
   });
 }
 
+function lightningPath(start: Vec2, end: Vec2, seed: number, progress: number, segments: number, amplitude: number): Vec2[] {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const normal = { x: -dy / length, y: dx / length };
+  const points = [start];
+  for (let index = 1; index < segments; index += 1) {
+    const t = index / segments;
+    const jitter = Math.sin(seed * 19.17 + index * 11.31 + progress * 48) * amplitude * Math.sin(Math.PI * t);
+    points.push({
+      x: start.x + dx * t + normal.x * jitter,
+      y: start.y + dy * t + normal.y * jitter,
+    });
+  }
+  points.push(end);
+  return points;
+}
+
+function strokeLightning(graphics: Graphics, points: Vec2[], width: number, color: number, alpha: number): void {
+  graphics.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach((point) => graphics.lineTo(point.x, point.y));
+  graphics.stroke({ width, color, alpha });
+}
+
+function drawLightningBolt(glow: Graphics, core: Graphics, start: Vec2, end: Vec2, seed: number, progress: number, fade: number): void {
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  const segments = Math.max(4, Math.min(7, Math.round(length / 34)));
+  const points = lightningPath(start, end, seed, progress, segments, Math.min(24, Math.max(9, length * 0.12)));
+  strokeLightning(glow, points, 13, 0x2cbfff, fade * 0.58);
+  strokeLightning(core, points, 4, 0xfff1a1, fade * 0.98);
+
+  for (let index = 1; index < points.length - 1; index += 2) {
+    const anchor = points[index];
+    const previous = points[index - 1];
+    const next = points[index + 1];
+    const tangentLength = Math.hypot(next.x - previous.x, next.y - previous.y) || 1;
+    const direction = (seed + index) % 2 === 0 ? 1 : -1;
+    const normal = {
+      x: -(next.y - previous.y) / tangentLength,
+      y: (next.x - previous.x) / tangentLength,
+    };
+    const branchLength = Math.min(32, Math.max(11, length * 0.16)) * (0.75 + Math.abs(Math.sin(seed + index)) * 0.25);
+    const branchEnd = {
+      x: anchor.x + normal.x * branchLength * direction,
+      y: anchor.y + normal.y * branchLength * direction,
+    };
+    const branch = lightningPath(anchor, branchEnd, seed + index * 2.7, progress, 3, branchLength * 0.22);
+    strokeLightning(glow, branch, 7, 0x4fd5ff, fade * 0.42);
+    strokeLightning(core, branch, 2, 0xffd95e, fade * 0.88);
+  }
+}
+
 function draw(): void {
   scene.clear();
   effectGlow.clear();
@@ -1382,13 +1434,11 @@ function draw(): void {
     } else if (ultimateEffect.type === "chainLightning") {
       const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
       let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
-      ultimateEffect.targets.slice(0, visibleTargets).forEach((target) => {
-        effectGlow.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
-          .stroke({ width: 10, color: 0xc76cff, alpha: alpha * 0.52 });
-        scene.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
-          .stroke({ width: 4, color: 0xf4d8ff, alpha });
+      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
+        drawLightningBolt(effectGlow, scene, previous, target, index + 1, progress, alpha);
         scene.circle(target.x, target.y, 4 + progress * 7)
-          .stroke({ width: 3, color: 0xffffff, alpha });
+          .fill({ color: 0x68dfff, alpha: alpha * 0.24 })
+          .stroke({ width: 3, color: 0xfff4ad, alpha });
         previous = target;
       });
     } else if (ultimateEffect.type === "meteorImpact") {
