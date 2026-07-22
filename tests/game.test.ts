@@ -49,6 +49,7 @@ import {
   finishVolley,
   hitBrickWithBall,
   laserEffectFrame,
+  maxBallsForStage,
   prepareVolley,
   relocateBlackHoles,
   resetGame,
@@ -61,6 +62,7 @@ import {
   stageResultStars,
   traceAimPath,
   useUltimateItem,
+  volleySpeedMultiplier,
 } from "../src/game";
 
 function advanceThroughReward(state: ReturnType<typeof createGame>): void {
@@ -318,7 +320,7 @@ describe("핵심 게임 규칙", () => {
     });
   });
 
-  it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 1~30개로 제한한다", () => {
+  it("드래그를 위쪽 발사 방향으로 제한하고 공 수를 스테이지별 상한으로 제한한다", () => {
     const direction = aimFromDrag({ x: 100, y: 500 }, { x: 330, y: 495 });
     expect(direction).not.toBeNull();
     expect(direction!.y).toBeLessThanOrEqual(-0.28);
@@ -330,8 +332,16 @@ describe("핵심 게임 규칙", () => {
     expect(state.stageTargetScore).toBe(450);
     expect(state.stageTargetTimeMs).toBeGreaterThan(0);
     state.ballCount = 99;
-    expect(MAX_BALLS).toBe(30);
-    expect(prepareVolley(state)).toBe(MAX_BALLS);
+    expect(MAX_BALLS).toBe(100);
+    expect(maxBallsForStage(1)).toBe(30);
+    expect(maxBallsForStage(10)).toBe(40);
+    expect(maxBallsForStage(40)).toBe(70);
+    expect(maxBallsForStage(70)).toBe(MAX_BALLS);
+    expect(maxBallsForStage(100)).toBe(MAX_BALLS);
+    expect(volleySpeedMultiplier(30)).toBe(1);
+    expect(volleySpeedMultiplier(70)).toBeCloseTo(1.2857, 3);
+    expect(volleySpeedMultiplier(100)).toBe(1.5);
+    expect(prepareVolley(state)).toBe(30);
     expect(state.gameStatus).toBe("volley");
   });
 
@@ -427,6 +437,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.ballCount).toBe(2);
     expect(state.score).toBe(MULTIBALL_SCORE);
 
+    state.stage = 70;
     state.ballCount = MAX_BALLS;
     state.score = 0;
     state.items.push({ id: "overflow-multiball", row: 1, column: 1, type: "multiball" });

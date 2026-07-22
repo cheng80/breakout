@@ -67,6 +67,7 @@ import {
   stabilizeBounce,
   traceAimPath,
   useUltimateItem,
+  volleySpeedMultiplier,
   type Brick,
   type FieldItem,
   type GameState,
@@ -416,13 +417,15 @@ function pullLaserEffects(): void {
 function launch(direction: Vec2): void {
   if (state.gameStatus !== "ready") return;
   const count = prepareVolley(state);
+  const speed = BALL_SPEED * volleySpeedMultiplier(count);
+  const launchDelay = 2.25 / count;
   firstLandingX = null;
   playSound("launch", { playbackRate: 1.08 });
   for (let index = 0; index < count; index += 1) {
     activeBalls.push(Object.assign(ballPool.acquire(), state.launchPosition, {
-      vx: direction.x * BALL_SPEED,
-      vy: direction.y * BALL_SPEED,
-      delay: index * 0.075,
+      vx: direction.x * speed,
+      vy: direction.y * speed,
+      delay: index * launchDelay,
       bounceCount: 0,
       blackHoleId: null,
     }));

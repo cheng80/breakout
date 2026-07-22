@@ -7,7 +7,7 @@ export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 10;
 export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
 export const FLOOR_Y = BOARD_HEIGHT - 40;
-export const MAX_BALLS = 30;
+export const MAX_BALLS = 100;
 export const MAX_BRICK_HP = 50;
 export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
@@ -19,6 +19,14 @@ export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
 export const BLACK_HOLE_CYCLE_DURATION = 5;
 export const BLACK_HOLE_CLEAR_FADE_DURATION = 0.15;
 export const MULTIBALL_SCORE = 50;
+
+export function maxBallsForStage(stage: number): number {
+  return Math.min(MAX_BALLS, 30 + Math.floor(Math.max(1, stage) / 10) * 10);
+}
+
+export function volleySpeedMultiplier(ballCount: number): number {
+  return 1 + (Math.min(MAX_BALLS, Math.max(30, ballCount)) - 30) / 140;
+}
 
 export type GameStatus = "ready" | "aiming" | "volley" | "reward" | "gameOver";
 export type FieldItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
@@ -497,7 +505,7 @@ export function traceAimPath(
 }
 
 export function prepareVolley(state: GameState): number {
-  state.ballCount = Math.max(1, Math.min(MAX_BALLS, state.ballCount));
+  state.ballCount = Math.max(1, Math.min(maxBallsForStage(state.stage), state.ballCount));
   state.gameStatus = "volley";
   return state.ballCount;
 }
@@ -629,7 +637,7 @@ export function collectItem(
   const previousBallCount = state.ballCount;
 
   if (item.type === "multiball") {
-    state.ballCount = Math.min(MAX_BALLS, state.ballCount + 1);
+    state.ballCount = Math.min(maxBallsForStage(state.stage), state.ballCount + 1);
     addScore(state, MULTIBALL_SCORE);
   } else if (item.type === "shield") {
     state.shield = true;
@@ -864,7 +872,7 @@ export function finishVolley(state: GameState, firstLandingX: number): boolean {
   );
 
   const barrierMultiballs = state.items.filter((item) => item.type === "multiball" && item.row >= DANGER_ROW);
-  state.ballCount = Math.min(MAX_BALLS, state.ballCount + barrierMultiballs.length);
+  state.ballCount = Math.min(maxBallsForStage(state.stage), state.ballCount + barrierMultiballs.length);
   state.items = state.items.filter((item) => !barrierMultiballs.includes(item));
 
   const reachedDanger = state.bricks.some(
