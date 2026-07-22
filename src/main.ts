@@ -282,6 +282,7 @@ app.stage.addChild(boardBackground, effectGlow, scene, brickHitGlow, labels, tra
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
 const ballsEl = document.querySelector<HTMLElement>("#balls")!;
+const ballsCapEl = document.querySelector<HTMLElement>("#balls-cap")!;
 const shieldEl = document.querySelector<HTMLElement>("#shield")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
@@ -1142,6 +1143,7 @@ function syncUi(): void {
   scoreEl.textContent = state.score.toLocaleString("ko-KR");
   scoreEl.classList.toggle("new-best", hasNewBestScore);
   ballsEl.textContent = `× ${state.ballCount}`;
+  ballsCapEl.textContent = `MAX ${maxBallsForStage(state.stage)}`;
   shieldEl.textContent = state.shield ? "ON" : "OFF";
   shieldEl.classList.toggle("active", state.shield);
 
