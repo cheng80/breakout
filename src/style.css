@@ -299,6 +299,27 @@ button {
   background: rgba(93, 183, 255, 0.1);
 }
 
+.hud-debug-tools {
+  grid-column: 1 / -1;
+  padding: 7px;
+  border: 1px dashed rgba(255, 193, 69, 0.45);
+  border-radius: 9px;
+  background: rgba(255, 193, 69, 0.08);
+  color: #ffd166;
+}
+
+.hud-debug-tools > strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.hud-debug-tools[hidden] {
+  display: none;
+}
+
 .hud span {
   display: block;
   margin-bottom: 5px;
@@ -577,6 +598,51 @@ button {
 
 .item-help-card h2 + h3 {
   margin-top: 0;
+}
+
+.debug-ultimate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.debug-ultimate {
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(164, 177, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #e7ecff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.debug-ultimate:active {
+  transform: scale(0.97);
+}
+
+.debug-ultimate img {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  object-fit: cover;
+  filter: saturate(0.82) brightness(0.84);
+}
+
+.debug-ultimate span {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  color: #ffe7a1;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.1;
+  word-break: keep-all;
 }
 
 .item-help-list {
@@ -1536,6 +1602,7 @@ button {
   outline: 1px solid rgba(255, 255, 255, 0.1);
   outline-offset: -1px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  filter: saturate(0.82) brightness(0.84);
 }
 
 .ultimate-slot-image[hidden],
@@ -1622,6 +1689,7 @@ button {
   outline: 1px solid rgba(255, 255, 255, 0.1);
   outline-offset: -1px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  filter: saturate(0.82) brightness(0.84);
 }
 
 #status-dot {
@@ -1685,7 +1753,7 @@ button {
     height: 40px;
   }
 
-  .hud div {
+  .hud > .stat {
     padding-block: 5px;
   }
 
@@ -1734,7 +1802,7 @@ button {
     gap: 4px;
   }
 
-  .hud div {
+  .hud > .stat {
     padding-inline: 5px;
   }
 

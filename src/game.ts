@@ -21,7 +21,15 @@ export const MULTIBALL_SCORE = 50;
 
 export type GameStatus = "ready" | "aiming" | "volley" | "reward" | "gameOver";
 export type FieldItemType = "bomb" | "multiball" | "shield" | "power" | "power3" | "power4" | "trap" | "blackhole";
-export type UltimateItemType = "antimatter" | "orbitalLaser" | "chainLightning";
+export type UltimateItemType =
+  | "antimatter"
+  | "orbitalLaser"
+  | "chainLightning"
+  | "meteorImpact"
+  | "blackHoleCollapse"
+  | "crossfire"
+  | "fusionChain"
+  | "missileBarrage";
 export type BrickType = "normal" | "laser" | "steel";
 
 export const ULTIMATE_SLOT_COUNT = 2;
@@ -146,6 +154,8 @@ export interface StageResult {
 export interface UltimateActivation {
   type: UltimateItemType;
   targets: Array<Pick<Brick, "row" | "column">>;
+  hits: Array<{ brickId: string; damage: number }>;
+  resolved: boolean;
 }
 
 export interface GameState {
@@ -508,6 +518,7 @@ export function useUltimateItem(
   state: GameState,
   slot: number,
   target: Pick<Brick, "row" | "column">,
+  deferResolution = false,
 ): UltimateActivation | null {
   if (state.gameStatus !== "ready" || !Number.isInteger(slot) || !Number.isInteger(target.row) || !Number.isInteger(target.column)) return null;
   if (slot < 0 || slot >= ULTIMATE_SLOT_COUNT || target.row < 0 || target.row >= DANGER_ROW || target.column < 0 || target.column >= GRID_COLUMNS) return null;
@@ -515,21 +526,62 @@ export function useUltimateItem(
   if (!type) return null;
 
   const destructible = state.bricks.filter((brick) => brick.type !== "steel");
+  const distance = (brick: Brick) => Math.abs(brick.row - target.row) + Math.abs(brick.column - target.column);
+  const fusionTargets = () => {
+    const remaining = [...destructible];
+    const result: Brick[] = [];
+    const frontier = remaining.sort((a, b) => distance(a) - distance(b)).slice(0, 1);
+    while (result.length < 18 && remaining.length > 0) {
+      const next = frontier.shift() ?? remaining[0];
+      const index = remaining.indexOf(next);
+      if (index < 0) continue;
+      remaining.splice(index, 1);
+      result.push(next);
+      frontier.push(...remaining
+        .filter((brick) => Math.max(Math.abs(brick.row - next.row), Math.abs(brick.column - next.column)) <= 1)
+        .sort((a, b) => distance(a) - distance(b)));
+    }
+    return result;
+  };
   const targets = type === "antimatter"
     ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
     : type === "orbitalLaser"
-      ? destructible.filter((brick) => Math.abs(brick.column - target.column) <= 1)
-      : destructible
-        .sort((a, b) => Math.abs(a.row - target.row) + Math.abs(a.column - target.column)
-          - Math.abs(b.row - target.row) - Math.abs(b.column - target.column))
-        .slice(0, 12);
+      ? destructible.filter((brick) => brick.column === target.column)
+      : type === "chainLightning"
+        ? [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 12)
+        : type === "meteorImpact"
+          ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
+          : type === "blackHoleCollapse"
+            ? destructible.filter((brick) => Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column)) <= 2)
+            : type === "crossfire"
+              ? destructible.filter((brick) => Math.abs(brick.row - target.row) <= 1 || Math.abs(brick.column - target.column) <= 1)
+              : type === "fusionChain"
+                ? fusionTargets()
+                : [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 20);
   if (targets.length === 0) return null;
 
-  const activation = { type, targets: targets.map(({ row, column }) => ({ row, column })) };
-  targets.forEach((brick) => damageBrick(state, brick.id, brick.hp));
+  const activation: UltimateActivation = {
+    type,
+    targets: targets.map(({ row, column }) => ({ row, column })),
+    hits: targets.map((brick) => {
+      const distanceFromImpact = Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column));
+      return {
+        brickId: brick.id,
+        damage: type === "meteorImpact" && distanceFromImpact === 2 ? 1 : brick.hp,
+      };
+    }),
+    resolved: false,
+  };
   state.ultimateInventory[slot] = null;
-  advanceStageIfCleared(state);
+  if (!deferResolution) resolveUltimateActivation(state, activation);
   return activation;
+}
+
+export function resolveUltimateActivation(state: GameState, activation: UltimateActivation): void {
+  if (activation.resolved) return;
+  activation.resolved = true;
+  activation.hits.forEach(({ brickId, damage }) => damageBrick(state, brickId, damage));
+  advanceStageIfCleared(state);
 }
 
 export function collectItem(state: GameState, itemId: string): FieldItemType | null {
@@ -652,11 +704,19 @@ export function rollUltimateReward(
     : stars === 3 ? (roll - 0.5) / 0.5
       : stars === 4 ? (roll - 0.2) / 0.8
         : roll;
-  const antimatterWeight = stars >= 5 ? 0.45 : stars === 4 ? 0.3 : stars === 3 ? 0.15 : 0.05;
-  const orbitalWeight = stars >= 5 ? 0.35 : stars === 4 ? 0.4 : stars === 3 ? 0.35 : 0.25;
-  if (rewardRoll < antimatterWeight) return "antimatter";
-  if (rewardRoll < antimatterWeight + orbitalWeight) return "orbitalLaser";
-  return "chainLightning";
+  const weights: Array<[UltimateItemType, number]> = stars === 2
+    ? [["chainLightning", 0.55], ["meteorImpact", 0.25], ["blackHoleCollapse", 0.12], ["crossfire", 0.08]]
+    : stars === 3
+      ? [["chainLightning", 0.3], ["meteorImpact", 0.2], ["blackHoleCollapse", 0.15], ["crossfire", 0.15], ["antimatter", 0.08], ["orbitalLaser", 0.07], ["fusionChain", 0.04], ["missileBarrage", 0.01]]
+      : stars === 4
+        ? [["chainLightning", 0.18], ["meteorImpact", 0.16], ["blackHoleCollapse", 0.14], ["crossfire", 0.16], ["antimatter", 0.12], ["orbitalLaser", 0.12], ["fusionChain", 0.08], ["missileBarrage", 0.04]]
+        : [["chainLightning", 0.12], ["meteorImpact", 0.14], ["blackHoleCollapse", 0.13], ["crossfire", 0.16], ["antimatter", 0.15], ["orbitalLaser", 0.12], ["fusionChain", 0.12], ["missileBarrage", 0.06]];
+  let cursor = rewardRoll;
+  for (const [item, weight] of weights) {
+    if (cursor < weight) return item;
+    cursor -= weight;
+  }
+  return weights[weights.length - 1][0];
 }
 
 export function acceptUltimateReward(
