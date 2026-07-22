@@ -93,6 +93,10 @@ button {
   background: #6c7cff;
 }
 
+#audio-toggle {
+  font-size: 17px;
+}
+
 .hud {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

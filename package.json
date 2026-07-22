@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "test": "vitest",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "audio:plan": "node scripts/generate-audio.mjs",
+    "audio:generate": "node scripts/generate-audio.mjs --generate"
   },
   "dependencies": {
     "pixi.js": "^8.12.0"
