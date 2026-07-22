@@ -408,14 +408,14 @@ describe("핵심 게임 규칙", () => {
   it("멀티볼, 쉴드, 폭탄, 강화볼, 공 감소 함정을 규칙대로 적용한다", () => {
     const state = createGame();
     const multiball = state.items.find((item) => item.type === "multiball")!;
-    collectItem(state, multiball.id);
+    expect(collectItem(state, multiball.id)).toEqual({ type: "multiball", ballCountDelta: 1 });
     expect(state.ballCount).toBe(2);
     expect(state.score).toBe(MULTIBALL_SCORE);
 
     state.ballCount = MAX_BALLS;
     state.score = 0;
     state.items.push({ id: "overflow-multiball", row: 1, column: 1, type: "multiball" });
-    collectItem(state, "overflow-multiball");
+    expect(collectItem(state, "overflow-multiball")).toEqual({ type: "multiball", ballCountDelta: 0 });
     expect(state.ballCount).toBe(MAX_BALLS);
     expect(state.score).toBe(MULTIBALL_SCORE);
 
