@@ -225,6 +225,19 @@ const itemTypes: Record<string, FieldItemType> = {
   P: "power",
 };
 
+function lowestSafeBlackHoleCells(occupied: Set<string>, excludedCell?: string): Array<{ row: number; column: number }> {
+  const openCells = Array.from({ length: (DANGER_ROW - 1) * GRID_COLUMNS }, (_, index) => ({
+    row: Math.floor(index / GRID_COLUMNS),
+    column: index % GRID_COLUMNS,
+  })).filter((cell) => {
+    const key = `${cell.row}:${cell.column}`;
+    const centerY = GRID_TOP + cell.row * CELL_HEIGHT + BRICK_HEIGHT / 2;
+    return key !== excludedCell && !occupied.has(key) && DANGER_Y - centerY > BLACK_HOLE_INFLUENCE_RADIUS;
+  });
+  const lowestRow = Math.max(...openCells.map((cell) => cell.row));
+  return openCells.filter((cell) => cell.row === lowestRow);
+}
+
 function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   let seed = Math.imul(stage, 0x9e3779b1) >>> 0;
   const random = () => {
@@ -291,13 +304,19 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
     if (stage % 3 === 0) itemOrder.push("shield");
     if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
   }
-  if (hasBlackHole) itemOrder.splice(Math.min(4, itemOrder.length), 0, "blackhole");
-  const itemLimit = (stage >= 31 ? 7 : stage >= 16 ? 5 : 4) + Number(hasBlackHole);
+  const itemLimit = stage >= 31 ? 7 : stage >= 16 ? 5 : 4;
   const items = itemOrder.slice(0, Math.min(itemLimit, openCells.length)).map((type, index) => {
     const item: FieldItem = { id: `s${stage}-i${index}`, ...openCells[index], type };
-    if (type === "blackhole") item.charges = blackHoleChargesForStage(stage);
     return item;
   });
+  if (hasBlackHole) {
+    const blackHoleCells = lowestSafeBlackHoleCells(new Set([
+      ...occupied,
+      ...items.map((item) => `${item.row}:${item.column}`),
+    ]));
+    const destination = blackHoleCells[Math.floor(random() * blackHoleCells.length)];
+    if (destination) items.push({ id: `s${stage}-i${items.length}`, ...destination, type: "blackhole", charges: blackHoleChargesForStage(stage) });
+  }
 
   return { bricks, items };
 }
@@ -692,14 +711,7 @@ export function relocateBlackHoles(state: GameState, cycle: number): boolean {
       relocated = true;
     }
     const currentCell = `${item.row}:${item.column}`;
-    const openCells = Array.from({ length: (DANGER_ROW - 1) * GRID_COLUMNS }, (_, index) => ({
-      row: Math.floor(index / GRID_COLUMNS),
-      column: index % GRID_COLUMNS,
-    })).filter((cell) => {
-      const key = `${cell.row}:${cell.column}`;
-      const centerY = GRID_TOP + cell.row * CELL_HEIGHT + BRICK_HEIGHT / 2;
-      return key !== currentCell && !occupied.has(key) && DANGER_Y - centerY > BLACK_HOLE_INFLUENCE_RADIUS;
-    });
+    const openCells = lowestSafeBlackHoleCells(occupied, currentCell);
     if (openCells.length === 0) {
       occupied.add(currentCell);
       return;
