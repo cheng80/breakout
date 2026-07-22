@@ -88,7 +88,16 @@ const BLACK_HOLE_MAX_SPEED = BALL_SPEED * 1.75;
 const BEST_SCORE_KEY = "swipe-breakout-best-score";
 const PLAYER_NAME_KEY = "swipe-breakout-player-name";
 const FPS_VISIBLE_KEY = "swipe-breakout-fps-visible";
-const ULTIMATE_EFFECT_DURATION = 0.9;
+const ULTIMATE_EFFECT_DURATIONS: Record<UltimateItemType, number> = {
+  antimatter: 1.05,
+  orbitalLaser: 0.95,
+  chainLightning: 1.05,
+  meteorImpact: 1.15,
+  blackHoleCollapse: 1.3,
+  crossfire: 1.05,
+  fusionChain: 1.25,
+  missileBarrage: 1.3,
+};
 const ULTIMATE_RESULT_DELAY = 0.35;
 interface ActiveBall extends Vec2 {
   vx: number;
@@ -200,6 +209,7 @@ app.canvas.setAttribute("role", "application");
 app.canvas.setAttribute("aria-label", "아래에서 위로 드래그해 공을 발사하는 게임판");
 
 const scene = new Graphics();
+const boardBackground = new Graphics().rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
 const effectGlow = new Graphics();
 effectGlow.filters = [new BlurFilter({ strength: 10, quality: 3 })];
 const brickHitGlow = new Graphics();
@@ -239,7 +249,7 @@ const dangerLabel = new Text({
 });
 dangerLabel.anchor.set(1, 0);
 dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
-app.stage.addChild(scene, effectGlow, brickHitGlow, labels, trapNotice, ballCounter, dangerLabel);
+app.stage.addChild(boardBackground, effectGlow, scene, brickHitGlow, labels, trapNotice, ballCounter, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
@@ -510,7 +520,9 @@ function restoreDebugState(): void {
 
 function startDebugUltimate(type: UltimateItemType): void {
   if (state.gameStatus !== "ready" || debugUltimateActive || ultimateEffect) return;
-  const targetBrick = state.bricks.find((brick) => brick.type !== "steel");
+  const targetBrick = state.bricks
+    .filter((brick) => brick.type !== "steel")
+    .sort((a, b) => b.row - a.row || Math.abs(a.column - (GRID_COLUMNS - 1) / 2) - Math.abs(b.column - (GRID_COLUMNS - 1) / 2))[0];
   if (!targetBrick) return;
   debugSnapshot = {
     bricks: state.bricks.map((brick) => ({ ...brick })),
@@ -1270,7 +1282,7 @@ function drawLightningBolt(glow: Graphics, core: Graphics, start: Vec2, end: Vec
   strokeLightning(glow, points, 13, 0x2cbfff, fade * 0.58);
   strokeLightning(core, points, 4, 0xfff1a1, fade * 0.98);
 
-  for (let index = 1; index < points.length - 1; index += 2) {
+  for (let index = 1; index < points.length - 1; index += 1) {
     const anchor = points[index];
     const previous = points[index - 1];
     const next = points[index + 1];
@@ -1280,22 +1292,48 @@ function drawLightningBolt(glow: Graphics, core: Graphics, start: Vec2, end: Vec
       x: -(next.y - previous.y) / tangentLength,
       y: (next.x - previous.x) / tangentLength,
     };
-    const branchLength = Math.min(32, Math.max(11, length * 0.16)) * (0.75 + Math.abs(Math.sin(seed + index)) * 0.25);
+    const branchLength = Math.min(55, Math.max(22, length * 0.38)) * (0.75 + Math.abs(Math.sin(seed + index)) * 0.25);
     const branchEnd = {
       x: anchor.x + normal.x * branchLength * direction,
       y: anchor.y + normal.y * branchLength * direction,
     };
     const branch = lightningPath(anchor, branchEnd, seed + index * 2.7, progress, 3, branchLength * 0.22);
-    strokeLightning(glow, branch, 7, 0x4fd5ff, fade * 0.42);
-    strokeLightning(core, branch, 2, 0xffd95e, fade * 0.88);
+    strokeLightning(glow, branch, 10, 0x2bc7ff, fade * 0.5);
+    strokeLightning(core, branch, 3, 0x8cecff, fade * 0.94);
   }
+}
+
+function drawMissile(glow: Graphics, core: Graphics, position: Vec2, velocity: Vec2, alpha: number): void {
+  const length = Math.hypot(velocity.x, velocity.y) || 1;
+  const direction = { x: velocity.x / length, y: velocity.y / length };
+  const normal = { x: -direction.y, y: direction.x };
+  const tail = { x: position.x - direction.x * 18, y: position.y - direction.y * 18 };
+  const flame = { x: tail.x - direction.x * 13, y: tail.y - direction.y * 13 };
+  glow.moveTo(flame.x, flame.y).lineTo(position.x, position.y)
+    .stroke({ width: 12, color: 0xff4f47, alpha: alpha * 0.52 });
+  core.moveTo(flame.x, flame.y).lineTo(tail.x, tail.y)
+    .stroke({ width: 5, color: 0xffc35a, alpha });
+  core.moveTo(position.x, position.y)
+    .lineTo(tail.x + normal.x * 5, tail.y + normal.y * 5)
+    .lineTo(tail.x - direction.x * 2, tail.y - direction.y * 2)
+    .lineTo(tail.x - normal.x * 5, tail.y - normal.y * 5)
+    .closePath()
+    .fill({ color: 0xf2f5ff, alpha })
+    .stroke({ width: 2, color: 0xff5a62, alpha });
+  core.moveTo(tail.x + normal.x * 5, tail.y + normal.y * 5)
+    .lineTo(tail.x - direction.x * 6 + normal.x * 8, tail.y - direction.y * 6 + normal.y * 8)
+    .lineTo(tail.x - direction.x * 3, tail.y - direction.y * 3)
+    .fill({ color: 0xff566f, alpha });
+  core.moveTo(tail.x - normal.x * 5, tail.y - normal.y * 5)
+    .lineTo(tail.x - direction.x * 6 - normal.x * 8, tail.y - direction.y * 6 - normal.y * 8)
+    .lineTo(tail.x - direction.x * 3, tail.y - direction.y * 3)
+    .fill({ color: 0xff566f, alpha });
 }
 
 function draw(): void {
   scene.clear();
   effectGlow.clear();
   brickHitGlow.clear();
-  scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill(0x091524);
   const shieldFrame = shieldRewindEffect ? shieldRewindFrame(shieldRewindEffect.elapsed) : null;
   const boardOffset = shieldFrame?.offset ?? 0;
   labels.y = boardOffset;
@@ -1413,113 +1451,383 @@ function draw(): void {
   });
 
   if (ultimateEffect) {
-    const progress = Math.min(1, ultimateEffect.elapsed / ULTIMATE_EFFECT_DURATION);
+    const progress = Math.min(1, ultimateEffect.elapsed / ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type]);
     const alpha = 1 - progress;
     if (ultimateEffect.type === "antimatter") {
-      const radius = 24 + 108 * (1 - (1 - progress) ** 3);
-      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
-        .stroke({ width: 22, color: 0xbd62ff, alpha: alpha * 0.58 });
-      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0x6d22aa, alpha: alpha * 0.06 });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).fill({ color: 0x7020a8, alpha: alpha * 0.16 });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 5, color: 0xf4dcff, alpha });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius * 0.55).stroke({ width: 2, color: 0xffffff, alpha: alpha * 0.65 });
-    } else if (ultimateEffect.type === "orbitalLaser") {
-      const width = CELL_WIDTH * Math.min(1, progress * 4);
-      effectGlow.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)
-        .fill({ color: 0x38dfff, alpha: alpha * 0.48 });
-      scene.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)
-        .fill({ color: 0x12bfe8, alpha: alpha * 0.24 });
-      scene.rect(ultimateEffect.x - Math.max(3, width * 0.16), 0, Math.max(6, width * 0.32), BOARD_HEIGHT)
-        .fill({ color: 0xffffff, alpha: alpha * 0.72 });
-    } else if (ultimateEffect.type === "chainLightning") {
-      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
-      let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
-      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
-        drawLightningBolt(effectGlow, scene, previous, target, index + 1, progress, alpha);
-        scene.circle(target.x, target.y, 4 + progress * 7)
-          .fill({ color: 0x68dfff, alpha: alpha * 0.24 })
-          .stroke({ width: 3, color: 0xfff4ad, alpha });
-        previous = target;
-      });
-    } else if (ultimateEffect.type === "meteorImpact") {
-      const radius = 18 + 105 * (1 - (1 - progress) ** 3);
-      const tail = { x: ultimateEffect.x - 110 - progress * 20, y: ultimateEffect.y - 140 - progress * 18 };
-      effectGlow.moveTo(tail.x, tail.y).lineTo(ultimateEffect.x, ultimateEffect.y)
-        .stroke({ width: 14, color: 0xff7133, alpha: alpha * 0.5 });
-      scene.moveTo(tail.x, tail.y).lineTo(ultimateEffect.x, ultimateEffect.y)
-        .stroke({ width: 6, color: 0xffbd55, alpha });
-      scene.circle(tail.x, tail.y, 9 + progress * 5).fill({ color: 0xffe9b0, alpha });
-      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
-        .stroke({ width: 18, color: 0xff7133, alpha: alpha * 0.52 });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).fill({ color: 0xf06a28, alpha: alpha * 0.16 });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 4, color: 0xffd978, alpha });
-    } else if (ultimateEffect.type === "blackHoleCollapse") {
-      const pull = Math.min(1, progress * 1.4);
-      const radius = 26 + 78 * progress;
-      effectGlow.ellipse(ultimateEffect.x, ultimateEffect.y, 28 + progress * 8, 10 + progress * 3)
-        .stroke({ width: 12, color: 0xe55216, alpha: alpha * 0.5 });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, 18 + progress * 7).fill({ color: 0x010101, alpha: alpha * 0.9 });
-      scene.ellipse(ultimateEffect.x, ultimateEffect.y, 28 + progress * 8, 10 + progress * 3)
-        .stroke({ width: 3, color: 0xff6a19, alpha });
+      const collapse = Math.min(1, progress / 0.4);
+      const collapseAlpha = Math.max(0, 1 - Math.max(0, progress - 0.34) / 0.22);
       const centerX = ultimateEffect.x;
       const centerY = ultimateEffect.y;
+      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0x3d0b70, alpha: collapseAlpha * 0.08 });
+      for (let ring = 0; ring < 3; ring += 1) {
+        const radius = 116 - collapse * (82 + ring * 8) + ring * 14;
+        effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .stroke({ width: 10 - ring * 2, color: ring === 1 ? 0xff73ee : 0x9d55ff, alpha: collapseAlpha * (0.5 - ring * 0.08) });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .stroke({ width: 2, color: ring === 1 ? 0xffb2f4 : 0xd9c2ff, alpha: collapseAlpha * 0.85 });
+      }
       ultimateEffect.targets.forEach((target, index) => {
-        const wobble = Math.sin(progress * 12 + index) * (1 - pull) * 7;
-        const x = target.x + (centerX - target.x) * pull + wobble;
-        const y = target.y + (centerY - target.y) * pull - wobble;
-        scene.moveTo(target.x, target.y).lineTo(x, y).stroke({ width: 2, color: 0xf99a48, alpha: alpha * 0.35 });
-        scene.circle(x, y, 3 + (1 - pull) * 3).fill({ color: 0xffa247, alpha: alpha * 0.55 });
+        const spiral = (1 - collapse) * 15;
+        const x = target.x + (centerX - target.x) * collapse + Math.sin(index * 2.3 + collapse * 12) * spiral;
+        const y = target.y + (centerY - target.y) * collapse + Math.cos(index * 1.7 + collapse * 12) * spiral;
+        const size = Math.max(2, 11 * (1 - collapse));
+        scene.roundRect(x - size / 2, y - size / 3, size, size * 0.66, 2)
+          .fill({ color: index % 2 === 0 ? 0xd081ff : 0x7755ff, alpha: collapseAlpha * 0.72 });
       });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, radius).stroke({ width: 5, color: 0xffb15b, alpha: alpha * 0.65 });
+      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, 18 + collapse * 12)
+        .fill({ color: 0xb45cff, alpha: collapseAlpha * 0.62 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 12 + collapse * 15)
+        .fill({ color: 0x010107, alpha: collapseAlpha * 0.98 })
+        .stroke({ width: 3, color: 0xf6d7ff, alpha: collapseAlpha });
+
+      const burstProgress = Math.max(0, (progress - 0.4) / 0.6);
+      if (burstProgress > 0) {
+        const burst = 1 - (1 - burstProgress) ** 3;
+        const burstAlpha = 1 - burstProgress;
+        const radius = 18 + burst * 140;
+        scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+          .fill({ color: 0xf1d8ff, alpha: Math.max(0, 0.18 - burstProgress * 0.5) });
+        effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .stroke({ width: 28, color: 0xc565ff, alpha: burstAlpha * 0.64 });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .stroke({ width: 6, color: 0xf7d7ff, alpha: burstAlpha });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, radius * 0.62)
+          .stroke({ width: 2, color: 0xffffff, alpha: burstAlpha * 0.78 });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, 28 * (1 - burst) + 4)
+          .fill({ color: 0xffffff, alpha: burstAlpha });
+        for (let index = 0; index < 14; index += 1) {
+          const angle = index / 14 * Math.PI * 2;
+          const inner = 18 + burst * 25;
+          const outer = 28 + burst * (78 + index % 3 * 12);
+          scene.moveTo(ultimateEffect.x + Math.cos(angle) * inner, ultimateEffect.y + Math.sin(angle) * inner)
+            .lineTo(ultimateEffect.x + Math.cos(angle) * outer, ultimateEffect.y + Math.sin(angle) * outer)
+            .stroke({ width: index % 2 === 0 ? 3 : 2, color: index % 2 === 0 ? 0xffffff : 0xdc83ff, alpha: burstAlpha * 0.86 });
+        }
+      }
+    } else if (ultimateEffect.type === "orbitalLaser") {
+      const charge = Math.min(1, progress / 0.24);
+      const beamProgress = Math.max(0, (progress - 0.2) / 0.8);
+      const beamOpen = Math.min(1, beamProgress * 5);
+      const beamAlpha = beamOpen * Math.min(1, (1 - progress) / 0.22);
+      scene.moveTo(ultimateEffect.x, 0).lineTo(ultimateEffect.x, BOARD_HEIGHT)
+        .stroke({ width: 1, color: 0x67e9ff, alpha: (1 - beamOpen) * charge * 0.72 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 23 - charge * 12)
+        .stroke({ width: 2, color: 0x8cf4ff, alpha: (1 - beamOpen) * charge });
+      effectGlow.ellipse(ultimateEffect.x, 3, 18 + charge * 34, 5 + charge * 9)
+        .stroke({ width: 15, color: 0x4ee6ff, alpha: Math.max(beamAlpha, charge * 0.42) });
+      scene.ellipse(ultimateEffect.x, 3, 18 + charge * 34, 5 + charge * 9)
+        .stroke({ width: 3, color: 0xd9fbff, alpha: Math.max(beamAlpha, charge * 0.8) });
+
+      if (beamProgress > 0) {
+        const width = CELL_WIDTH * beamOpen;
+        effectGlow.rect(ultimateEffect.x - width * 0.62, 0, width * 1.24, BOARD_HEIGHT)
+          .fill({ color: 0x22dfff, alpha: beamAlpha * 0.62 });
+        scene.rect(ultimateEffect.x - width / 2, 0, width, BOARD_HEIGHT)
+          .fill({ color: 0x0a93cf, alpha: beamAlpha * 0.42 });
+        scene.rect(ultimateEffect.x - width * 0.28, 0, width * 0.56, BOARD_HEIGHT)
+          .fill({ color: 0x76f1ff, alpha: beamAlpha * 0.74 });
+        scene.rect(ultimateEffect.x - Math.max(3, width * 0.09), 0, Math.max(6, width * 0.18), BOARD_HEIGHT)
+          .fill({ color: 0xffffff, alpha: beamAlpha });
+        for (let index = 0; index < 8; index += 1) {
+          const y = (beamProgress * BOARD_HEIGHT * 2.4 + index * BOARD_HEIGHT / 8) % BOARD_HEIGHT;
+          const side = index % 2 === 0 ? -1 : 1;
+          scene.moveTo(ultimateEffect.x + side * width * 0.25, y)
+            .lineTo(ultimateEffect.x + side * width * 0.48, y - 18)
+            .stroke({ width: 2, color: 0xc8faff, alpha: beamAlpha * 0.7 });
+        }
+        scene.circle(ultimateEffect.x, ultimateEffect.y, 12 + beamOpen * 28)
+          .stroke({ width: 4, color: 0xffffff, alpha: beamAlpha * 0.82 });
+      }
+    } else if (ultimateEffect.type === "chainLightning") {
+      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 2.4)));
+      const lightningAlpha = alpha * (0.72 + Math.abs(Math.sin(progress * 52)) * 0.28);
+      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+        .fill({ color: 0x2b9cff, alpha: lightningAlpha * 0.035 });
+      let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
+      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
+        drawLightningBolt(effectGlow, scene, previous, target, index + 1, progress, lightningAlpha);
+        scene.circle(target.x, target.y, 3.5).fill({ color: 0xffffff, alpha: lightningAlpha });
+        scene.moveTo(target.x - 7, target.y).lineTo(target.x + 7, target.y)
+          .moveTo(target.x, target.y - 7).lineTo(target.x, target.y + 7)
+          .stroke({ width: 2, color: index % 2 === 0 ? 0xffe672 : 0x67dcff, alpha: lightningAlpha * 0.82 });
+        previous = target;
+      });
+      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, 15 + Math.sin(progress * 44) * 3)
+        .fill({ color: 0x54dfff, alpha: lightningAlpha * 0.62 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, 6)
+        .fill({ color: 0xffffff, alpha: lightningAlpha });
+    } else if (ultimateEffect.type === "meteorImpact") {
+      const approachSide = ultimateEffect.x < BOARD_WIDTH / 2 ? 1 : -1;
+      const start = {
+        x: Math.max(28, Math.min(BOARD_WIDTH - 28, ultimateEffect.x + approachSide * 130)),
+        y: -28,
+      };
+      const dx = ultimateEffect.x - start.x;
+      const dy = ultimateEffect.y - start.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const direction = { x: dx / distance, y: dy / distance };
+      const normal = { x: -direction.y, y: direction.x };
+      const flightProgress = Math.min(1, progress / 0.38);
+      const flight = flightProgress ** 1.65;
+
+      if (flightProgress < 1) {
+        const meteor = { x: start.x + dx * flight, y: start.y + dy * flight };
+        const tailLength = 72 + (1 - flightProgress) * 35;
+        const tail = { x: meteor.x - direction.x * tailLength, y: meteor.y - direction.y * tailLength };
+        effectGlow.moveTo(tail.x, tail.y).lineTo(meteor.x, meteor.y)
+          .stroke({ width: 30, color: 0xff5b24, alpha: 0.42 });
+        scene.moveTo(tail.x, tail.y).lineTo(meteor.x, meteor.y)
+          .stroke({ width: 13, color: 0xff7b2d, alpha: 0.74 });
+        scene.moveTo(tail.x + normal.x * 4, tail.y + normal.y * 4).lineTo(meteor.x, meteor.y)
+          .stroke({ width: 5, color: 0xffe079, alpha: 0.95 });
+
+        for (let index = 0; index < 7; index += 1) {
+          const trailDistance = 20 + index * 13 + Math.sin(progress * 38 + index * 2.1) * 5;
+          const spread = Math.sin(index * 4.7 + progress * 25) * (5 + index * 1.8);
+          const emberX = meteor.x - direction.x * trailDistance + normal.x * spread;
+          const emberY = meteor.y - direction.y * trailDistance + normal.y * spread;
+          scene.circle(emberX, emberY, 1.5 + (index % 3))
+            .fill({ color: index % 2 === 0 ? 0xffd76a : 0xff6230, alpha: 0.7 - index * 0.065 });
+        }
+
+        effectGlow.circle(meteor.x, meteor.y, 19).fill({ color: 0xff6428, alpha: 0.58 });
+        scene.circle(meteor.x + direction.x * 4, meteor.y + direction.y * 4, 13).fill(0xff9b42);
+        scene.circle(meteor.x - direction.x * 3, meteor.y - direction.y * 3, 11)
+          .fill(0x4a2926)
+          .stroke({ width: 2, color: 0xffc05b, alpha: 0.9 });
+        scene.circle(meteor.x - direction.x * 5 + normal.x * 3, meteor.y - direction.y * 5 + normal.y * 3, 3)
+          .fill(0x241b20);
+      }
+
+      const impactProgress = Math.max(0, (progress - 0.38) / 0.62);
+      if (impactProgress > 0) {
+        const impact = 1 - (1 - impactProgress) ** 3;
+        const impactAlpha = 1 - impactProgress;
+        const radius = 18 + 112 * impact;
+        scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+          .fill({ color: 0xff8b35, alpha: Math.max(0, 0.13 - impactProgress * 0.26) });
+        effectGlow.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .stroke({ width: 24, color: 0xff5428, alpha: impactAlpha * 0.58 });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, radius)
+          .fill({ color: 0xd94320, alpha: impactAlpha * 0.16 })
+          .stroke({ width: 5, color: 0xffba55, alpha: impactAlpha });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, radius * 0.62)
+          .stroke({ width: 3, color: 0xfff0a0, alpha: impactAlpha * 0.82 });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, 25 * (1 - impact) + 5)
+          .fill({ color: 0xffffff, alpha: impactAlpha * 0.9 });
+
+        for (let index = 0; index < 12; index += 1) {
+          const angle = index / 12 * Math.PI * 2 + Math.sin(index * 8.3) * 0.13;
+          const travel = impact * (45 + index % 4 * 11);
+          const startRadius = 8 + index % 3 * 3;
+          const sparkStart = {
+            x: ultimateEffect.x + Math.cos(angle) * startRadius,
+            y: ultimateEffect.y + Math.sin(angle) * startRadius,
+          };
+          const sparkEnd = {
+            x: ultimateEffect.x + Math.cos(angle) * travel,
+            y: ultimateEffect.y + Math.sin(angle) * travel,
+          };
+          scene.moveTo(sparkStart.x, sparkStart.y).lineTo(sparkEnd.x, sparkEnd.y)
+            .stroke({ width: index % 3 === 0 ? 3 : 2, color: index % 2 === 0 ? 0xffe37c : 0xff7038, alpha: impactAlpha * 0.9 });
+          scene.circle(sparkEnd.x, sparkEnd.y, 2 + index % 2)
+            .fill({ color: 0xffc35b, alpha: impactAlpha * 0.8 });
+        }
+        for (let index = 0; index < 7; index += 1) {
+          const angle = index / 7 * Math.PI * 2 + 0.3;
+          const debrisDistance = impact * (24 + index % 3 * 10);
+          const x = ultimateEffect.x + Math.cos(angle) * debrisDistance;
+          const y = ultimateEffect.y + Math.sin(angle) * debrisDistance;
+          const size = 3 + index % 3;
+          scene.poly([x, y - size, x + size, y + size, x - size, y + size * 0.6], true)
+            .fill({ color: 0x3c2522, alpha: impactAlpha * 0.9 })
+            .stroke({ width: 1, color: 0xff8b42, alpha: impactAlpha * 0.8 });
+        }
+      }
+    } else if (ultimateEffect.type === "blackHoleCollapse") {
+      const pullProgress = Math.min(1, progress / 0.62);
+      const pull = pullProgress ** 2;
+      const collapseProgress = Math.max(0, Math.min(1, (progress - 0.58) / 0.16));
+      const suctionAlpha = Math.max(0, 1 - Math.max(0, progress - 0.58) / 0.18);
+      const centerX = ultimateEffect.x;
+      const centerY = ultimateEffect.y;
+      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill({ color: 0x09001c, alpha: suctionAlpha * 0.16 });
+      ultimateEffect.targets.forEach((target, index) => {
+        const dx = centerX - target.x;
+        const dy = centerY - target.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        const normal = { x: -dy / distance, y: dx / distance };
+        const swirl = Math.sin(pullProgress * Math.PI) * Math.min(34, distance * 0.28) * (index % 2 === 0 ? 1 : -1);
+        const x = target.x + dx * pull + normal.x * swirl;
+        const y = target.y + dy * pull + normal.y * swirl;
+        const scale = Math.max(0.08, 1 - pull);
+        scene.moveTo(target.x, target.y).lineTo(x, y)
+          .stroke({ width: 2, color: 0x7d7cff, alpha: suctionAlpha * 0.32 });
+        scene.roundRect(x - CELL_WIDTH * 0.28 * scale, y - BRICK_HEIGHT * 0.28 * scale, CELL_WIDTH * 0.56 * scale, BRICK_HEIGHT * 0.56 * scale, 3)
+          .fill({ color: index % 2 === 0 ? 0x695cff : 0xb06cff, alpha: suctionAlpha * 0.76 });
+      });
+      const diskRadius = (34 + pullProgress * 11) * (1 - collapseProgress * 0.85);
+      effectGlow.ellipse(ultimateEffect.x, ultimateEffect.y, diskRadius, diskRadius * 0.34)
+        .stroke({ width: 16, color: 0x745cff, alpha: suctionAlpha * 0.62 });
+      scene.ellipse(ultimateEffect.x, ultimateEffect.y, diskRadius, diskRadius * 0.34)
+        .stroke({ width: 5, color: 0xb9a2ff, alpha: suctionAlpha });
+      for (let index = 0; index < 9; index += 1) {
+        const angle = index / 9 * Math.PI * 2 + progress * 15;
+        const orbit = diskRadius * (0.72 + index % 3 * 0.12);
+        scene.circle(ultimateEffect.x + Math.cos(angle) * orbit, ultimateEffect.y + Math.sin(angle) * orbit * 0.34, 2 + index % 2)
+          .fill({ color: index % 2 === 0 ? 0x67d9ff : 0xd48cff, alpha: suctionAlpha * 0.85 });
+      }
+      const coreRadius = (17 + pullProgress * 10) * (1 - collapseProgress * 0.9);
+      effectGlow.circle(ultimateEffect.x, ultimateEffect.y, coreRadius + 7)
+        .fill({ color: 0x6d43ff, alpha: suctionAlpha * 0.52 });
+      scene.circle(ultimateEffect.x, ultimateEffect.y, Math.max(3, coreRadius))
+        .fill(0x000005)
+        .stroke({ width: 3, color: 0xd8ceff, alpha: suctionAlpha });
+
+      const burstProgress = Math.max(0, (progress - 0.72) / 0.28);
+      if (burstProgress > 0) {
+        const burst = 1 - (1 - burstProgress) ** 3;
+        const burstAlpha = 1 - burstProgress;
+        const radius = 8 + burst * 118;
+        scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+          .fill({ color: 0xd6ccff, alpha: Math.max(0, 0.14 - burstProgress * 0.42) });
+        effectGlow.ellipse(ultimateEffect.x, ultimateEffect.y, radius, radius * 0.4)
+          .stroke({ width: 28, color: 0x7c5cff, alpha: burstAlpha * 0.72 });
+        scene.ellipse(ultimateEffect.x, ultimateEffect.y, radius, radius * 0.4)
+          .stroke({ width: 6, color: 0xe8e0ff, alpha: burstAlpha });
+        const jetLength = 18 + burst * 118;
+        for (const direction of [-1, 1]) {
+          const end = {
+            x: ultimateEffect.x + jetLength * direction,
+            y: ultimateEffect.y - jetLength * 0.16 * direction,
+          };
+          effectGlow.moveTo(ultimateEffect.x, ultimateEffect.y).lineTo(end.x, end.y)
+            .stroke({ width: 22, color: 0x4bdcff, alpha: burstAlpha * 0.58 });
+          scene.moveTo(ultimateEffect.x, ultimateEffect.y).lineTo(end.x, end.y)
+            .stroke({ width: 7, color: 0x8cecff, alpha: burstAlpha * 0.84 });
+          scene.moveTo(ultimateEffect.x, ultimateEffect.y).lineTo(end.x, end.y)
+            .stroke({ width: 2, color: 0xffffff, alpha: burstAlpha });
+        }
+        scene.circle(ultimateEffect.x, ultimateEffect.y, 11 - burst * 5)
+          .fill(0x000005)
+          .stroke({ width: 3, color: 0xb8f5ff, alpha: burstAlpha });
+      }
     } else if (ultimateEffect.type === "crossfire") {
-      const reach = 30 + 170 * Math.min(1, progress * 1.8);
-      const width = 5 + progress * 8;
+      const charge = Math.min(1, progress / 0.24);
+      const fireProgress = Math.max(0, (progress - 0.2) / 0.8);
+      const beamAlpha = Math.min(1, fireProgress * 6) * Math.min(1, (1 - progress) / 0.2);
       for (let offset = -1; offset <= 1; offset += 1) {
         const y = ultimateEffect.y + offset * CELL_HEIGHT;
         const x = ultimateEffect.x + offset * (CELL_WIDTH + GRID_GAP);
-        effectGlow.moveTo(ultimateEffect.x - reach, y).lineTo(ultimateEffect.x + reach, y)
-          .stroke({ width: width * 1.6, color: 0x26dfff, alpha: alpha * 0.45 });
-        effectGlow.moveTo(x, Math.max(0, ultimateEffect.y - reach)).lineTo(x, Math.min(BOARD_HEIGHT, ultimateEffect.y + reach))
-          .stroke({ width: width * 1.6, color: 0x26dfff, alpha: alpha * 0.45 });
-        scene.moveTo(ultimateEffect.x - reach, y).lineTo(ultimateEffect.x + reach, y)
-          .stroke({ width, color: 0x9af7ff, alpha });
-        scene.moveTo(x, Math.max(0, ultimateEffect.y - reach)).lineTo(x, Math.min(BOARD_HEIGHT, ultimateEffect.y + reach))
-          .stroke({ width, color: 0xffffff, alpha });
+        scene.moveTo(0, y).lineTo(BOARD_WIDTH, y)
+          .stroke({ width: 1, color: 0x5be7ff, alpha: charge * (1 - Math.min(1, fireProgress * 5)) * 0.62 });
+        scene.moveTo(x, 0).lineTo(x, BOARD_HEIGHT)
+          .stroke({ width: 1, color: 0x5be7ff, alpha: charge * (1 - Math.min(1, fireProgress * 5)) * 0.62 });
+        if (fireProgress <= 0) continue;
+        const entry = Math.min(1, fireProgress * 5 - Math.abs(offset) * 0.16);
+        if (entry <= 0) continue;
+        const leftEnd = ultimateEffect.x * entry;
+        const rightStart = BOARD_WIDTH - (BOARD_WIDTH - ultimateEffect.x) * entry;
+        const topEnd = ultimateEffect.y * entry;
+        const bottomStart = BOARD_HEIGHT - (BOARD_HEIGHT - ultimateEffect.y) * entry;
+        effectGlow.moveTo(0, y).lineTo(leftEnd, y).moveTo(BOARD_WIDTH, y).lineTo(rightStart, y)
+          .stroke({ width: 22, color: 0x23dfff, alpha: beamAlpha * 0.55 });
+        effectGlow.moveTo(x, 0).lineTo(x, topEnd).moveTo(x, BOARD_HEIGHT).lineTo(x, bottomStart)
+          .stroke({ width: 22, color: 0x23dfff, alpha: beamAlpha * 0.55 });
+        scene.moveTo(0, y).lineTo(leftEnd, y).moveTo(BOARD_WIDTH, y).lineTo(rightStart, y)
+          .stroke({ width: 10, color: 0x43dfff, alpha: beamAlpha * 0.78 });
+        scene.moveTo(x, 0).lineTo(x, topEnd).moveTo(x, BOARD_HEIGHT).lineTo(x, bottomStart)
+          .stroke({ width: 10, color: 0x43dfff, alpha: beamAlpha * 0.78 });
+        scene.moveTo(0, y).lineTo(leftEnd, y).moveTo(BOARD_WIDTH, y).lineTo(rightStart, y)
+          .stroke({ width: 3, color: 0xffffff, alpha: beamAlpha });
+        scene.moveTo(x, 0).lineTo(x, topEnd).moveTo(x, BOARD_HEIGHT).lineTo(x, bottomStart)
+          .stroke({ width: 3, color: 0xffffff, alpha: beamAlpha });
       }
-      scene.circle(ultimateEffect.x, ultimateEffect.y, 14 + progress * 18).fill({ color: 0x48dfff, alpha: alpha * 0.28 });
+      if (fireProgress > 0) {
+        const flashRadius = 10 + Math.min(1, fireProgress * 5) * 34;
+        effectGlow.circle(ultimateEffect.x, ultimateEffect.y, flashRadius)
+          .fill({ color: 0x3ce7ff, alpha: beamAlpha * 0.5 });
+        scene.circle(ultimateEffect.x, ultimateEffect.y, flashRadius)
+          .stroke({ width: 4, color: 0xffffff, alpha: beamAlpha * 0.84 });
+      }
     } else if (ultimateEffect.type === "fusionChain") {
-      const visibleTargets = Math.max(1, Math.ceil(ultimateEffect.targets.length * Math.min(1, progress * 1.7)));
-      let previous = { x: ultimateEffect.x, y: ultimateEffect.y };
-      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
-        effectGlow.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
-          .stroke({ width: 10, color: 0xff7c35, alpha: alpha * 0.48 });
-        scene.moveTo(previous.x, previous.y).lineTo(target.x, target.y)
-          .stroke({ width: 4, color: index % 2 === 0 ? 0xfff3a6 : 0xff8e49, alpha });
-        scene.circle(target.x, target.y, 5 + progress * 7)
-          .fill({ color: 0xffbd55, alpha: alpha * 0.24 })
-          .stroke({ width: 2, color: 0xffffdc, alpha });
-        previous = target;
+      const count = Math.max(1, ultimateEffect.targets.length);
+      scene.rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT)
+        .fill({ color: 0xff6328, alpha: Math.max(0, 0.045 - progress * 0.03) });
+      ultimateEffect.targets.forEach((target, index) => {
+        const ignition = index / count * 0.62;
+        const localProgress = Math.max(0, Math.min(1, (progress - ignition) / 0.32));
+        if (localProgress <= 0) return;
+        const expansion = 1 - (1 - localProgress) ** 3;
+        const localAlpha = 1 - localProgress;
+        const radius = 5 + expansion * (18 + index % 3 * 3);
+        effectGlow.circle(target.x, target.y, radius)
+          .fill({ color: 0xff4b20, alpha: localAlpha * 0.5 })
+          .stroke({ width: 15, color: 0xff692d, alpha: localAlpha * 0.58 });
+        scene.circle(target.x, target.y, radius)
+          .fill({ color: 0xff6c28, alpha: localAlpha * 0.3 })
+          .stroke({ width: 4, color: index % 2 === 0 ? 0xffffbc : 0xffb34f, alpha: localAlpha });
+        scene.roundRect(target.x - CELL_WIDTH * 0.34, target.y - BRICK_HEIGHT * 0.34, CELL_WIDTH * 0.68, BRICK_HEIGHT * 0.68, 4)
+          .fill({ color: 0xffffff, alpha: Math.max(0, 1 - localProgress * 5) * 0.92 });
+        scene.circle(target.x, target.y, Math.max(2, 12 * (1 - expansion)))
+          .fill({ color: 0xffffff, alpha: localAlpha * 0.95 });
+        for (let spark = 0; spark < 5; spark += 1) {
+          const angle = spark / 5 * Math.PI * 2 + index * 1.13;
+          const sparkDistance = expansion * (18 + spark * 4);
+          scene.moveTo(target.x + Math.cos(angle) * sparkDistance * 0.28, target.y + Math.sin(angle) * sparkDistance * 0.28)
+            .lineTo(target.x + Math.cos(angle) * sparkDistance, target.y + Math.sin(angle) * sparkDistance)
+            .stroke({ width: spark % 2 === 0 ? 3 : 2, color: spark % 2 === 0 ? 0xffffa8 : 0xff5b27, alpha: localAlpha * 0.92 });
+          scene.circle(target.x + Math.cos(angle) * sparkDistance, target.y + Math.sin(angle) * sparkDistance, 1.5 + spark % 2)
+            .fill({ color: 0xffd56a, alpha: localAlpha * 0.86 });
+        }
       });
-      scene.circle(ultimateEffect.x, ultimateEffect.y, 22 + progress * 55)
-        .stroke({ width: 5, color: 0xff9d42, alpha: alpha * 0.55 });
     } else {
-      const count = ultimateEffect.targets.length;
-      const visibleTargets = Math.max(1, Math.ceil(count * Math.min(1, progress * 2.2)));
-      const centerX = ultimateEffect.x;
-      const centerY = ultimateEffect.y;
-      ultimateEffect.targets.slice(0, visibleTargets).forEach((target, index) => {
-        const angle = (index / Math.max(1, count)) * Math.PI * 2 + progress * 1.5;
-        const origin = { x: centerX + Math.cos(angle) * 235, y: centerY + Math.sin(angle) * 235 };
-        const dx = target.x - origin.x;
-        const dy = target.y - origin.y;
-        const length = Math.hypot(dx, dy) || 1;
-        const tip = { x: target.x - (dx / length) * 12, y: target.y - (dy / length) * 12 };
-        effectGlow.moveTo(origin.x, origin.y).lineTo(target.x, target.y)
-          .stroke({ width: 8, color: 0xff456f, alpha: alpha * 0.45 });
-        scene.moveTo(origin.x, origin.y).lineTo(tip.x, tip.y)
-          .stroke({ width: 3, color: 0xffc5d5, alpha });
-        scene.moveTo(tip.x, tip.y).lineTo(target.x, target.y).lineTo(tip.x - (dx / length) * 8, tip.y - (dy / length) * 8)
-          .stroke({ width: 4, color: 0xff5b78, alpha });
+      const count = Math.max(1, ultimateEffect.targets.length);
+      ultimateEffect.targets.forEach((target, index) => {
+        const launchDelay = index / count * 0.32;
+        const localProgress = Math.max(0, Math.min(1, (progress - launchDelay) / 0.62));
+        if (localProgress <= 0) return;
+        const flightProgress = Math.min(1, localProgress / 0.76);
+        const side = index % 3;
+        const origin = side === 0
+          ? { x: target.x - 90 + index % 5 * 38, y: -30 }
+          : side === 1
+            ? { x: -32, y: Math.max(25, target.y - 110 + index % 4 * 35) }
+            : { x: BOARD_WIDTH + 32, y: Math.max(25, target.y - 120 + index % 4 * 32) };
+        const originDx = target.x - origin.x;
+        const originDy = target.y - origin.y;
+        const originDistance = Math.hypot(originDx, originDy) || 1;
+        const curveNormal = { x: -originDy / originDistance, y: originDx / originDistance };
+        const curve = Math.sin(index * 5.17) * 48;
+        const control = {
+          x: (origin.x + target.x) / 2 + curveNormal.x * curve,
+          y: (origin.y + target.y) / 2 + curveNormal.y * curve,
+        };
+        if (flightProgress < 1) {
+          const flight = 1 - (1 - flightProgress) ** 2;
+          const inverse = 1 - flight;
+          const position = {
+            x: inverse * inverse * origin.x + 2 * inverse * flight * control.x + flight * flight * target.x,
+            y: inverse * inverse * origin.y + 2 * inverse * flight * control.y + flight * flight * target.y,
+          };
+          const velocity = {
+            x: 2 * inverse * (control.x - origin.x) + 2 * flight * (target.x - control.x),
+            y: 2 * inverse * (control.y - origin.y) + 2 * flight * (target.y - control.y),
+          };
+          drawMissile(effectGlow, scene, position, velocity, Math.min(1, localProgress * 8));
+        } else {
+          const explosionProgress = (localProgress - 0.76) / 0.24;
+          const explosion = 1 - (1 - explosionProgress) ** 3;
+          const explosionAlpha = 1 - explosionProgress;
+          const radius = 4 + explosion * 24;
+          effectGlow.circle(target.x, target.y, radius)
+            .fill({ color: 0xff3f4f, alpha: explosionAlpha * 0.42 });
+          scene.circle(target.x, target.y, radius)
+            .fill({ color: 0xff693d, alpha: explosionAlpha * 0.22 })
+            .stroke({ width: 3, color: 0xffe28a, alpha: explosionAlpha });
+          scene.circle(target.x, target.y, Math.max(2, 10 * (1 - explosion)))
+            .fill({ color: 0xffffff, alpha: explosionAlpha });
+        }
       });
     }
   }
@@ -1767,7 +2075,7 @@ function update(delta: number): void {
   }
   if (ultimateEffect) {
     ultimateEffect.elapsed += delta;
-    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATION) {
+    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type]) {
       ultimateEffect = null;
       if (debugUltimateActive) restoreDebugState();
       else if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;
