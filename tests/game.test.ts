@@ -15,6 +15,8 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   BLACK_HOLE_CLEAR_FADE_DURATION,
+  BLACK_HOLE_CAPTURE_FADE_DURATION,
+  BLACK_HOLE_CAPTURE_HOLD_DURATION,
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BLACK_HOLE_MIN_DEFLECTION_ANGLE,
@@ -35,6 +37,7 @@ import {
   advanceStageIfCleared,
   aimFromDrag,
   blackHoleClearFade,
+  blackHoleCaptureFade,
   blackHolePresence,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
@@ -168,6 +171,8 @@ describe("핵심 게임 규칙", () => {
     expect(blackHolePresence(BLACK_HOLE_CYCLE_DURATION)).toBe(0);
     expect(blackHoleClearFade(0)).toBe(1);
     expect(blackHoleClearFade(BLACK_HOLE_CLEAR_FADE_DURATION)).toBe(0);
+    expect(blackHoleCaptureFade(BLACK_HOLE_CAPTURE_HOLD_DURATION)).toBe(1);
+    expect(blackHoleCaptureFade(BLACK_HOLE_CAPTURE_HOLD_DURATION + BLACK_HOLE_CAPTURE_FADE_DURATION)).toBe(0);
 
     const state = createGame();
     state.stage = 31;
