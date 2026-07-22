@@ -3,7 +3,7 @@
  * Swipe Breakout 점수 랭킹 API.
  *
  * GET  ?action=list&limit=10 → 상위 점수 반환
- * POST ?action=submit       → {"name":"...", "score":123, "stage":4}
+ * POST ?action=submit       → {"name":"...", "score":123, "stage":4, "durationMs":12345}
  *
  * 같은 디렉터리의 ranking_data.json에 최대 30건을 저장합니다.
  */
@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 define('MAX_ENTRIES', 30);
 define('MAX_NAME_LENGTH', 12);
+define('MAX_DURATION_MS', 86400000);
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -54,6 +55,11 @@ function saveData(array $data): void {
     );
 }
 
+function durationValue(array $entry): int {
+    $duration = filter_var($entry['durationMs'] ?? null, FILTER_VALIDATE_INT);
+    return $duration === false || $duration < 0 ? PHP_INT_MAX : $duration;
+}
+
 function sortData(array &$data): void {
     usort($data, static function (array $a, array $b): int {
         $scoreOrder = ((int) ($b['score'] ?? 0)) <=> ((int) ($a['score'] ?? 0));
@@ -62,6 +68,9 @@ function sortData(array &$data): void {
         $stageOrder = ((int) ($b['stage'] ?? 1)) <=> ((int) ($a['stage'] ?? 1));
         if ($stageOrder !== 0) return $stageOrder;
 
+        $durationOrder = durationValue($a) <=> durationValue($b);
+        if ($durationOrder !== 0) return $durationOrder;
+
         return ((int) ($a['ts'] ?? 0)) <=> ((int) ($b['ts'] ?? 0));
     });
 }
@@ -69,11 +78,13 @@ function sortData(array &$data): void {
 function rankedData(array $data, int $limit): array {
     $result = [];
     foreach (array_slice($data, 0, $limit) as $index => $entry) {
+        $duration = durationValue($entry);
         $result[] = [
             'rank' => $index + 1,
             'name' => (string) ($entry['name'] ?? ''),
             'score' => (int) ($entry['score'] ?? 0),
             'stage' => (int) ($entry['stage'] ?? 1),
+            'durationMs' => $duration === PHP_INT_MAX ? null : $duration,
             'ts' => (int) ($entry['ts'] ?? 0),
         ];
     }
@@ -105,43 +116,32 @@ if (!is_array($body)) {
 $name = trim((string) ($body['name'] ?? ''));
 $score = filter_var($body['score'] ?? null, FILTER_VALIDATE_INT);
 $stage = filter_var($body['stage'] ?? 1, FILTER_VALIDATE_INT);
+$durationMs = filter_var($body['durationMs'] ?? null, FILTER_VALIDATE_INT);
 
-if ($name === '' || $score === false || $score < 1 || $stage === false || $stage < 1) {
-    respond(['ok' => false, 'error' => 'name, score and stage are required'], 400);
+if ($name === '' || $score === false || $score < 1 || $stage === false || $stage < 1
+    || $durationMs === false || $durationMs < 0) {
+    respond(['ok' => false, 'error' => 'name, score, stage and durationMs are required'], 400);
 }
 
 $name = function_exists('mb_substr')
     ? mb_substr($name, 0, MAX_NAME_LENGTH)
     : substr($name, 0, MAX_NAME_LENGTH);
 $stage = min($stage, 999);
+$durationMs = min($durationMs, MAX_DURATION_MS);
 
 $data = loadData();
-sortData($data);
-$minScore = count($data) >= MAX_ENTRIES
-    ? (int) ($data[count($data) - 1]['score'] ?? 0)
-    : 0;
-
-if (count($data) >= MAX_ENTRIES && $score <= $minScore) {
-    respond([
-        'ok' => true,
-        'ranked' => false,
-        'message' => '상위 ' . MAX_ENTRIES . '위 밖의 점수입니다.',
-    ]);
-}
-
 $entry = [
     'name' => $name,
     'score' => $score,
     'stage' => $stage,
+    'durationMs' => $durationMs,
     'ts' => time(),
 ];
 $data[] = $entry;
 sortData($data);
-$data = array_values(array_slice($data, 0, MAX_ENTRIES));
-saveData($data);
 
 $rank = null;
-foreach ($data as $index => $candidate) {
+foreach (array_slice($data, 0, MAX_ENTRIES) as $index => $candidate) {
     if ($candidate['name'] === $entry['name']
         && (int) $candidate['score'] === $entry['score']
         && (int) $candidate['ts'] === $entry['ts']) {
@@ -150,11 +150,23 @@ foreach ($data as $index => $candidate) {
     }
 }
 
+if ($rank === null) {
+    respond([
+        'ok' => true,
+        'ranked' => false,
+        'message' => '상위 ' . MAX_ENTRIES . '위 밖의 점수입니다.',
+    ]);
+}
+
+$data = array_values(array_slice($data, 0, MAX_ENTRIES));
+saveData($data);
+
 respond([
     'ok' => true,
     'ranked' => $rank !== null,
     'rank' => $rank,
     'score' => $score,
     'stage' => $stage,
+    'durationMs' => $durationMs,
     'total' => count($data),
 ]);

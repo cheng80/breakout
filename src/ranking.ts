@@ -3,6 +3,7 @@ export interface RankingEntry {
   name: string;
   score: number;
   stage: number;
+  durationMs: number | null;
 }
 
 export interface SubmitRankingResult {
@@ -10,6 +11,7 @@ export interface SubmitRankingResult {
   rank: number | null;
   score: number;
   stage: number;
+  durationMs: number;
   message?: string;
 }
 
@@ -26,12 +28,15 @@ function toRankingEntry(value: unknown, index: number): RankingEntry | null {
   const name = typeof value.name === "string" ? value.name : "";
   const score = Number(value.score);
   const stage = Number(value.stage ?? 1);
+  const durationMs = value.durationMs === null || value.durationMs === undefined ? null : Number(value.durationMs);
   if (!name || !Number.isFinite(score) || !Number.isFinite(stage)) return null;
+  if (durationMs !== null && (!Number.isFinite(durationMs) || durationMs < 0)) return null;
   return {
     rank: Number(value.rank) || index + 1,
     name,
     score: Math.max(0, Math.floor(score)),
     stage: Math.max(1, Math.floor(stage)),
+    durationMs: durationMs === null ? null : Math.floor(durationMs),
   };
 }
 
@@ -66,16 +71,18 @@ export async function submitRanking(options: {
   name: string;
   score: number;
   stage: number;
+  durationMs: number;
 }): Promise<SubmitRankingResult | null> {
   const name = normalizePlayerName(options.name);
   const score = Math.floor(options.score);
   const stage = Math.floor(options.stage);
-  if (!name || score < 1 || stage < 1) return null;
+  const durationMs = Math.floor(options.durationMs);
+  if (!name || score < 1 || stage < 1 || !Number.isFinite(durationMs) || durationMs < 0) return null;
 
   const body = await request("?action=submit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, score, stage }),
+    body: JSON.stringify({ name, score, stage, durationMs }),
   });
   if (!body || typeof body.ranked !== "boolean") return null;
   return {
@@ -83,6 +90,7 @@ export async function submitRanking(options: {
     rank: body.rank === null || body.rank === undefined ? null : Number(body.rank),
     score: Number(body.score ?? score),
     stage: Number(body.stage ?? stage),
+    durationMs: Number(body.durationMs ?? durationMs),
     message: typeof body.message === "string" ? body.message : undefined,
   };
 }

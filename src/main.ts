@@ -117,6 +117,7 @@ let resetConfirmOpen = false;
 let rankingLoaded = false;
 let rankingSubmitting = false;
 let rankingRequestId = 0;
+let purePlayTimeMs = 0;
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -194,6 +195,7 @@ const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
 const resultScore = document.querySelector<HTMLElement>("#result-score")!;
 const resultBestScore = document.querySelector<HTMLElement>("#result-best-score")!;
+const resultDuration = document.querySelector<HTMLElement>("#result-duration")!;
 const appRoot = document.querySelector<HTMLElement>(".app")!;
 const entryScreen = document.querySelector<HTMLElement>("#entry-screen")!;
 const entryForm = document.querySelector<HTMLFormElement>("#entry-form")!;
@@ -293,6 +295,7 @@ function reset(): void {
   rankingLoaded = false;
   rankingSubmitting = false;
   rankingRequestId += 1;
+  purePlayTimeMs = 0;
   rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
   setHelpOpen(false);
@@ -493,6 +496,14 @@ function savePlayerName(name: string): void {
   }
 }
 
+function formatPlayTime(durationMs: number | null): string {
+  if (durationMs === null || !Number.isFinite(durationMs) || durationMs < 0) return "기록 없음";
+  const centiseconds = Math.floor(durationMs / 10);
+  const seconds = Math.floor(centiseconds / 100);
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}.${String(centiseconds % 100).padStart(2, "0")}`;
+}
+
 function renderRanking(entries: RankingEntry[]): void {
   rankingList.replaceChildren();
   if (entries.length === 0) {
@@ -513,7 +524,7 @@ function renderRanking(entries: RankingEntry[]): void {
     score.className = "ranking-score";
     rank.textContent = String(entry.rank).padStart(2, "0");
     name.textContent = entry.name;
-    score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage}`;
+    score.textContent = `${entry.score.toLocaleString("ko-KR")} · Lv.${entry.stage} · ${formatPlayTime(entry.durationMs)}`;
     row.append(rank, name, score);
     rankingList.append(row);
   });
@@ -562,7 +573,12 @@ async function submitCurrentScore(): Promise<void> {
   rankingSubmitButton.disabled = true;
   rankingFeedback.textContent = "등록 중...";
   const requestId = ++rankingRequestId;
-  const response = await submitRanking({ name, score: state.score, stage: state.stage });
+  const response = await submitRanking({
+    name,
+    score: state.score,
+    stage: state.stage,
+    durationMs: Math.max(0, Math.round(purePlayTimeMs)),
+  });
   if (requestId !== rankingRequestId || state.gameStatus !== "gameOver") return;
 
   rankingSubmitting = false;
@@ -604,6 +620,7 @@ function syncUi(): void {
   if (state.gameStatus === "gameOver") {
     resultScore.textContent = state.score.toLocaleString("ko-KR");
     resultBestScore.textContent = bestScore.toLocaleString("ko-KR");
+    resultDuration.textContent = formatPlayTime(Math.round(purePlayTimeMs));
     if (!rankingLoaded) {
       rankingLoaded = true;
       rankingNameInput.value = loadPlayerName();
@@ -977,6 +994,9 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
 
 function update(delta: number): void {
   const paused = helpOpen || optionsOpen || resetConfirmOpen;
+  if (!paused && (state.gameStatus === "aiming" || state.gameStatus === "volley")) {
+    purePlayTimeMs += Math.min(delta, 0.032) * 1000;
+  }
   if (!paused) {
     brickHitEffects.forEach((effect, brickId) => {
       effect.elapsed += delta;
