@@ -283,13 +283,19 @@ const dangerLabel = new Text({
 });
 dangerLabel.anchor.set(1, 0);
 dangerLabel.position.set(BOARD_WIDTH - 12, DANGER_Y + 5);
-app.stage.addChild(boardBackground, effectGlow, scene, brickHitGlow, labels, trapNotice, ballCounter, dangerLabel);
+const shieldLabel = new Text({
+  text: "보호막",
+  style: { fill: 0x9fe7ff, fontFamily: "system-ui", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
+});
+shieldLabel.anchor.set(0, 0);
+shieldLabel.position.set(12, DANGER_Y + 5);
+shieldLabel.visible = false;
+app.stage.addChild(boardBackground, effectGlow, scene, brickHitGlow, labels, trapNotice, ballCounter, shieldLabel, dangerLabel);
 
 const stageEl = document.querySelector<HTMLElement>("#stage")!;
 const scoreEl = document.querySelector<HTMLElement>("#score")!;
 const ballsEl = document.querySelector<HTMLElement>("#balls")!;
 const ballsCapEl = document.querySelector<HTMLElement>("#balls-cap")!;
-const shieldEl = document.querySelector<HTMLElement>("#shield")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const statusDot = document.querySelector<HTMLElement>("#status-dot")!;
 const result = document.querySelector<HTMLElement>("#result")!;
@@ -1163,8 +1169,6 @@ function syncUi(): void {
   scoreEl.classList.toggle("new-best", hasNewBestScore);
   ballsEl.textContent = `× ${state.ballCount}`;
   ballsCapEl.textContent = `MAX ${maxBallsForStage(state.stage)}`;
-  shieldEl.textContent = state.shield ? "ON" : "OFF";
-  shieldEl.classList.toggle("active", state.shield);
 
   const selectedUltimate = selectedUltimateSlot === null ? null : state.ultimateInventory[selectedUltimateSlot];
   const messages = {
@@ -1476,6 +1480,14 @@ function draw(): void {
     .roundRect(state.launchPosition.x - 19, FLOOR_Y + 4, 38, 8, 4)
     .fill({ color: 0x6c7cff, alpha: 0.75 });
 
+  shieldLabel.visible = state.shield;
+  if (state.shield) {
+    effectGlow.roundRect(8, DANGER_Y - 7, BOARD_WIDTH - 16, 24, 6)
+      .stroke({ width: 6, color: 0x38bfff, alpha: 0.38 });
+    scene.roundRect(8, DANGER_Y - 7, BOARD_WIDTH - 16, 24, 6)
+      .fill({ color: 0x38bfff, alpha: 0.1 })
+      .stroke({ width: 2, color: 0x9fe7ff, alpha: 0.92 });
+  }
   for (let x = 10; x < BOARD_WIDTH - 10; x += 16) {
     scene.moveTo(x, DANGER_Y).lineTo(Math.min(x + 8, BOARD_WIDTH - 10), DANGER_Y);
   }

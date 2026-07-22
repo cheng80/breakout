@@ -5,7 +5,8 @@ export const GRID_TOP = 42;
 export const CELL_HEIGHT = 42;
 export const BRICK_HEIGHT = 34;
 export const DANGER_ROW = 10;
-export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT;
+export const DANGER_LINE_OFFSET = 12;
+export const DANGER_Y = GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT + DANGER_LINE_OFFSET;
 export const FLOOR_Y = BOARD_HEIGHT - 40;
 export const MAX_BALLS = 80;
 export const MAX_BRICK_HP = 50;
@@ -292,7 +293,7 @@ function lowestSafeBlackHoleCells(occupied: Set<string>, excludedCell?: string):
   })).filter((cell) => {
     const key = `${cell.row}:${cell.column}`;
     const centerY = GRID_TOP + cell.row * CELL_HEIGHT + BRICK_HEIGHT / 2;
-    return key !== excludedCell && !occupied.has(key) && DANGER_Y - centerY > BLACK_HOLE_INFLUENCE_RADIUS;
+    return key !== excludedCell && !occupied.has(key) && DANGER_Y - DANGER_LINE_OFFSET - centerY > BLACK_HOLE_INFLUENCE_RADIUS;
   });
   const lowestRow = Math.max(...openCells.map((cell) => cell.row));
   return openCells.filter((cell) => cell.row === lowestRow);

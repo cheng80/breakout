@@ -22,6 +22,7 @@ import {
   BLACK_HOLE_MIN_DEFLECTION_ANGLE,
   BRICK_HIT_EFFECT_DURATION,
   DANGER_ROW,
+  DANGER_LINE_OFFSET,
   DANGER_Y,
   FLOOR_Y,
   BRICK_HEIGHT,
@@ -541,7 +542,7 @@ describe("핵심 게임 규칙", () => {
     expect(BOARD_HEIGHT).toBe(602);
     expect(DANGER_ROW).toBe(10);
     expect(FLOOR_Y).toBe(562);
-    expect(DANGER_Y).toBe(GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT);
+    expect(DANGER_Y).toBe(GRID_TOP + DANGER_ROW * CELL_HEIGHT + BRICK_HEIGHT + DANGER_LINE_OFFSET);
     const state = createGame();
     state.bricks = [{ ...state.bricks[0], row: DANGER_ROW - 1 }];
     state.items = [];

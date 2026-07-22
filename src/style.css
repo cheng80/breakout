@@ -199,6 +199,7 @@ button {
 
 .topbar {
   min-width: 0;
+  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -222,11 +223,11 @@ button {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: #c7ceff;
+  color: #d7dcff;
   font-size: clamp(15px, 4.5vw, 21px);
   line-height: 1;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow: 0 0 16px rgba(165, 175, 255, 0.36);
@@ -236,9 +237,9 @@ button {
   width: 42px;
   height: 42px;
   border: 0;
-  border-radius: 13px;
-  background: linear-gradient(145deg, rgba(126, 140, 255, 0.28), rgba(255, 255, 255, 0.08));
-  box-shadow: 0 10px 28px rgba(39, 51, 130, 0.3), inset 0 1px rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(126, 140, 255, 0.24), rgba(255, 255, 255, 0.06));
+  box-shadow: 0 7px 18px rgba(18, 28, 79, 0.28), inset 0 1px rgba(255, 255, 255, 0.12);
   cursor: pointer;
   font-size: 21px;
   font-weight: 800;
@@ -270,20 +271,21 @@ button {
 
 .hud {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 7px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 28px 29px;
+  gap: 5px 7px;
 }
 
 .hud .stat {
   min-width: 0;
-  min-height: 62px;
-  padding: 10px;
+  min-height: 0;
+  padding: 6px 11px;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), inset 0 1px rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.045));
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.16), inset 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .hud .stat-level {
@@ -292,11 +294,25 @@ button {
 }
 
 .hud .stat-balls {
-  background: rgba(69, 213, 161, 0.12);
+  background: linear-gradient(135deg, rgba(69, 213, 161, 0.18), rgba(69, 213, 161, 0.08));
 }
 
-.hud .stat-shield {
-  background: rgba(93, 183, 255, 0.1);
+.hud .stat-score {
+  grid-column: 1 / -1;
+  padding-inline: 80px;
+  background: linear-gradient(90deg, rgba(89, 107, 213, 0.2), rgba(255, 255, 255, 0.08), rgba(89, 107, 213, 0.2));
+  box-shadow: 0 7px 18px rgba(17, 27, 76, 0.2), inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.hud .stat > span {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.hud .stat-score strong {
+  font-size: clamp(17px, 2.4dvh, 22px);
+  text-shadow: 0 0 12px rgba(208, 216, 255, 0.16);
 }
 
 .hud-debug-tools {
@@ -370,6 +386,8 @@ button {
 }
 
 .hud strong {
+  min-width: 0;
+  flex: 1 1 auto;
   display: block;
   width: 100%;
   overflow: hidden;
@@ -383,14 +401,28 @@ button {
 }
 
 .hud .stat-balls > span {
+  flex: 0 0 auto;
+}
+
+.hud .stat-balls strong {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.hud .stat-balls i {
+  color: #83e6c5;
+  font-style: normal;
+}
+
+.hud .stat-balls #balls {
+  width: auto;
 }
 
 #balls-cap {
   color: #ffd166;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.02em;
 }
@@ -401,14 +433,6 @@ button {
 
 .hud .stat-balls span {
   color: #83e6c5;
-}
-
-.hud .stat-shield span {
-  color: #91cfff;
-}
-
-#shield.active {
-  color: #5db7ff;
 }
 
 #score {
