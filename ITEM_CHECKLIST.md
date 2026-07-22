@@ -29,7 +29,7 @@
 - [x] 반물질 폭탄 (`antimatter`) — 선택 지점을 중심으로 5×5 범위의 파괴 가능한 블록을 체력과 무관하게 제거한다. 블록 파편과 보라색 고리가 암흑 코어로 수축한 뒤 백색 섬광과 구형 충격파로 소멸하며 `public/images/ultimates/antimatter.png` 아이콘과 폭탄 효과음을 사용한다.
 - [x] 궤도 레이저 (`orbitalLaser`) — 선택한 1열의 파괴 가능한 블록을 체력과 무관하게 제거한다. 조준선과 상단 충전 고리 뒤 한 열 폭의 다층 광선이 전체 높이를 관통하며 `public/images/ultimates/orbital-laser.png` 아이콘과 레이저 효과음을 사용한다.
 - [x] 연쇄 번개 (`chainLightning`) — 선택 지점에서 가까운 파괴 가능한 블록 최대 12개를 체력과 무관하게 제거한다. 푸른 외곽광과 노란 중심선의 지그재그 전류가 잔가지를 뻗으며 목표 사이를 연쇄하고 `public/images/ultimates/chain-lightning.png` 아이콘과 폭탄 효과음을 사용한다.
-- [x] 운석 충돌 (`meteorImpact`) — 선택 지점 중심부의 블록을 즉시 제거하고 외곽 블록에 피해를 준다. 암석 본체가 다중 화염 꼬리와 불씨를 흩리며 대각선으로 낙하한 뒤 파편·섬광·충격파를 만들고 `public/images/ultimates/meteor-impact.png` 아이콘과 폭탄 효과음을 사용한다.
+- [x] 운석 충돌 (`meteorImpact`) — 운석이 선택 지점에 실제 충돌하는 순간 중심부 블록을 제거하고 외곽 블록에 피해를 준다. 암석 본체가 다중 화염 꼬리와 불씨를 흩리며 대각선으로 낙하한 뒤 피해·폭탄 효과음과 동시에 파편·섬광·충격파를 만들며 `public/images/ultimates/meteor-impact.png` 아이콘을 사용한다.
 - [x] 블랙홀 붕괴 (`blackHoleCollapse`) — 선택 범위의 블록을 한 점으로 끌어당긴 뒤 폭발시켜 제거한다. 블록 형상이 소용돌이치며 사건의 지평선으로 흡입되고 강착 원반이 붕괴한 뒤 청색 양방향 제트와 타원 충격파가 방출되며 `public/images/ultimates/black-hole-collapse.png` 아이콘과 폭탄 효과음을 사용한다.
 - [x] 십자포화 (`crossfire`) — 선택 위치를 중심으로 가로 3줄과 세로 3줄의 블록을 제거한다. 얇은 조준 격자 뒤 화면 네 방향에서 3줄씩의 다층 레이저가 진입해 중앙에서 교차하며 `public/images/ultimates/crossfire.png` 아이콘과 레이저 효과음을 사용한다.
 - [x] 핵융합 연쇄 (`fusionChain`) — 선택 블록에서 시작해 주변 블록으로 폭발을 전염시킨다. 목표 블록이 순서대로 백색 점화된 뒤 주황색 국소 폭발과 방사형 불꽃을 만들며 `public/images/ultimates/fusion-chain.png` 아이콘과 폭탄 효과음을 사용한다.

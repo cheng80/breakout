@@ -58,6 +58,7 @@ import {
   prepareVolley,
   relocateBlackHoles,
   resetGame,
+  resolveUltimateActivation,
   resolveCircleRectCollision,
   shieldRewindFrame,
   stabilizeBounce,
@@ -98,6 +99,7 @@ const ULTIMATE_EFFECT_DURATIONS: Record<UltimateItemType, number> = {
   fusionChain: 1.25,
   missileBarrage: 1.3,
 };
+const METEOR_IMPACT_PROGRESS = 0.38;
 const ULTIMATE_RESULT_DELAY = 0.35;
 interface ActiveBall extends Vec2 {
   vx: number;
@@ -118,6 +120,7 @@ interface TimedEffect {
 interface UltimateEffect extends PositionedEffect {
   type: UltimateItemType;
   targets: Vec2[];
+  activation: UltimateActivation;
 }
 
 interface DebugSnapshot {
@@ -477,13 +480,18 @@ function beginUltimateEffect(activation: UltimateActivation, target: Pick<Brick,
     elapsed: 0,
     type: activation.type,
     targets: activation.targets.map(itemCenter),
+    activation,
   };
   selectedUltimateSlot = null;
-  playSound(activation.type === "orbitalLaser" || activation.type === "crossfire" ? "laser" : "bomb", {
-    playbackRate: activation.type === "chainLightning" ? 1.18 : activation.type === "missileBarrage" ? 0.82 : 0.9,
-  });
-  pullLaserEffects();
-  boardSignature = "";
+  if (activation.type !== "meteorImpact") {
+    playSound(activation.type === "orbitalLaser" || activation.type === "crossfire" ? "laser" : "bomb", {
+      playbackRate: activation.type === "chainLightning" ? 1.18 : activation.type === "missileBarrage" ? 0.82 : 0.9,
+    });
+  }
+  if (activation.resolved) {
+    pullLaserEffects();
+    boardSignature = "";
+  }
   syncUi();
 }
 
@@ -493,7 +501,12 @@ function useSelectedUltimate(point: Vec2): void {
     row: Math.max(0, Math.min(DANGER_ROW - 1, Math.floor((point.y - GRID_TOP) / CELL_HEIGHT))),
     column: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.floor((point.x - GRID_MARGIN) / (CELL_WIDTH + GRID_GAP)))),
   };
-  const activation = useUltimateItem(state, selectedUltimateSlot, target);
+  const activation = useUltimateItem(
+    state,
+    selectedUltimateSlot,
+    target,
+    state.ultimateInventory[selectedUltimateSlot] === "meteorImpact",
+  );
   if (!activation) return;
   beginUltimateEffect(activation, target);
 }
@@ -537,7 +550,7 @@ function startDebugUltimate(type: UltimateItemType): void {
   debugUltimateActive = true;
   state.ultimateInventory[0] = type;
   const target = { row: targetBrick.row, column: targetBrick.column };
-  const activation = useUltimateItem(state, 0, target);
+  const activation = useUltimateItem(state, 0, target, type === "meteorImpact");
   if (!activation) {
     restoreDebugState();
     return;
@@ -546,7 +559,7 @@ function startDebugUltimate(type: UltimateItemType): void {
 }
 
 app.canvas.addEventListener("pointerdown", (event) => {
-  if (helpOpen || optionsOpen || resetConfirmOpen || shieldRewindEffect || state.gameStatus !== "ready") return;
+  if (helpOpen || optionsOpen || resetConfirmOpen || shieldRewindEffect || ultimateEffect || state.gameStatus !== "ready") return;
   const point = screenPoint(event);
   if (selectedUltimateSlot !== null) {
     useSelectedUltimate(point);
@@ -1567,7 +1580,7 @@ function draw(): void {
       const distance = Math.hypot(dx, dy) || 1;
       const direction = { x: dx / distance, y: dy / distance };
       const normal = { x: -direction.y, y: direction.x };
-      const flightProgress = Math.min(1, progress / 0.38);
+      const flightProgress = Math.min(1, progress / METEOR_IMPACT_PROGRESS);
       const flight = flightProgress ** 1.65;
 
       if (flightProgress < 1) {
@@ -1599,7 +1612,7 @@ function draw(): void {
           .fill(0x241b20);
       }
 
-      const impactProgress = Math.max(0, (progress - 0.38) / 0.62);
+      const impactProgress = Math.max(0, (progress - METEOR_IMPACT_PROGRESS) / (1 - METEOR_IMPACT_PROGRESS));
       if (impactProgress > 0) {
         const impact = 1 - (1 - impactProgress) ** 3;
         const impactAlpha = 1 - impactProgress;
@@ -2075,7 +2088,15 @@ function update(delta: number): void {
   }
   if (ultimateEffect) {
     ultimateEffect.elapsed += delta;
-    if (ultimateEffect.elapsed >= ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type]) {
+    const duration = ULTIMATE_EFFECT_DURATIONS[ultimateEffect.type];
+    if (ultimateEffect.type === "meteorImpact" && !ultimateEffect.activation.resolved && ultimateEffect.elapsed >= duration * METEOR_IMPACT_PROGRESS) {
+      resolveUltimateActivation(state, ultimateEffect.activation);
+      playSound("bomb", { playbackRate: 0.9 });
+      pullLaserEffects();
+      boardSignature = "";
+      syncUi();
+    }
+    if (ultimateEffect.elapsed >= duration) {
       ultimateEffect = null;
       if (debugUltimateActive) restoreDebugState();
       else if (state.gameStatus === "reward") ultimateResultDelay = ULTIMATE_RESULT_DELAY;

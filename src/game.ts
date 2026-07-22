@@ -154,6 +154,8 @@ export interface StageResult {
 export interface UltimateActivation {
   type: UltimateItemType;
   targets: Array<Pick<Brick, "row" | "column">>;
+  hits: Array<{ brickId: string; damage: number }>;
+  resolved: boolean;
 }
 
 export interface GameState {
@@ -516,6 +518,7 @@ export function useUltimateItem(
   state: GameState,
   slot: number,
   target: Pick<Brick, "row" | "column">,
+  deferResolution = false,
 ): UltimateActivation | null {
   if (state.gameStatus !== "ready" || !Number.isInteger(slot) || !Number.isInteger(target.row) || !Number.isInteger(target.column)) return null;
   if (slot < 0 || slot >= ULTIMATE_SLOT_COUNT || target.row < 0 || target.row >= DANGER_ROW || target.column < 0 || target.column >= GRID_COLUMNS) return null;
@@ -557,14 +560,28 @@ export function useUltimateItem(
                 : [...destructible].sort((a, b) => distance(a) - distance(b)).slice(0, 20);
   if (targets.length === 0) return null;
 
-  const activation = { type, targets: targets.map(({ row, column }) => ({ row, column })) };
-  targets.forEach((brick) => {
-    const distanceFromImpact = Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column));
-    damageBrick(state, brick.id, type === "meteorImpact" && distanceFromImpact === 2 ? 1 : brick.hp);
-  });
+  const activation: UltimateActivation = {
+    type,
+    targets: targets.map(({ row, column }) => ({ row, column })),
+    hits: targets.map((brick) => {
+      const distanceFromImpact = Math.max(Math.abs(brick.row - target.row), Math.abs(brick.column - target.column));
+      return {
+        brickId: brick.id,
+        damage: type === "meteorImpact" && distanceFromImpact === 2 ? 1 : brick.hp,
+      };
+    }),
+    resolved: false,
+  };
   state.ultimateInventory[slot] = null;
-  advanceStageIfCleared(state);
+  if (!deferResolution) resolveUltimateActivation(state, activation);
   return activation;
+}
+
+export function resolveUltimateActivation(state: GameState, activation: UltimateActivation): void {
+  if (activation.resolved) return;
+  activation.resolved = true;
+  activation.hits.forEach(({ brickId, damage }) => damageBrick(state, brickId, damage));
+  advanceStageIfCleared(state);
 }
 
 export function collectItem(state: GameState, itemId: string): FieldItemType | null {

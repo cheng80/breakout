@@ -49,6 +49,7 @@ import {
   laserEffectFrame,
   prepareVolley,
   relocateBlackHoles,
+  resolveUltimateActivation,
   resolveCircleRectCollision,
   rollUltimateReward,
   shieldRewindFrame,
@@ -638,5 +639,36 @@ describe("핵심 게임 규칙", () => {
       expect(state.bricks).toHaveLength(type === "meteorImpact" ? 16 : 25 - expected);
       expect(state.ultimateInventory[0]).toBeNull();
     });
+  });
+
+  it("운석 충돌 피해는 연출의 충돌 시점까지 지연할 수 있다", () => {
+    const state = createGame();
+    state.bricks = Array.from({ length: 25 }, (_, index) => ({
+      id: `brick-${index}`,
+      row: Math.floor(index / 5),
+      column: index % 5,
+      hp: 20,
+      maxHp: 20,
+      type: "normal" as const,
+    }));
+    state.ultimateInventory = ["meteorImpact", null];
+
+    const activation = useUltimateItem(state, 0, { row: 2, column: 2 }, true);
+
+    expect(activation?.resolved).toBe(false);
+    expect(state.bricks).toHaveLength(25);
+    expect(state.ultimateInventory[0]).toBeNull();
+
+    resolveUltimateActivation(state, activation!);
+    const scoreAfterImpact = state.score;
+
+    expect(activation?.resolved).toBe(true);
+    expect(state.bricks).toHaveLength(16);
+    expect(state.bricks.find((brick) => brick.id === "brick-0")?.hp).toBe(19);
+
+    resolveUltimateActivation(state, activation!);
+
+    expect(state.score).toBe(scoreAfterImpact);
+    expect(state.bricks.find((brick) => brick.id === "brick-0")?.hp).toBe(19);
   });
 });
