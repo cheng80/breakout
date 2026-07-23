@@ -192,7 +192,6 @@ let rankingOpen = false;
 let rankingTrigger: HTMLButtonElement | null = null;
 let rankingLoaded = false;
 let rankingSubmitting = false;
-let rankingSubmitted = false;
 let rankingRequestId = 0;
 let rankingPanelRequestId = 0;
 let rewardReplacementOpen = false;
@@ -206,7 +205,7 @@ let lastClearedStage = 0;
 let lastClearedScore = 0;
 let lastClearedDurationMs = 0;
 let challengeAbandoned = false;
-let resetConfirmAction: "reset" | "exit" | "home" | "abandon" = "reset";
+let resetConfirmAction: "reset" | "home" | "abandon" = "reset";
 let blackHoleTime = 0;
 let blackHoleCycle = 0;
 let blackHoleStage = state.stage;
@@ -319,9 +318,6 @@ const rankingPanelList = document.querySelector<HTMLOListElement>("#ranking-pane
 const rankingStatus = document.querySelector<HTMLElement>("#ranking-status")!;
 const rankingList = document.querySelector<HTMLOListElement>("#ranking-list")!;
 const rankingPrediction = document.querySelector<HTMLElement>("#ranking-prediction")!;
-const rankingForm = document.querySelector<HTMLFormElement>("#ranking-form")!;
-const rankingNameInput = document.querySelector<HTMLInputElement>("#ranking-name")!;
-const rankingSubmitButton = document.querySelector<HTMLButtonElement>("#ranking-submit")!;
 const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")!;
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
@@ -485,7 +481,6 @@ function reset(stage = 1, ballCount = 1): void {
   brickHitEffects.clear();
   rankingLoaded = false;
   rankingSubmitting = false;
-  rankingSubmitted = false;
   rankingRequestId += 1;
   rankingPanelRequestId += 1;
   purePlayTimeMs = 0;
@@ -493,7 +488,6 @@ function reset(stage = 1, ballCount = 1): void {
   lastClearedScore = 0;
   lastClearedDurationMs = 0;
   challengeAbandoned = false;
-  rankingSubmitButton.disabled = false;
   rankingFeedback.textContent = "";
   rankingPrediction.textContent = "계산 중";
   setHelpOpen(false);
@@ -669,16 +663,7 @@ app.canvas.addEventListener("pointercancel", () => {
 
 document.querySelector("#result-restart")!.addEventListener("click", () => reset());
 
-function exitFromGameOver(): void {
-  if (state.gameStatus !== "gameOver") return;
-  if (rankingSubmitted || state.score < 1) {
-    returnToEntryScreen();
-    return;
-  }
-  setResetConfirmOpen(true, "exit");
-}
-
-resultExitButton.addEventListener("click", exitFromGameOver);
+resultExitButton.addEventListener("click", returnToEntryScreen);
 
 function abandonChallenge(): void {
   if (state.gameStatus === "reward" || state.gameStatus === "gameOver") return;
@@ -708,7 +693,6 @@ entryForm.addEventListener("submit", (event) => {
   }
   savePlayerName(name);
   entryNameInput.value = name;
-  rankingNameInput.value = name;
   entryFeedback.textContent = "";
   entryScreen.hidden = true;
   appRoot.hidden = false;
@@ -723,10 +707,6 @@ entryAudioToggleButton.addEventListener("click", () => {
 });
 rankingButton.addEventListener("click", () => setRankingOpen(!rankingOpen, rankingButton));
 rankingCloseButton.addEventListener("click", () => setRankingOpen(false));
-rankingForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  void submitCurrentScore();
-});
 helpButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
@@ -796,7 +776,7 @@ resetCancelButton.addEventListener("click", () => setResetConfirmOpen(false));
 resetConfirmButton.addEventListener("click", () => {
   const action = resetConfirmAction;
   setResetConfirmOpen(false);
-  if (action === "exit" || action === "home") returnToEntryScreen();
+  if (action === "home") returnToEntryScreen();
   else if (action === "abandon") abandonChallenge();
   else reset();
 });
@@ -888,7 +868,7 @@ function setRankingOpen(open: boolean, trigger?: HTMLButtonElement): void {
   if (wasOpen !== open) playSound("ui_panel", { playbackRate: open ? 1 : 0.9 });
 }
 
-function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | "abandon" = "reset"): void {
+function setResetConfirmOpen(open: boolean, action: "reset" | "home" | "abandon" = "reset"): void {
   const wasOpen = resetConfirmOpen;
   if (open) resetConfirmAction = action;
   resetConfirmOpen = open;
@@ -896,7 +876,6 @@ function setResetConfirmOpen(open: boolean, action: "reset" | "exit" | "home" | 
   if (open) {
     const copy = {
       reset: ["정말 다시 시작할까요?", "현재 점수와 진행 상황이 사라집니다.", "다시 시작"],
-      exit: ["랭킹을 등록하지 않고 나갈까요?", "이번 게임 기록은 저장되지 않습니다.", "나가기"],
       home: ["처음 화면으로 돌아갈까요?", "현재 게임 진행이 사라집니다.", "처음 화면 가기"],
       abandon: ["챌린지를 포기할까요?", "마지막 클리어 기록 기준으로 게임오버 처리됩니다.", "챌린지 포기"],
     }[resetConfirmAction];
@@ -1111,10 +1090,10 @@ async function loadRankingPanel(): Promise<void> {
 
 async function submitCurrentScore(): Promise<void> {
   if (rankingSubmitting) return;
-  const name = normalizePlayerName(rankingNameInput.value);
+  const name = normalizePlayerName(entryNameInput.value);
   if (!name) {
-    rankingFeedback.textContent = "닉네임을 입력하세요.";
-    rankingNameInput.focus();
+    rankingFeedback.textContent = "닉네임을 확인할 수 없습니다.";
+    await loadRanking();
     return;
   }
   const score = challengeAbandoned ? lastClearedScore : state.score;
@@ -1122,13 +1101,12 @@ async function submitCurrentScore(): Promise<void> {
   const durationMs = challengeAbandoned ? lastClearedDurationMs : Math.max(0, Math.round(purePlayTimeMs));
   if (score < 1) {
     rankingFeedback.textContent = "등록할 점수가 없습니다.";
+    await loadRanking();
     return;
   }
 
   savePlayerName(name);
-  rankingNameInput.value = name;
   rankingSubmitting = true;
-  rankingSubmitButton.disabled = true;
   rankingFeedback.textContent = "등록 중...";
   const requestId = ++rankingRequestId;
   const response = await submitRanking({
@@ -1140,15 +1118,14 @@ async function submitCurrentScore(): Promise<void> {
   if (requestId !== rankingRequestId || state.gameStatus !== "gameOver") return;
 
   rankingSubmitting = false;
-  rankingSubmitButton.disabled = false;
   if (!response) {
     rankingFeedback.textContent = "랭킹 서버에 연결할 수 없습니다.";
+    await loadRanking();
     return;
   }
   rankingFeedback.textContent = response.ranked
     ? `${response.rank}위로 등록되었습니다.`
     : (response.message ?? "상위 랭킹에 들지 못했습니다.");
-  rankingSubmitted = true;
   await loadRanking();
 }
 
@@ -1196,9 +1173,8 @@ function syncUi(): void {
     resultDuration.textContent = formatPlayTime(Math.round(purePlayTimeMs));
     if (!rankingLoaded) {
       rankingLoaded = true;
-      rankingNameInput.value = loadPlayerName();
       rankingFeedback.textContent = "";
-      void loadRanking();
+      void submitCurrentScore();
     }
   }
 }
