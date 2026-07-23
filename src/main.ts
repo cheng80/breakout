@@ -184,7 +184,7 @@ let hasNewBestScore = false;
 const activeBalls: ActiveBall[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
-let firstLandingX: number | null = null;
+let lastLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
@@ -444,7 +444,7 @@ function launch(direction: Vec2): void {
   const count = prepareVolley(state);
   const speed = BALL_SPEED * volleySpeedMultiplier(count);
   const launchDelay = 2.25 / count;
-  firstLandingX = null;
+  lastLandingX = null;
   playSound("launch", { playbackRate: 1.08 });
   for (let index = 0; index < count; index += 1) {
     activeBalls.push(Object.assign(ballPool.acquire(), state.launchPosition, {
@@ -475,7 +475,7 @@ function reset(stage = 1, ballCount = 1): void {
   hasNewBestScore = false;
   aimStart = null;
   aimCurrent = null;
-  firstLandingX = null;
+  lastLandingX = null;
   boardSignature = "";
   blackHoleTime = 0;
   blackHoleCycle = 0;
@@ -1458,11 +1458,11 @@ function draw(): void {
   labels.y = boardOffset;
 
   scene
-    .roundRect(8, FLOOR_Y + 7, BOARD_WIDTH - 16, BOARD_HEIGHT - FLOOR_Y - 10, 11)
+    .roundRect(0, FLOOR_Y + 7, BOARD_WIDTH, BOARD_HEIGHT - FLOOR_Y - 7, 11)
     .fill(0x14263d);
   scene
-    .moveTo(14, FLOOR_Y + 7)
-    .lineTo(BOARD_WIDTH - 14, FLOOR_Y + 7)
+    .moveTo(0, FLOOR_Y + 7)
+    .lineTo(BOARD_WIDTH, FLOOR_Y + 7)
     .stroke({ width: 3, color: 0x365274, alpha: 0.95 });
   scene
     .roundRect(state.launchPosition.x - 19, FLOOR_Y + 4, 38, 8, 4)
@@ -2360,14 +2360,14 @@ function update(delta: number): void {
       const exit = updateBall(ball, safeDelta);
       if (state.gameStatus !== "volley") break;
       if (exit) {
-        if (exit === "landed") firstLandingX ??= ball.x;
+        if (exit === "landed") lastLandingX = ball.x;
         activeBalls.splice(index, 1);
         ballPool.release(ball);
       }
     }
 
     if (state.gameStatus === "volley" && activeBalls.length === 0) {
-      const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
+      const shieldRewound = finishVolley(state, lastLandingX ?? state.launchPosition.x);
       if (shieldRewound) {
         shieldRewindEffect = timedEffectPool.acquire();
         playSound("shield_rewind");
@@ -2376,7 +2376,7 @@ function update(delta: number): void {
       } else if ((state.gameStatus as GameStatus) === "gameOver") {
         playSound("game_over");
       }
-      firstLandingX = null;
+      lastLandingX = null;
       boardSignature = "";
       syncUi();
     }
