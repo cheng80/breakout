@@ -272,8 +272,8 @@ export interface GameState {
 }
 
 const layouts = [
-  [".1.11.1.", "..1111..", "...M...."],
-  ["2.2..2.2", ".22L222.", ".PB..M..", ".2.22.2.", "2..22..2"],
+  [".1.11.1.", "..1111..", "...MS..."],
+  ["2S2..2.2", ".22L222.", ".PB..M..", ".2.22.2.", "2..22..2"],
   ["333..333", "3..3X..3", ".3.S..3.", "..3333..", "3.M..B.3"],
   ["44.44.44", ".444444.", "4.B..M.4", ".44..44.", "44.SS.44"],
   ["55555555", "5.5..5.5", ".555555.", "5.BMS..5", ".55..55.", "555..555"],
@@ -339,6 +339,7 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   });
 
   const specialBricks = [...bricks].sort(() => random() - 0.5);
+  if (rows >= 6) specialBricks.unshift(...specialBricks.splice(specialBricks.findIndex((brick) => brick.row === rows - 1), 1));
   const laserCount = stage >= 31 ? 3 : stage >= 16 ? 2 : 1;
   specialBricks.slice(0, laserCount).forEach((brick) => (brick.type = "laser"));
   if (specialBricks[laserCount]) Object.assign(specialBricks[laserCount], { type: "steel", hp: 0, maxHp: 0 });
@@ -352,17 +353,14 @@ function proceduralBoard(stage: number): Pick<GameState, "bricks" | "items"> {
   const hasBlackHole = stage >= 10 && (stage - 10) % 3 === 0;
   let itemOrder: FieldItemType[];
   if (stage >= 31) {
-    itemOrder = ["multiball", "power3", "power4", "bomb", "bomb"];
-    if (stage % 3 === 0) itemOrder.push("shield");
+    itemOrder = ["shield", "multiball", "power3", "power4", "bomb", "bomb"];
     itemOrder.push("trap", "trap");
   } else if (stage >= 16) {
-    itemOrder = ["multiball", "power", "power3", "bomb"];
-    if (stage % 3 === 0) itemOrder.push("shield");
+    itemOrder = ["shield", "multiball", "power", "power3", "bomb"];
     itemOrder.push("trap");
   } else {
-    itemOrder = ["multiball", "power"];
+    itemOrder = ["shield", "multiball", "power"];
     if (stage % 2 === 0) itemOrder.push("bomb");
-    if (stage % 3 === 0) itemOrder.push("shield");
     if (stage >= 11 && itemOrder.length < 4) itemOrder.push("trap");
   }
   const itemLimit = stage >= 31 ? 7 : stage >= 16 ? 5 : 4;
