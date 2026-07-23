@@ -53,6 +53,7 @@ import {
   discardUltimateReward,
   finishVolley,
   hitBrickWithBall,
+  landingXAtFloor,
   laserEffectFrame,
   maxBallsForStage,
   prepareVolley,
@@ -536,6 +537,11 @@ describe("핵심 게임 규칙", () => {
     expect(finishVolley(state, 51)).toBe(false);
     expect(state.gameStatus).toBe("gameOver");
     expect(state.ballCount).toBe(2);
+  });
+
+  it("프레임 간격과 관계없이 바닥 교차 지점을 착지 위치로 계산한다", () => {
+    expect(landingXAtFloor({ x: 100, y: 550 }, { x: 120, y: 570 })).toBe(112);
+    expect(landingXAtFloor({ x: 100, y: 550 }, { x: 114, y: 564 })).toBe(112);
   });
 
   it("벽돌 하단이 위험선에 닿는 것은 허용하고 아래로 내려오면 게임오버다", () => {
