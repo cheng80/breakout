@@ -1,3 +1,5 @@
+import type { IMediaInstance, SoundLibrary } from "@pixi/sound";
+
 export type SoundName =
   | "ui_click"
   | "ui_panel"
@@ -48,17 +50,10 @@ const settings: Record<SoundName, { volume: number; cooldown: number; group: str
 const BGM_KEY = "bgm";
 const BGM_FILE = "audio/music/gameplay_loop.mp3";
 const DEFAULT_BGM_VOLUME = 0.5;
-const BGM_FADE_IN_SECONDS = 1.25;
-const BGM_STOP_FADE_SECONDS = 0.35;
-const BGM_VOLUME_CHANGE_SECONDS = 0.2;
-const buffers = new Map<string, AudioBuffer>();
 const lastPlayedAt = new Map<SoundName, number>();
 const activeVoices = new Map<string, number>();
-let context: AudioContext | null = null;
-let masterGain: GainNode | null = null;
-let bgmGain: GainNode | null = null;
-let bgmSource: AudioBufferSourceNode | null = null;
-let bgmStopTimer: number | null = null;
+let bgmInstance: IMediaInstance | null = null;
+let pixiSound: SoundLibrary | null = null;
 let loadPromise: Promise<void> | null = null;
 let allMuted = readMuted("swipe-breakout-all-muted") || readMuted("swipe-breakout-muted");
 let bgmMuted = readMuted("swipe-breakout-bgm-muted");
@@ -89,16 +84,34 @@ function isSfxSilenced(): boolean {
   return allMuted || sfxMuted;
 }
 
-function ensureContext(): AudioContext {
-  if (context) return context;
-  context = new AudioContext();
-  masterGain = context.createGain();
-  masterGain.gain.value = isSfxSilenced() ? 0 : 1;
-  masterGain.connect(context.destination);
-  bgmGain = context.createGain();
-  bgmGain.gain.value = 0;
-  bgmGain.connect(context.destination);
-  return context;
+async function getPixiSound(): Promise<SoundLibrary | null> {
+  if (typeof document === "undefined") return null;
+  if (pixiSound) return pixiSound;
+  ({ sound: pixiSound } = await import("@pixi/sound"));
+  pixiSound.useLegacy = false;
+  return pixiSound;
+}
+
+function loadSound(library: SoundLibrary, name: string, url: string, singleInstance = false): Promise<void> {
+  if (library.exists(name)) return Promise.resolve();
+  return new Promise((resolve) => {
+    library.add(name, {
+      url,
+      preload: true,
+      singleInstance,
+      loaded: (error) => {
+        if (error) console.warn(`${name} 오디오를 불러오지 못했습니다.`, error);
+        resolve();
+      },
+    });
+  });
+}
+
+function syncSfxMute(): void {
+  if (!pixiSound) return;
+  Object.keys(files).forEach((name) => {
+    if (pixiSound!.exists(name)) pixiSound!.find(name).muted = isSfxSilenced();
+  });
 }
 
 export function canPlaySound(lastPlayed: number | undefined, now: number, cooldown: number): boolean {
@@ -107,97 +120,58 @@ export function canPlaySound(lastPlayed: number | undefined, now: number, cooldo
 
 export function preloadAudio(): Promise<void> {
   if (loadPromise) return loadPromise;
-  if (typeof AudioContext === "undefined") return Promise.resolve();
-  const audioContext = ensureContext();
-  const sounds: Array<[string, string]> = [...Object.entries(files), [BGM_KEY, BGM_FILE]];
-  loadPromise = Promise.all(sounds.map(async ([name, path]) => {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      buffers.set(name, await audioContext.decodeAudioData(await response.arrayBuffer()));
-    } catch (error) {
-      console.warn(`${name} 오디오를 불러오지 못했습니다.`, error);
-    }
-  })).then(() => undefined);
+  loadPromise = getPixiSound().then(async (library) => {
+    if (!library) return;
+    await Promise.all([
+      ...Object.entries(files).map(([name, url]) => loadSound(library, name, url)),
+      loadSound(library, BGM_KEY, BGM_FILE, true),
+    ]);
+    syncSfxMute();
+  });
   return loadPromise;
 }
 
-function fadeBgm(target: number, duration: number): void {
-  if (!context || !bgmGain) return;
-  const now = context.currentTime;
-  bgmGain.gain.cancelScheduledValues(now);
-  bgmGain.gain.setValueAtTime(bgmGain.gain.value, now);
-  if (duration > 0) bgmGain.gain.linearRampToValueAtTime(target, now + duration);
-  else bgmGain.gain.setValueAtTime(target, now);
-}
-
 function stopBgm(): void {
-  const source = bgmSource;
-  if (!source) return;
-  fadeBgm(0, BGM_STOP_FADE_SECONDS);
-  if (bgmStopTimer !== null) window.clearTimeout(bgmStopTimer);
-  bgmStopTimer = window.setTimeout(() => {
-    if (bgmSource !== source) return;
-    source.stop();
-    bgmSource = null;
-    bgmStopTimer = null;
-  }, BGM_STOP_FADE_SECONDS * 1000);
+  bgmInstance?.stop();
+  bgmInstance = null;
 }
 
 function startBgm(): void {
-  if (isBgmSilenced() || !context || !bgmGain) return;
-  if (bgmStopTimer !== null) {
-    window.clearTimeout(bgmStopTimer);
-    bgmStopTimer = null;
+  if (isBgmSilenced() || bgmInstance || !pixiSound?.exists(BGM_KEY)) return;
+  const result = pixiSound.play(BGM_KEY, { loop: true, volume: bgmVolume });
+  if (result instanceof Promise) {
+    void result.then((instance) => {
+      if (isBgmSilenced()) instance.stop();
+      else bgmInstance = instance;
+    }).catch(() => undefined);
+  } else {
+    bgmInstance = result;
   }
-  if (bgmSource) {
-    fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS);
-    return;
-  }
-  const buffer = buffers.get(BGM_KEY);
-  if (!buffer) return;
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.loop = true;
-  source.connect(bgmGain);
-  source.onended = () => {
-    if (bgmSource === source) bgmSource = null;
-  };
-  bgmSource = source;
-  fadeBgm(0, 0);
-  source.start();
-  fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS);
 }
 
 export async function unlockAudio(): Promise<void> {
-  if (typeof AudioContext === "undefined") return;
-  const audioContext = ensureContext();
-  const resumePromise = audioContext.state === "suspended" ? audioContext.resume() : Promise.resolve();
   await preloadAudio();
-  await resumePromise;
+  if (pixiSound?.context.audioContext.state === "suspended") void pixiSound.context.audioContext.resume();
   startBgm();
 }
 
 export function playSound(name: SoundName, options: { volume?: number; playbackRate?: number } = {}): void {
   void unlockAudio().then(() => {
-    if (!context || !masterGain || isSfxSilenced()) return;
-    const buffer = buffers.get(name);
-    if (!buffer) return;
+    if (!pixiSound || isSfxSilenced()) return;
     const config = settings[name];
-    const now = context.currentTime;
+    const now = performance.now() / 1000;
     if (!canPlaySound(lastPlayedAt.get(name), now, config.cooldown)) return;
     if ((activeVoices.get(config.group) ?? 0) >= config.maxVoices) return;
 
+    const finish = () => activeVoices.set(config.group, Math.max(0, (activeVoices.get(config.group) ?? 1) - 1));
     lastPlayedAt.set(name, now);
     activeVoices.set(config.group, (activeVoices.get(config.group) ?? 0) + 1);
-    const source = context.createBufferSource();
-    const gain = context.createGain();
-    source.buffer = buffer;
-    source.playbackRate.value = options.playbackRate ?? 1;
-    gain.gain.value = options.volume ?? config.volume;
-    source.connect(gain).connect(masterGain);
-    source.onended = () => activeVoices.set(config.group, Math.max(0, (activeVoices.get(config.group) ?? 1) - 1));
-    source.start();
+    const result = pixiSound.play(name, {
+      volume: options.volume ?? config.volume,
+      speed: options.playbackRate ?? 1,
+      complete: finish,
+    });
+    if (result instanceof Promise) void result.catch(finish);
   });
 }
 
@@ -223,7 +197,7 @@ export function getBgmVolume(): number {
 
 export function setBgmVolume(value: number): void {
   bgmVolume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : DEFAULT_BGM_VOLUME));
-  if (!isBgmSilenced() && bgmSource) fadeBgm(bgmVolume, BGM_VOLUME_CHANGE_SECONDS);
+  if (bgmInstance) bgmInstance.volume = bgmVolume;
 }
 
 export function setMuted(value: boolean): void {
@@ -240,14 +214,14 @@ export function setBgmMuted(value: boolean): void {
 export function setSfxMuted(value: boolean): void {
   sfxMuted = value;
   writeMuted("swipe-breakout-sfx-muted", sfxMuted);
-  if (masterGain) masterGain.gain.value = isSfxSilenced() ? 0 : 1;
+  syncSfxMute();
 }
 
 export function setAllMuted(value: boolean): void {
   allMuted = value;
   writeMuted("swipe-breakout-all-muted", allMuted);
   writeMuted("swipe-breakout-muted", allMuted);
-  if (masterGain) masterGain.gain.value = isSfxSilenced() ? 0 : 1;
+  syncSfxMute();
   if (isBgmSilenced()) stopBgm();
   else void unlockAudio();
 }
