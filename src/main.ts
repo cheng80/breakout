@@ -61,6 +61,7 @@ import {
   finishVolley,
   hitBrickWithBall,
   isGrowthUltimate,
+  landingXAtFloor,
   laserEffectFrame,
   maxBallsForStage,
   orbitalLaserStartColumn,
@@ -2144,8 +2145,14 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
   const steps = 2;
   for (let step = 0; step < steps; step += 1) {
     if (applyBlackHolePull(ball, delta / steps)) return "captured";
+    const previousPosition = { x: ball.x, y: ball.y };
     ball.x += (ball.vx * delta) / steps;
     ball.y += (ball.vy * delta) / steps;
+    if (ball.y >= FLOOR_Y && ball.vy > 0) {
+      ball.x = Math.max(BALL_RADIUS, Math.min(BOARD_WIDTH - BALL_RADIUS, landingXAtFloor(previousPosition, ball)));
+      ball.y = FLOOR_Y;
+      return "landed";
+    }
 
     let bounced = false;
     if (ball.x <= BALL_RADIUS || ball.x >= BOARD_WIDTH - BALL_RADIUS) {
@@ -2232,7 +2239,7 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
     }
   }
 
-  return ball.y >= FLOOR_Y ? "landed" : null;
+  return null;
 }
 
 function update(delta: number): void {

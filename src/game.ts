@@ -116,6 +116,11 @@ export interface Vec2 {
   y: number;
 }
 
+export function landingXAtFloor(previous: Vec2, current: Vec2): number {
+  const progress = Math.max(0, Math.min(1, (FLOOR_Y - previous.y) / (current.y - previous.y)));
+  return previous.x + (current.x - previous.x) * progress;
+}
+
 export interface AimBounds {
   minX: number;
   maxX: number;
