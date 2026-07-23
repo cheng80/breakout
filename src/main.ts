@@ -58,6 +58,7 @@ import {
   consumeLaserTriggers,
   createGame,
   discardUltimateReward,
+  edgeBrickCollisionRect,
   finishVolley,
   hitBrickWithBall,
   isGrowthUltimate,
@@ -69,7 +70,7 @@ import {
   relocateBlackHoles,
   resetGame,
   resolveUltimateHits,
-  resolveCircleRectCollision,
+  resolveCircleRectsCollision,
   shieldRewindFrame,
   stabilizeBounce,
   traceAimPath,
@@ -425,6 +426,8 @@ const brickRect = (brick: Brick) => ({
   width: CELL_WIDTH,
   height: BRICK_HEIGHT,
 });
+
+const brickCollisionRect = (brick: Brick) => edgeBrickCollisionRect(brickRect(brick), brick.column);
 
 const itemCenter = (item: Pick<FieldItem, "row" | "column">) => ({
   x: GRID_MARGIN + item.column * (CELL_WIDTH + GRID_GAP) + CELL_WIDTH / 2,
@@ -2052,7 +2055,7 @@ function draw(): void {
       state.launchPosition,
       direction,
       { minX: BALL_RADIUS, maxX: BOARD_WIDTH - BALL_RADIUS, minY: BALL_RADIUS, maxY: FLOOR_Y },
-      state.bricks.map(brickRect),
+      state.bricks.map(brickCollisionRect),
       2,
       BALL_RADIUS,
     ).forEach((segment, reflection) => {
@@ -2172,13 +2175,19 @@ function updateBall(ball: ActiveBall, delta: number): BallExit {
       ball.vy = velocity.y;
     }
 
-    const hitBrick = state.bricks.find((brick) => {
-      const rect = brickRect(brick);
+    const hitAnyBrick = state.bricks.some((brick) => {
+      const rect = brickCollisionRect(brick);
       return circleHitsRect(ball, rect.x, rect.y, rect.width, rect.height);
     });
-    if (hitBrick) {
-      const rect = brickRect(hitBrick);
-      const collision = resolveCircleRectCollision(ball, { x: ball.vx, y: ball.vy }, rect, BALL_RADIUS)!;
+    if (hitAnyBrick) {
+      const collision = resolveCircleRectsCollision(
+        previousPosition,
+        ball,
+        { x: ball.vx, y: ball.vy },
+        state.bricks.map(brickCollisionRect),
+        BALL_RADIUS,
+      )!;
+      const hitBrick = state.bricks[collision.rectIndex];
       ball.x = collision.position.x;
       ball.y = collision.position.y;
       ball.bounceCount = hitBrick.type === "steel" ? ball.bounceCount + 1 : 0;

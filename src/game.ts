@@ -478,6 +478,7 @@ export function resolveCircleRectCollision(
   velocity: Vec2,
   rect: AimObstacle,
   radius: number,
+  previousPosition = position,
 ): { position: Vec2; velocity: Vec2 } | null {
   const nearestX = Math.max(rect.x, Math.min(position.x, rect.x + rect.width));
   const nearestY = Math.max(rect.y, Math.min(position.y, rect.y + rect.height));
@@ -498,12 +499,14 @@ export function resolveCircleRectCollision(
     };
   } else {
     const exits = [
-      { distance: Math.abs(position.x - (rect.x - radius)), position: { x: rect.x - radius - 0.01, y: position.y }, normal: { x: -1, y: 0 } },
-      { distance: Math.abs(position.x - (rect.x + rect.width + radius)), position: { x: rect.x + rect.width + radius + 0.01, y: position.y }, normal: { x: 1, y: 0 } },
-      { distance: Math.abs(position.y - (rect.y - radius)), position: { x: position.x, y: rect.y - radius - 0.01 }, normal: { x: 0, y: -1 } },
-      { distance: Math.abs(position.y - (rect.y + rect.height + radius)), position: { x: position.x, y: rect.y + rect.height + radius + 0.01 }, normal: { x: 0, y: 1 } },
+      { position: { x: rect.x - radius - 0.01, y: position.y }, normal: { x: -1, y: 0 } },
+      { position: { x: rect.x + rect.width + radius + 0.01, y: position.y }, normal: { x: 1, y: 0 } },
+      { position: { x: position.x, y: rect.y - radius - 0.01 }, normal: { x: 0, y: -1 } },
+      { position: { x: position.x, y: rect.y + rect.height + radius + 0.01 }, normal: { x: 0, y: 1 } },
     ];
-    const exit = exits.sort((a, b) => a.distance - b.distance)[0];
+    const previousDistance = (exit: (typeof exits)[number]) =>
+      Math.hypot(exit.position.x - previousPosition.x, exit.position.y - previousPosition.y);
+    const exit = exits.sort((a, b) => previousDistance(a) - previousDistance(b))[0];
     normal = exit.normal;
     correctedPosition = exit.position;
   }
@@ -515,6 +518,33 @@ export function resolveCircleRectCollision(
       ? { x: velocity.x - 2 * dot * normal.x, y: velocity.y - 2 * dot * normal.y }
       : velocity,
   };
+}
+
+export function resolveCircleRectsCollision(
+  previousPosition: Vec2,
+  position: Vec2,
+  velocity: Vec2,
+  rects: AimObstacle[],
+  radius: number,
+): { position: Vec2; velocity: Vec2; rectIndex: number } | null {
+  const collisions = rects.flatMap((rect, rectIndex) => {
+    const collision = resolveCircleRectCollision(position, velocity, rect, radius, previousPosition);
+    return collision ? [{ ...collision, rectIndex }] : [];
+  });
+  if (collisions.length === 0) return null;
+  if (collisions.length === 1) return collisions[0];
+
+  return {
+    position: previousPosition,
+    velocity: { x: -velocity.x, y: -velocity.y },
+    rectIndex: collisions[0].rectIndex,
+  };
+}
+
+export function edgeBrickCollisionRect(rect: AimObstacle, column: number): AimObstacle {
+  if (column === 0) return { ...rect, x: 0, width: rect.x + rect.width };
+  if (column === GRID_COLUMNS - 1) return { ...rect, width: BOARD_WIDTH - rect.x };
+  return rect;
 }
 
 function rayRectHit(origin: Vec2, direction: Vec2, obstacle: AimObstacle, padding: number) {
