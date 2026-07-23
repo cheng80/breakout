@@ -49,17 +49,17 @@ const buffers = new Map<string, AudioBuffer>();
 const lastPlayedAt = new Map<SoundName, number>();
 const activeVoices = new Map<string, number>();
 const bgmAudio = typeof Audio === "undefined" ? null : new Audio("audio/music/gameplay_loop.mp3");
-const DEFAULT_BGM_VOLUME = 0.1;
+const DEFAULT_BGM_VOLUME = 0.5;
 const BGM_FADE_IN_SECONDS = 1.25;
 const BGM_FADE_OUT_SECONDS = 3;
 const BGM_VOLUME_CHANGE_SECONDS = 0.2;
 let context: AudioContext | null = null;
 let masterGain: GainNode | null = null;
+let bgmGain: GainNode | null = null;
 let loadPromise: Promise<void> | null = null;
 let allMuted = readMuted("swipe-breakout-all-muted") || readMuted("swipe-breakout-muted");
 let bgmMuted = readMuted("swipe-breakout-bgm-muted");
 let sfxMuted = readMuted("swipe-breakout-sfx-muted");
-let bgmFadeFrame: number | null = null;
 let bgmEnding = false;
 let bgmVolume = DEFAULT_BGM_VOLUME;
 
@@ -77,8 +77,8 @@ function restartBgm(): void {
   bgmAudio.currentTime = 0;
   bgmEnding = false;
   if (!isBgmSilenced()) {
-    fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS);
-    void bgmAudio.play().catch(() => undefined);
+    fadeBgm(0, 0);
+    void bgmAudio.play().then(() => fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS)).catch(() => undefined);
   }
 }
 
@@ -86,7 +86,7 @@ function setupBgm(): void {
   if (!bgmAudio) return;
   bgmAudio.loop = false;
   bgmAudio.preload = "auto";
-  bgmAudio.volume = 0;
+  bgmAudio.volume = 1;
   bgmAudio.addEventListener("timeupdate", handleBgmTimeUpdate);
   bgmAudio.addEventListener("ended", restartBgm);
 }
@@ -127,6 +127,11 @@ function ensureContext(): AudioContext {
   masterGain = context.createGain();
   masterGain.gain.value = isSfxSilenced() ? 0 : 1;
   masterGain.connect(context.destination);
+  if (bgmAudio) {
+    bgmGain = context.createGain();
+    bgmGain.gain.value = 0;
+    context.createMediaElementSource(bgmAudio).connect(bgmGain).connect(context.destination);
+  }
   return context;
 }
 
@@ -150,23 +155,17 @@ export function preloadAudio(): Promise<void> {
 }
 
 function fadeBgm(target: number, duration: number): void {
-  if (!bgmAudio) return;
-  if (bgmFadeFrame !== null) cancelAnimationFrame(bgmFadeFrame);
-  const startedAt = performance.now();
-  const initial = bgmAudio.volume;
-  const tick = (now: number) => {
-    const progress = Math.min(1, (now - startedAt) / (duration * 1000));
-    bgmAudio.volume = initial + (target - initial) * progress;
-    if (progress < 1) bgmFadeFrame = requestAnimationFrame(tick);
-    else bgmFadeFrame = null;
-  };
-  bgmFadeFrame = requestAnimationFrame(tick);
+  if (!context || !bgmGain) return;
+  const now = context.currentTime;
+  bgmGain.gain.cancelAndHoldAtTime(now);
+  if (duration > 0) bgmGain.gain.linearRampToValueAtTime(target, now + duration);
+  else bgmGain.gain.setValueAtTime(target, now);
 }
 
 function startBgm(): void {
   if (!bgmAudio || isBgmSilenced() || !bgmAudio.paused) return;
   bgmEnding = false;
-  bgmAudio.volume = 0;
+  fadeBgm(0, 0);
   void bgmAudio.play().then(() => fadeBgm(bgmVolume, BGM_FADE_IN_SECONDS)).catch(() => undefined);
 }
 
@@ -237,7 +236,7 @@ export function setBgmMuted(value: boolean): void {
   writeMuted("swipe-breakout-bgm-muted", bgmMuted);
   if (isBgmSilenced() && bgmAudio) {
     bgmAudio.pause();
-    bgmAudio.volume = 0;
+    fadeBgm(0, 0);
     bgmEnding = false;
   } else if (!isBgmSilenced()) {
     startBgm();
@@ -257,7 +256,7 @@ export function setAllMuted(value: boolean): void {
   syncSfxGain();
   if (isBgmSilenced() && bgmAudio) {
     bgmAudio.pause();
-    bgmAudio.volume = 0;
+    fadeBgm(0, 0);
     bgmEnding = false;
   } else if (!isBgmSilenced() && typeof AudioContext !== "undefined") {
     void unlockAudio();
