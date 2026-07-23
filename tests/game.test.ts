@@ -28,6 +28,7 @@ import {
   BRICK_HEIGHT,
   BOMB_EFFECT_DURATION,
   CELL_HEIGHT,
+  GRID_COLUMNS,
   GRID_TOP,
   MAX_BALLS,
   MAX_BRICK_HP,
@@ -51,6 +52,7 @@ import {
   createGame,
   damageBrick,
   discardUltimateReward,
+  edgeBrickCollisionRect,
   finishVolley,
   hitBrickWithBall,
   landingXAtFloor,
@@ -62,6 +64,7 @@ import {
   resolveUltimateActivation,
   resolveUltimateHits,
   resolveCircleRectCollision,
+  resolveCircleRectsCollision,
   rollUltimateReward,
   shieldRewindFrame,
   stabilizeBounce,
@@ -293,6 +296,49 @@ describe("핵심 게임 규칙", () => {
     const embedded = resolveCircleRectCollision({ x: 42, y: 50 }, { x: 100, y: 0 }, rect, 5)!;
     expect(resolveCircleRectCollision(embedded.position, embedded.velocity, rect, 5)).toBeNull();
     expect(embedded.velocity.x).toBeLessThan(0);
+  });
+
+  it("공보다 좁은 블록 틈에서는 최초 충돌면에 한 번만 반사한다", () => {
+    const rects = [
+      { x: 0, y: 40, width: 40, height: 20 },
+      { x: 44, y: 40, width: 40, height: 20 },
+    ];
+    const collision = resolveCircleRectsCollision(
+      { x: 42, y: 70 },
+      { x: 42, y: 55 },
+      { x: 0, y: -600 },
+      rects,
+      5,
+    );
+
+    expect(collision).not.toBeNull();
+    expect(collision!.position.y).toBeGreaterThan(64);
+    expect(collision!.velocity.y).toBeGreaterThan(0);
+    expect(collision!.rectIndex).toBe(0);
+    expect(resolveCircleRectsCollision(
+      collision!.position,
+      { x: collision!.position.x, y: collision!.position.y + 5 },
+      collision!.velocity,
+      rects,
+      5,
+    )).toBeNull();
+  });
+
+  it("벽과 끝열 블록 사이 통로를 충돌 영역으로 막는다", () => {
+    const rect = edgeBrickCollisionRect({ x: 12, y: 40, width: 40, height: 20 }, 0);
+    const collision = resolveCircleRectsCollision(
+      { x: 5, y: 70 },
+      { x: 5, y: 55 },
+      { x: 0, y: -600 },
+      [rect],
+      5,
+    );
+
+    expect(rect).toEqual({ x: 0, y: 40, width: 52, height: 20 });
+    expect(edgeBrickCollisionRect({ x: 308, y: 40, width: 40, height: 20 }, GRID_COLUMNS - 1))
+      .toEqual({ x: 308, y: 40, width: 52, height: 20 });
+    expect(collision!.position.y).toBeGreaterThan(64);
+    expect(collision!.velocity.y).toBeGreaterThan(0);
   });
 
   it("거의 수평인 반사는 속도를 유지하면서 반복 횟수에 따라 다른 탈출 각도로 보정한다", () => {
