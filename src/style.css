@@ -584,8 +584,8 @@ button {
   max-height: min(82dvh, 680px);
 }
 
-.ranking-card h2 {
-  padding-right: 38px;
+.item-help-card:has(> .dialog-close) h2 {
+  padding-right: 44px;
 }
 
 .ranking-card > p {
@@ -1272,18 +1272,17 @@ button {
 }
 
 .options-card {
-  position: relative;
   width: min(100%, 320px);
 }
 
 .item-help-card .dialog-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  margin: 0 !important;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin: 0 0 -40px auto !important;
   padding: 0;
   display: grid;
   place-items: center;
