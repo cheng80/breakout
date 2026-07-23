@@ -2047,7 +2047,7 @@ function draw(): void {
   const ballColor = state.powerTurns > 0 ? 0xc58cff : 0xffffff;
   const showLaunchBall = state.gameStatus === "ready" || state.gameStatus === "aiming" || queuedBalls > 0;
   if (showLaunchBall) {
-    scene.circle(state.launchPosition.x, state.launchPosition.y, 8).fill(ballColor);
+    scene.circle(state.launchPosition.x, state.launchPosition.y, BALL_RADIUS).fill(ballColor);
     scene.circle(state.launchPosition.x, state.launchPosition.y, 13).stroke({ width: 1, color: 0x6c7cff, alpha: 0.7 });
   }
 
