@@ -14,6 +14,7 @@ export const BOMB_EFFECT_DURATION = 0.5;
 export const LASER_EFFECT_DURATION = 0.45;
 export const SHIELD_REWIND_DURATION = 0.85;
 export const BRICK_HIT_EFFECT_DURATION = 0.18;
+export const BALL_RETURN_DURATION = 0.5;
 export const BLACK_HOLE_INFLUENCE_RADIUS = 110;
 export const BLACK_HOLE_CAPTURE_RADIUS = 9;
 export const BLACK_HOLE_MIN_DEFLECTION_ANGLE = Math.PI / 6;
@@ -121,6 +122,10 @@ export function landingXAtFloor(previous: Vec2, current: Vec2): number {
   return previous.x + (current.x - previous.x) * progress;
 }
 
+export function safeLandingX(landingX: number): number {
+  return Math.max(14, Math.min(BOARD_WIDTH - 14, landingX));
+}
+
 export interface AimBounds {
   minX: number;
   maxX: number;
@@ -160,6 +165,14 @@ export function brickHitEffectFrame(elapsed: number): { scale: number; alpha: nu
   const progress = Math.min(1, Math.max(0, elapsed / BRICK_HIT_EFFECT_DURATION));
   const pulse = Math.sin(Math.PI * progress);
   return { scale: 1 + pulse * 0.08, alpha: pulse };
+}
+
+export function ballReturnFrame(startX: number, targetX: number, elapsed: number): { x: number; alpha: number } {
+  const progress = Math.min(1, Math.max(0, elapsed / BALL_RETURN_DURATION));
+  return {
+    x: startX + (targetX - startX) * (1 - (1 - progress) ** 3),
+    alpha: 1 - progress,
+  };
 }
 
 export function shieldRewindFrame(elapsed: number): { offset: number; flash: number } {
@@ -976,7 +989,7 @@ function addTurnMultiball(state: GameState): void {
 }
 
 export function finishVolley(state: GameState, landingX: number): boolean {
-  state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, landingX));
+  state.launchPosition.x = safeLandingX(landingX);
   if (advanceStageIfCleared(state)) return false;
   state.powerTurns = Math.max(0, state.powerTurns - 1);
   if (state.powerTurns === 0) state.powerMultiplier = 1;

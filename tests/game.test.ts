@@ -20,6 +20,7 @@ import {
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BLACK_HOLE_MIN_DEFLECTION_ANGLE,
+  BALL_RETURN_DURATION,
   BRICK_HIT_EFFECT_DURATION,
   DANGER_ROW,
   DANGER_LINE_OFFSET,
@@ -43,6 +44,7 @@ import {
   blackHolePresence,
   blackHoleDeflectionAngle,
   blackHolePullStrength,
+  ballReturnFrame,
   createUltimateItem,
   bombEffectFrame,
   brickHitEffectFrame,
@@ -609,6 +611,12 @@ describe("핵심 게임 규칙", () => {
   it("프레임 간격과 관계없이 바닥 교차 지점을 착지 위치로 계산한다", () => {
     expect(landingXAtFloor({ x: 100, y: 550 }, { x: 120, y: 570 })).toBe(112);
     expect(landingXAtFloor({ x: 100, y: 550 }, { x: 114, y: 564 })).toBe(112);
+  });
+
+  it("후속 착지 공은 첫 착지점으로 이동하며 사라진다", () => {
+    expect(ballReturnFrame(300, 100, 0)).toEqual({ x: 300, alpha: 1 });
+    expect(ballReturnFrame(300, 100, BALL_RETURN_DURATION / 2)).toEqual({ x: 125, alpha: 0.5 });
+    expect(ballReturnFrame(300, 100, BALL_RETURN_DURATION)).toEqual({ x: 100, alpha: 0 });
   });
 
   it("벽돌 하단이 위험선에 닿는 것은 허용하고 아래로 내려오면 게임오버다", () => {
