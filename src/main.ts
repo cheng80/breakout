@@ -33,6 +33,7 @@ import {
   BLACK_HOLE_CYCLE_DURATION,
   BLACK_HOLE_INFLUENCE_RADIUS,
   BOMB_EFFECT_DURATION,
+  BALL_RETURN_DURATION,
   BRICK_HIT_EFFECT_DURATION,
   BRICK_HEIGHT,
   CELL_HEIGHT,
@@ -50,6 +51,7 @@ import {
   blackHoleDeflectionAngle,
   blackHolePullStrength,
   blackHolePresence,
+  ballReturnFrame,
   bombEffectFrame,
   brickHitEffectFrame,
   captureBallByBlackHole,
@@ -71,6 +73,7 @@ import {
   resetGame,
   resolveUltimateHits,
   resolveCircleRectsCollision,
+  safeLandingX,
   shieldRewindFrame,
   stabilizeBounce,
   traceAimPath,
@@ -183,9 +186,10 @@ const timedEffectPool = new ObjectPool<TimedEffect>(
 let bestScore = loadBestScore();
 let hasNewBestScore = false;
 const activeBalls: ActiveBall[] = [];
+const returningBalls: PositionedEffect[] = [];
 let aimStart: Vec2 | null = null;
 let aimCurrent: Vec2 | null = null;
-let lastLandingX: number | null = null;
+let firstLandingX: number | null = null;
 let boardSignature = "";
 let helpOpen = false;
 let optionsOpen = false;
@@ -447,7 +451,7 @@ function launch(direction: Vec2): void {
   const count = prepareVolley(state);
   const speed = BALL_SPEED * volleySpeedMultiplier(count);
   const launchDelay = 2.25 / count;
-  lastLandingX = null;
+  firstLandingX = null;
   playSound("launch", { playbackRate: 1.08 });
   for (let index = 0; index < count; index += 1) {
     activeBalls.push(Object.assign(ballPool.acquire(), state.launchPosition, {
@@ -465,6 +469,7 @@ function reset(stage = 1, ballCount = 1): void {
   setResetConfirmOpen(false);
   setRankingOpen(false);
   ballPool.releaseAll(activeBalls);
+  positionedEffectPool.releaseAll(returningBalls);
   if (bombEffect) positionedEffectPool.release(bombEffect);
   if (trapEffect) positionedEffectPool.release(trapEffect);
   positionedEffectPool.releaseAll(laserEffects);
@@ -478,7 +483,7 @@ function reset(stage = 1, ballCount = 1): void {
   hasNewBestScore = false;
   aimStart = null;
   aimCurrent = null;
-  lastLandingX = null;
+  firstLandingX = null;
   boardSignature = "";
   blackHoleTime = 0;
   blackHoleCycle = 0;
@@ -681,6 +686,8 @@ resultExitButton.addEventListener("click", returnToEntryScreen);
 function abandonChallenge(): void {
   if (state.gameStatus === "reward" || state.gameStatus === "gameOver") return;
   ballPool.releaseAll(activeBalls);
+  positionedEffectPool.releaseAll(returningBalls);
+  firstLandingX = null;
   aimStart = null;
   aimCurrent = null;
   challengeAbandoned = true;
@@ -2067,6 +2074,14 @@ function draw(): void {
   activeBalls.forEach((ball) => {
     if (ball.delay <= 0) scene.circle(ball.x, ball.y, BALL_RADIUS).fill(ballColor);
   });
+  if (state.gameStatus === "volley" && firstLandingX !== null) {
+    const targetX = firstLandingX;
+    scene.circle(targetX, FLOOR_Y, BALL_RADIUS).fill(ballColor);
+    returningBalls.forEach((ball) => {
+      const frame = ballReturnFrame(ball.x, targetX, ball.elapsed);
+      scene.circle(frame.x, ball.y, BALL_RADIUS).fill({ color: ballColor, alpha: frame.alpha });
+    });
+  }
   rebuildLabels();
 }
 
@@ -2364,19 +2379,30 @@ function update(delta: number): void {
   }
   if (!paused && state.gameStatus === "volley") {
     const safeDelta = Math.min(delta, 0.032);
+    for (let index = returningBalls.length - 1; index >= 0; index -= 1) {
+      const ball = returningBalls[index];
+      ball.elapsed += safeDelta;
+      if (ball.elapsed >= BALL_RETURN_DURATION) {
+        returningBalls.splice(index, 1);
+        positionedEffectPool.release(ball);
+      }
+    }
     for (let index = activeBalls.length - 1; index >= 0; index -= 1) {
       const ball = activeBalls[index];
       const exit = updateBall(ball, safeDelta);
       if (state.gameStatus !== "volley") break;
       if (exit) {
-        if (exit === "landed") lastLandingX = ball.x;
+        if (exit === "landed") {
+          if (firstLandingX === null) firstLandingX = safeLandingX(ball.x);
+          else returningBalls.push(Object.assign(positionedEffectPool.acquire(), ball, { elapsed: 0 }));
+        }
         activeBalls.splice(index, 1);
         ballPool.release(ball);
       }
     }
 
-    if (state.gameStatus === "volley" && activeBalls.length === 0) {
-      const shieldRewound = finishVolley(state, lastLandingX ?? state.launchPosition.x);
+    if (state.gameStatus === "volley" && activeBalls.length === 0 && returningBalls.length === 0) {
+      const shieldRewound = finishVolley(state, firstLandingX ?? state.launchPosition.x);
       if (shieldRewound) {
         shieldRewindEffect = timedEffectPool.acquire();
         playSound("shield_rewind");
@@ -2385,7 +2411,7 @@ function update(delta: number): void {
       } else if ((state.gameStatus as GameStatus) === "gameOver") {
         playSound("game_over");
       }
-      lastLandingX = null;
+      firstLandingX = null;
       boardSignature = "";
       syncUi();
     }
