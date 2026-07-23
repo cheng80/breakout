@@ -372,6 +372,14 @@ const rewardReplacementButtons = [...document.querySelectorAll<HTMLButtonElement
 const ultimateSlotButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-ultimate-slot]")];
 const ultimateSlotCount = document.querySelector<HTMLElement>("#ultimate-slot-count")!;
 
+const APP_DESIGN_WIDTH = 430;
+const APP_DESIGN_HEIGHT = 900;
+const appResizeObserver = new ResizeObserver(([entry]) => {
+  const { width, height } = entry.contentRect;
+  appRoot.style.setProperty("--app-scale", String(Math.min(1, width / APP_DESIGN_WIDTH, height / APP_DESIGN_HEIGHT)));
+});
+appResizeObserver.observe(document.body);
+
 const ultimateImage = (fileName: string) => `${import.meta.env.BASE_URL}images/ultimates/${fileName}`;
 type UltimateDetail = { name: string; symbol: string; className: string; image: string | null };
 const ultimateDetails: Record<UltimateItemType, UltimateDetail> = {

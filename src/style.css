@@ -14,6 +14,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   margin: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -23,6 +24,10 @@ body {
     radial-gradient(circle at 50% -12%, rgba(101, 120, 255, 0.38), transparent 38%),
     radial-gradient(circle at 10% 92%, rgba(69, 213, 161, 0.1), transparent 30%),
     #07111f;
+}
+
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 button {
@@ -183,18 +188,20 @@ button {
 }
 
 .app {
+  --app-scale: 1;
   position: relative;
-  width: min(100%, 430px);
-  height: auto;
-  min-width: 360px;
-  min-height: calc(360px * 900 / 430);
-  aspect-ratio: 430 / 900;
+  width: 430px;
+  height: 900px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   margin: 0;
-  padding: max(12px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
+  padding: 12px 14px 10px;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: clamp(7px, 1.4dvh, 12px);
+  gap: 12px;
+  transform: scale(var(--app-scale));
+  transform-origin: top center;
 }
 
 .topbar {
@@ -224,7 +231,7 @@ button {
   margin: 0;
   overflow: hidden;
   color: #d7dcff;
-  font-size: clamp(15px, 4.5vw, 21px);
+  font-size: 19px;
   line-height: 1;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -311,7 +318,7 @@ button {
 }
 
 .hud .stat-score strong {
-  font-size: clamp(17px, 2.4dvh, 22px);
+  font-size: 22px;
   text-shadow: 0 0 12px rgba(208, 216, 255, 0.16);
 }
 
@@ -392,7 +399,7 @@ button {
   width: 100%;
   overflow: hidden;
   color: #fff;
-  font-size: clamp(17px, 2.2dvh, 21px);
+  font-size: 20px;
   line-height: 1;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1768,99 +1775,6 @@ button {
 #status-dot[data-state="gameOver"] {
   background: #ff4d6d;
   box-shadow: 0 0 12px rgba(255, 77, 109, 0.65);
-}
-
-@media (max-height: 650px) {
-  .item-help {
-    --popup-scale: 0.8;
-    padding: 8px;
-  }
-
-  .item-help-card,
-  .options-card,
-  .reward-card,
-  .ranking-card {
-    width: min(100%, 320px);
-    max-height: none;
-    overflow: hidden;
-    transform: scale(var(--popup-scale));
-  }
-
-  .ranking-card {
-    width: min(100%, 360px);
-  }
-
-  .result {
-    --popup-scale: 0.8;
-    width: min(calc(100% - 24px), 360px);
-    max-height: none;
-    overflow: hidden;
-    transform: translate(-50%, -50%) scale(var(--popup-scale));
-  }
-
-  .app {
-    gap: 6px;
-    padding-top: 8px;
-  }
-
-  .icon-button {
-    width: 40px;
-    height: 40px;
-  }
-
-  .hud > .stat {
-    padding-block: 5px;
-  }
-
-  .ultimate-tray {
-    grid-template-columns: 54px 1fr;
-    gap: 5px;
-  }
-
-  .ultimate-slot {
-    min-height: 40px;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 5px;
-  }
-
-  .ultimate-slot-symbol {
-    width: 24px;
-    height: 24px;
-  }
-
-  .control-panel {
-    gap: 4px;
-    padding-block: 5px;
-  }
-}
-
-@media (max-height: 520px) {
-  .item-help,
-  .result {
-    --popup-scale: 0.72;
-  }
-}
-
-@media (max-height: 420px) {
-  .item-help,
-  .result {
-    --popup-scale: 0.62;
-  }
-}
-
-@media (max-width: 350px) {
-  .app {
-    padding-inline: 8px;
-  }
-
-  .hud {
-    gap: 4px;
-  }
-
-  .hud > .stat {
-    padding-inline: 5px;
-  }
-
 }
 
 @media (prefers-reduced-motion: reduce) {
