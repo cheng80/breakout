@@ -2071,7 +2071,11 @@ function draw(): void {
       if (reflection < 2) scene.circle(segment.end.x, segment.end.y, 2.5).fill({ color: 0xffffff, alpha: [0.75, 0.4][reflection] });
     });
     const firstCollision = aimPath[0]?.end;
-    if (firstCollision) scene.circle(firstCollision.x, firstCollision.y, BALL_RADIUS).fill({ color: ballColor, alpha: 0.45 });
+    if (firstCollision)
+      scene
+        .circle(firstCollision.x, firstCollision.y, BALL_RADIUS)
+        .fill({ color: 0x38bfff, alpha: 0.55 })
+        .stroke({ width: 1.5, color: 0xd9fbff, alpha: 0.95 });
   }
 
   activeBalls.forEach((ball) => {
