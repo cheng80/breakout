@@ -518,7 +518,7 @@ describe("핵심 게임 규칙", () => {
     expect(state.ballCount).toBe(1);
   });
 
-  it("첫 공 착지 위치를 계승하고 벽돌 하강 및 쉴드 1회 방어를 적용한다", () => {
+  it("마지막 공 착지 위치를 계승하고 벽돌 하강 및 쉴드 1회 방어를 적용한다", () => {
     const state = createGame();
     state.shield = true;
     state.bricks[0].row = DANGER_ROW;
@@ -537,6 +537,26 @@ describe("핵심 게임 규칙", () => {
     expect(finishVolley(state, 51)).toBe(false);
     expect(state.gameStatus).toBe("gameOver");
     expect(state.ballCount).toBe(2);
+  });
+
+  it("스테이지가 바뀌면 중앙에서 시작한다", () => {
+    const state = createGame();
+    state.bricks = [];
+
+    expect(finishVolley(state, 37)).toBe(false);
+    expect(state.gameStatus).toBe("reward");
+    expect(discardUltimateReward(state)).toBe(true);
+    expect(state.launchPosition.x).toBe(BOARD_WIDTH / 2);
+  });
+
+  it("착지점이 너무 바깥이면 다음 발사 위치를 안전 여백 안으로 보정한다", () => {
+    const left = createGame();
+    const right = createGame();
+
+    finishVolley(left, -100);
+    finishVolley(right, BOARD_WIDTH + 100);
+    expect(left.launchPosition.x).toBe(14);
+    expect(right.launchPosition.x).toBe(BOARD_WIDTH - 14);
   });
 
   it("프레임 간격과 관계없이 바닥 교차 지점을 착지 위치로 계산한다", () => {

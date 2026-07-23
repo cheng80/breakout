@@ -945,8 +945,8 @@ function addTurnMultiball(state: GameState): void {
   }
 }
 
-export function finishVolley(state: GameState, firstLandingX: number): boolean {
-  state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, firstLandingX));
+export function finishVolley(state: GameState, landingX: number): boolean {
+  state.launchPosition.x = Math.max(14, Math.min(BOARD_WIDTH - 14, landingX));
   if (advanceStageIfCleared(state)) return false;
   state.powerTurns = Math.max(0, state.powerTurns - 1);
   if (state.powerTurns === 0) state.powerMultiplier = 1;
