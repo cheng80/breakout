@@ -108,11 +108,12 @@ describe("핵심 게임 규칙", () => {
   });
 
   it("BGM 전체 볼륨은 0부터 1 사이로 적용된다", () => {
+    expect(getBgmVolume()).toBe(0.5);
     setBgmVolume(0.5);
     expect(getBgmVolume()).toBe(0.5);
     setBgmVolume(2);
     expect(getBgmVolume()).toBe(1);
-    setBgmVolume(0.1);
+    setBgmVolume(0.5);
   });
 
   it("랭킹 닉네임은 공백을 정리하고 20자로 제한한다", () => {
