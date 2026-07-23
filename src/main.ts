@@ -2058,17 +2058,20 @@ function draw(): void {
 
   const direction = aimStart && aimCurrent ? aimFromDrag(aimStart, aimCurrent) : null;
   if (direction) {
-    traceAimPath(
+    const aimPath = traceAimPath(
       state.launchPosition,
       direction,
       { minX: BALL_RADIUS, maxX: BOARD_WIDTH - BALL_RADIUS, minY: BALL_RADIUS, maxY: FLOOR_Y },
       state.bricks.map(brickCollisionRect),
       2,
       BALL_RADIUS,
-    ).forEach((segment, reflection) => {
+    );
+    aimPath.forEach((segment, reflection) => {
       drawAimSegment(segment.start, segment.end, reflection);
       if (reflection < 2) scene.circle(segment.end.x, segment.end.y, 2.5).fill({ color: 0xffffff, alpha: [0.75, 0.4][reflection] });
     });
+    const firstCollision = aimPath[0]?.end;
+    if (firstCollision) scene.circle(firstCollision.x, firstCollision.y, BALL_RADIUS).fill({ color: ballColor, alpha: 0.45 });
   }
 
   activeBalls.forEach((ball) => {
