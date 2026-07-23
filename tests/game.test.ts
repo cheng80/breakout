@@ -660,7 +660,19 @@ describe("핵심 게임 규칙", () => {
     doubleTrap.stage = 30;
     doubleTrap.bricks = [];
     advanceThroughReward(doubleTrap);
-    expect(doubleTrap.items.filter((item) => item.type === "trap")).toHaveLength(2);
+    expect(doubleTrap.items.filter((item) => item.type === "trap")).toHaveLength(1);
+  });
+
+  it("모든 스테이지에 보호막을 배치하고 6행부터 최하단 레이저를 보장한다", () => {
+    const state = createGame();
+    for (let stage = 1; stage <= 100; stage += 1) {
+      resetGame(state, stage);
+      expect(state.items.some((item) => item.type === "shield")).toBe(true);
+      if (stage >= 16) {
+        const bottomRow = Math.max(...state.bricks.map((brick) => brick.row));
+        expect(state.bricks.some((brick) => brick.type === "laser" && brick.row === bottomRow)).toBe(true);
+      }
+    }
   });
 
   it("마지막 벽돌 제거 후 보상 처리를 마쳐야 다음 스테이지로 이동한다", () => {
