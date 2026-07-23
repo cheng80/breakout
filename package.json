@@ -15,7 +15,6 @@
     "audio:generate": "node scripts/generate-audio.mjs --generate"
   },
   "dependencies": {
-    "@pixi/sound": "^6.0.1",
     "pixi.js": "^8.12.0"
   },
   "devDependencies": {
