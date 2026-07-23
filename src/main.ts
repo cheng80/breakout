@@ -322,6 +322,7 @@ const rankingFeedback = document.querySelector<HTMLElement>("#ranking-feedback")
 const helpButton = document.querySelector<HTMLButtonElement>("#help")!;
 const helpDialog = document.querySelector<HTMLElement>("#item-help")!;
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#item-help-close")!;
+const helpDismissButton = document.querySelector<HTMLButtonElement>("#item-help-dismiss")!;
 const debugStageTools = document.querySelector<HTMLElement>("#debug-stage-tools")!;
 const debugTools = document.querySelector<HTMLElement>("#debug-tools")!;
 const debugStageForm = document.querySelector<HTMLFormElement>("#debug-stage-form")!;
@@ -710,7 +711,9 @@ rankingCloseButton.addEventListener("click", () => setRankingOpen(false));
 helpButton.addEventListener("click", () => {
   if (!resetConfirmOpen && !optionsOpen && !rankingOpen && state.gameStatus !== "reward") setHelpOpen(!helpOpen);
 });
-helpCloseButton.addEventListener("click", () => setHelpOpen(false));
+[helpCloseButton, helpDismissButton].forEach((button) => {
+  button.addEventListener("click", () => setHelpOpen(false));
+});
 if (import.meta.env.MODE === "stage-fixture") {
   debugStageTools.hidden = false;
   const syncDebugBallCountLimit = () => {
