@@ -30,6 +30,14 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: browser) and (hover: none) and (pointer: coarse) {
+    body {
+      padding-bottom: max(96px, env(safe-area-inset-bottom));
+    }
+  }
+}
+
 button {
   color: inherit;
   font: inherit;
